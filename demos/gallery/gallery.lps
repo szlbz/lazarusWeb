@@ -1,0 +1,184 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<CONFIG>
+  <ProjectSession>
+    <PathDelim Value="\"/>
+    <Version Value="12"/>
+    <BuildModes Active="Default"/>
+    <Units>
+      <Unit>
+        <Filename Value="gallery.lpr"/>
+        <IsPartOfProject Value="True"/>
+        <IsVisibleTab Value="True"/>
+        <EditorIndex Value="5"/>
+        <CursorPos X="38" Y="25"/>
+        <UsageCount Value="24"/>
+        <Loaded Value="True"/>
+      </Unit>
+      <Unit>
+        <Filename Value="ugallery.pas"/>
+        <IsPartOfProject Value="True"/>
+        <ComponentName Value="GalleryForm"/>
+        <HasResources Value="True"/>
+        <ResourceBaseClass Value="Form"/>
+        <UnitName Value="uGallery"/>
+        <TopLine Value="51"/>
+        <CursorPos X="54" Y="51"/>
+        <UsageCount Value="24"/>
+        <Loaded Value="True"/>
+        <LoadedDesigner Value="True"/>
+      </Unit>
+      <Unit>
+        <Filename Value="uabout.pas"/>
+        <IsPartOfProject Value="True"/>
+        <ComponentName Value="AboutForm"/>
+        <HasResources Value="True"/>
+        <ResourceBaseClass Value="Form"/>
+        <UnitName Value="uAbout"/>
+        <UsageCount Value="24"/>
+      </Unit>
+      <Unit>
+        <Filename Value="C:\111\fpcsrc\rtl\objpas\classes\streams.inc"/>
+        <EditorIndex Value="4"/>
+        <TopLine Value="619"/>
+        <CursorPos Y="631"/>
+        <UsageCount Value="12"/>
+        <Loaded Value="True"/>
+      </Unit>
+      <Unit>
+        <Filename Value="C:\111\fpcsrc\rtl\inc\heap.inc"/>
+        <EditorIndex Value="-1"/>
+        <TopLine Value="1765"/>
+        <CursorPos Y="1778"/>
+        <UsageCount Value="11"/>
+      </Unit>
+      <Unit>
+        <Filename Value="..\..\src\core\lwwriter.pas"/>
+        <EditorIndex Value="3"/>
+        <TopLine Value="431"/>
+        <CursorPos Y="445"/>
+        <UsageCount Value="12"/>
+        <Loaded Value="True"/>
+      </Unit>
+      <Unit>
+        <Filename Value="C:\111\fpcsrc\rtl\inc\objpas.inc"/>
+        <EditorIndex Value="-1"/>
+        <TopLine Value="866"/>
+        <CursorPos Y="878"/>
+        <UsageCount Value="10"/>
+      </Unit>
+      <Unit>
+        <Filename Value="..\..\src\core\lwws.pas"/>
+        <EditorIndex Value="1"/>
+        <TopLine Value="79"/>
+        <CursorPos X="71" Y="87"/>
+        <UsageCount Value="11"/>
+        <Loaded Value="True"/>
+      </Unit>
+      <Unit>
+        <Filename Value="C:\111\lazarus\lcl\interfacebase.pp"/>
+        <UnitName Value="InterfaceBase"/>
+        <EditorIndex Value="2"/>
+        <TopLine Value="150"/>
+        <CursorPos X="15" Y="161"/>
+        <UsageCount Value="11"/>
+        <Loaded Value="True"/>
+      </Unit>
+    </Units>
+    <JumpHistory HistoryIndex="22">
+      <Position>
+        <Filename Value="ugallery.pas"/>
+      </Position>
+      <Position>
+        <Filename Value="ugallery.pas"/>
+        <Caret Line="729" Column="3" TopLine="727"/>
+      </Position>
+      <Position>
+        <Filename Value="ugallery.pas"/>
+      </Position>
+      <Position>
+        <Filename Value="ugallery.pas"/>
+        <Caret Line="211" Column="26" TopLine="190"/>
+      </Position>
+      <Position>
+        <Filename Value="ugallery.pas"/>
+        <Caret Line="702" Column="3" TopLine="697"/>
+      </Position>
+      <Position>
+        <Filename Value="ugallery.pas"/>
+        <Caret Line="714" Column="3" TopLine="697"/>
+      </Position>
+      <Position>
+        <Filename Value="ugallery.pas"/>
+        <Caret Line="128" Column="22" TopLine="116"/>
+      </Position>
+      <Position>
+        <Filename Value="..\..\src\core\lwwriter.pas"/>
+        <Caret Line="445" TopLine="431"/>
+      </Position>
+      <Position>
+        <Filename Value="ugallery.pas"/>
+        <Caret Line="6" Column="92"/>
+      </Position>
+      <Position>
+        <Filename Value="ugallery.pas"/>
+        <Caret Line="163" Column="21" TopLine="126"/>
+      </Position>
+      <Position>
+        <Filename Value="ugallery.pas"/>
+        <Caret Line="116" Column="26" TopLine="103"/>
+      </Position>
+      <Position>
+        <Filename Value="gallery.lpr"/>
+        <Caret Line="19"/>
+      </Position>
+      <Position>
+        <Filename Value="ugallery.pas"/>
+        <Caret Line="116" Column="26" TopLine="104"/>
+      </Position>
+      <Position>
+        <Filename Value="ugallery.pas"/>
+        <Caret Line="127" Column="29" TopLine="106"/>
+      </Position>
+      <Position>
+        <Filename Value="..\..\src\core\lwws.pas"/>
+        <Caret Line="86" Column="14" TopLine="73"/>
+      </Position>
+      <Position>
+        <Filename Value="..\..\src\core\lwws.pas"/>
+        <Caret Line="87" Column="71" TopLine="73"/>
+      </Position>
+      <Position>
+        <Filename Value="ugallery.pas"/>
+        <Caret Line="126" Column="46" TopLine="101"/>
+      </Position>
+      <Position>
+        <Filename Value="ugallery.pas"/>
+        <Caret Line="59" Column="25" TopLine="43"/>
+      </Position>
+      <Position>
+        <Filename Value="ugallery.pas"/>
+        <Caret Line="119" Column="13" TopLine="106"/>
+      </Position>
+      <Position>
+        <Filename Value="ugallery.pas"/>
+        <Caret Line="52" Column="3" TopLine="27"/>
+      </Position>
+      <Position>
+        <Filename Value="ugallery.pas"/>
+        <Caret Line="182" Column="12" TopLine="165"/>
+      </Position>
+      <Position>
+        <Filename Value="ugallery.pas"/>
+        <Caret Line="183" TopLine="171"/>
+      </Position>
+      <Position>
+        <Filename Value="ugallery.pas"/>
+        <Caret Line="226" Column="12" TopLine="209"/>
+      </Position>
+    </JumpHistory>
+    <RunParams>
+      <FormatVersion Value="2"/>
+      <Modes ActiveMode=""/>
+    </RunParams>
+  </ProjectSession>
+</CONFIG>

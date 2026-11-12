@@ -1,0 +1,105 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<CONFIG>
+  <ProjectSession>
+    <PathDelim Value="\"/>
+    <Version Value="12"/>
+    <BuildModes Active="Default"/>
+    <Units>
+      <Unit>
+        <Filename Value="dbdemo.lpr"/>
+        <IsPartOfProject Value="True"/>
+        <EditorIndex Value="2"/>
+        <CursorPos Y="15"/>
+        <UsageCount Value="24"/>
+        <Loaded Value="True"/>
+      </Unit>
+      <Unit>
+        <Filename Value="uDbMain.pas"/>
+        <IsPartOfProject Value="True"/>
+        <ComponentName Value="DbForm"/>
+        <HasResources Value="True"/>
+        <ResourceBaseClass Value="Form"/>
+        <IsVisibleTab Value="True"/>
+        <TopLine Value="446"/>
+        <CursorPos Y="476"/>
+        <UsageCount Value="24"/>
+        <Loaded Value="True"/>
+        <LoadedDesigner Value="True"/>
+      </Unit>
+      <Unit>
+        <Filename Value="C:\111\fpcsrc\packages\fcl-db\src\sqldb\sqldb.pp"/>
+        <UnitName Value="SQLDB"/>
+        <EditorIndex Value="-1"/>
+        <TopLine Value="1323"/>
+        <CursorPos Y="1338"/>
+        <UsageCount Value="11"/>
+      </Unit>
+      <Unit>
+        <Filename Value="..\..\src\core\lwapp.pas"/>
+        <EditorIndex Value="-1"/>
+        <TopLine Value="250"/>
+        <CursorPos X="34" Y="271"/>
+        <UsageCount Value="11"/>
+      </Unit>
+      <Unit>
+        <Filename Value="..\..\src\core\lwhttp.pas"/>
+        <EditorIndex Value="-1"/>
+        <CursorPos X="45" Y="29"/>
+        <UsageCount Value="11"/>
+      </Unit>
+      <Unit>
+        <Filename Value="..\..\src\design\lwdsgnregister.pas"/>
+        <EditorIndex Value="-1"/>
+        <TopLine Value="129"/>
+        <CursorPos X="13" Y="145"/>
+        <UsageCount Value="11"/>
+      </Unit>
+      <Unit>
+        <Filename Value="..\..\src\core\lwbase.pas"/>
+        <EditorIndex Value="-1"/>
+        <TopLine Value="115"/>
+        <CursorPos X="17" Y="22"/>
+        <UsageCount Value="10"/>
+      </Unit>
+      <Unit>
+        <Filename Value="..\..\src\core\lwlogin.pas"/>
+        <EditorIndex Value="1"/>
+        <TopLine Value="107"/>
+        <CursorPos X="8" Y="123"/>
+        <UsageCount Value="10"/>
+        <Loaded Value="True"/>
+      </Unit>
+    </Units>
+    <JumpHistory HistoryIndex="6">
+      <Position>
+        <Filename Value="uDbMain.pas"/>
+      </Position>
+      <Position>
+        <Filename Value="dbdemo.lpr"/>
+      </Position>
+      <Position>
+        <Filename Value="uDbMain.pas"/>
+      </Position>
+      <Position>
+        <Filename Value="uDbMain.pas"/>
+        <Caret Line="467" Column="27" TopLine="37"/>
+      </Position>
+      <Position>
+        <Filename Value="uDbMain.pas"/>
+        <Caret Line="467" Column="27" TopLine="37"/>
+      </Position>
+      <Position>
+        <Filename Value="uDbMain.pas"/>
+        <Caret Line="477" Column="27" TopLine="447"/>
+      </Position>
+      <Position>
+        <Filename Value="uDbMain.pas"/>
+        <Caret Line="476" TopLine="446"/>
+      </Position>
+    </JumpHistory>
+    <RunParams>
+      <FormatVersion Value="2"/>
+      <Modes ActiveMode=""/>
+    </RunParams>
+  </ProjectSession>
+</CONFIG>
