@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<CONFIG>
+  <Lazarus Version="4.8"/>
+  <Compiler Value="C:\111\fpc\bin\x86_64-win64\fpc.exe" Date="1567004938"/>
+  <Params Value="-MObjFPC -Scghi -O1 -l -vewnhibq -FuC:\lazarusWeb\src\design\ -FuC:\111\lazarus\packager\units\x86_64-win64 -FuC:\111\lazarus\components\lazdebuggers\lazdebuggerintf\lib\x86_64-win64 -FuC:\111\lazarus\components\lazutils\lib\x86_64-win64 -FuC:\111\lazarus\components\buildintf\units\x86_64-win64 -FuC:\111\lazarus\components\debuggerintf\lib\x86_64-win64 -FuC:\111\lazarus\components\freetype\lib\x86_64-win64 -FuC:\111\lazarus\lcl\units\x86_64-win64 -FuC:\111\lazarus\lcl\units\x86_64-win64\win32 -FuC:\111\lazarus\components\lazcontrols\lib\x86_64-win64\win32 -FuC:\lazarusWeb\lib\x86_64-win64-win32 -FuC:\111\lazarus\components\ideintf\units\x86_64-win64\win32 -FUC:\lazarusWeb\src\lib\x86_64-win64-win32\ -dLCL -dLCLwin32 lwdesign.pas"/>
+</CONFIG>

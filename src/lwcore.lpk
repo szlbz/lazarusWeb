@@ -1,0 +1,64 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<CONFIG>
+  <Package Version="5">
+    <Name Value="lwcore"/>
+    <Type Value="RunAndDesignTime"/>
+    <Author Value="lazarusWeb"/>
+    <License Value="LGPL"/>
+    <Description Value="lazarusWeb 核心：TLWForm / 上传控件 / 下载令牌 / 工程模板（不依赖任何 widgetset）"/>
+    <Version Major="1" Minor="0"/>
+    <Files Count="6">
+      <Item1>
+        <Filename Value="core\lwbase.pas"/>
+        <UnitName Value="lwbase"/>
+      </Item1>
+      <Item2>
+        <Filename Value="core\lwform.pas"/>
+        <UnitName Value="lwform"/>
+      </Item2>
+      <Item3>
+        <Filename Value="core\lwfileupload.pas"/>
+        <UnitName Value="lwfileupload"/>
+      </Item3>
+      <Item4>
+        <Filename Value="core\lwdownload.pas"/>
+        <UnitName Value="lwdownload"/>
+      </Item4>
+      <Item5>
+        <Filename Value="core\lwnewproject.pas"/>
+        <UnitName Value="lwnewproject"/>
+      </Item5>
+      <Item6>
+        <Filename Value="core\lwdlg.pas"/>
+        <UnitName Value="lwdlg"/>
+      </Item6>
+    </Files>
+    <CompatibilityMode Value="True"/>
+    <RequiredPkgs Count="2">
+      <Item1>
+        <PackageName Value="LCL"/>
+      </Item1>
+      <Item2>
+        <PackageName Value="FCL"/>
+      </Item2>
+    </RequiredPkgs>
+    <UsageOptions>
+      <UnitPath Value="$(PkgOutDir)"/>
+    </UsageOptions>
+    <PublishOptions>
+      <Version Value="2"/>
+    </PublishOptions>
+    <CompilerOptions>
+      <Version Value="11"/>
+      <SearchPaths>
+        <OtherUnitFiles Value="core"/>
+        <UnitOutputDirectory Value="..\lib\$(TargetCPU)-$(TargetOS)-$(LCLWidgetType)"/>
+      </SearchPaths>
+      <Linking>
+        <Debugging>
+          <GenerateDebugInfo Value="False"/>
+        </Debugging>
+      </Linking>
+    </CompilerOptions>
+  </Package>
+</CONFIG>
