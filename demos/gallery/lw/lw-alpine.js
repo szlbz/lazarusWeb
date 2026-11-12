@@ -863,14 +863,14 @@ var LW = (function () {
                     '<div class="lw-group-body">' +
                     '<template x-for="(t,i) in ' + r + '.items" :key="i">' +
                     '<label class="lw-cb"><input type="checkbox" x-model="' + r + '.checked[i]" ' + dis +
-                    ' @change="' + evAttr(id, 'OnItemClick', '{idx:i, val:' + r + '.checked[i] ? \'1\' : \'0\'}') + '"/>' +
+                    ' @change="' + evAttr(id, 'OnItemClick', '{idx:i, val:' + r + '.checked[i] ? \'1\' : \'0\', checked:' + r + '.checked.slice()}') + '"/>' +
                     '<span x-text="t"></span></label></template></div></div>';
 
             case 'checklistbox':
                 return '<div class="lw-list lw-boxed lw-clb">' +
                     '<template x-for="(t,i) in ' + r + '.items" :key="i">' +
                     '<label class="lw-cb lw-clb-item"><input type="checkbox" x-model="' + r + '.checked[i]" ' + dis +
-                    ' @change="' + evAttr(id, 'OnClickCheck', '{val:String(i)}') + '" ' +
+                    ' @change="' + evAttr(id, 'OnClickCheck', '{val:String(i), checked:' + r + '.checked.slice()}') + '" ' +
                     '@click="$lwSet(\'' + id + '\',\'idx\', i); ' + evAttr(id, 'OnClick', '{val:String(i)}') + '"/>' +
                     '<span x-text="t"></span></label></template></div>';
 
@@ -1144,19 +1144,45 @@ var LW = (function () {
         if ($lwHas(id, 'OnCellClick')) fire(id, 'OnCellClick', { row: row, col: col });
         var n = S.ND[id], r = S.R[id];
         if (!n || n.readonly || !r) return;
-        if ((n.cedit || [])[col] === 0) return;      /* cedit=0 的列不可编辑 */
+        /* 列编辑器类型（服务端 cedit）：0=只读 1=文本 2=PickList 下拉
+           3=日期选择。旧服务端只发 0/1，缺省当文本。 */
+        var et = (n.cedit || [])[col];
+        if (et === 0) return;
+        if (et == null) et = 1;
         var td = e.currentTarget;
         if (td.__lwEditing) return;
         var old = (r.rows || [])[row] ? (r.rows[row][col]) : '';
         td.__lwEditing = true;
-        var inp = document.createElement('input');
-        inp.type = 'text';
-        inp.className = 'lw-input';
-        inp.value = old == null ? '' : String(old);
+        var inp;
+        if (et === 2) {
+            /* 下拉：服务端 TColumn.PickList（plist 按列下标带选项） */
+            inp = document.createElement('select');
+            inp.className = 'lw-input';
+            var items = ((n.plist || [])[col]) || [];
+            if (!items.length) items = [old == null ? '' : String(old)];
+            items.forEach(function (it) {
+                var op = document.createElement('option');
+                op.value = it;
+                op.textContent = it;
+                if (String(it) === String(old == null ? '' : old)) op.selected = true;
+                inp.appendChild(op);
+            });
+        } else {
+            inp = document.createElement('input');
+            inp.className = 'lw-input';
+            if (et === 3) {
+                /* 日期：服务端日期列发的就是 ISO 'yyyy-mm-dd' */
+                inp.type = 'date';
+                inp.value = old == null ? '' : String(old).substring(0, 10);
+            } else {
+                inp.type = 'text';
+                inp.value = old == null ? '' : String(old);
+                inp.select();
+            }
+        }
         td.textContent = '';
         td.appendChild(inp);
         inp.focus();
-        inp.select();
         function commit() {
             if (!td.__lwEditing) return;
             td.__lwEditing = false;
@@ -1169,13 +1195,18 @@ var LW = (function () {
             }
         }
         inp.addEventListener('blur', commit);
-        inp.addEventListener('keydown', function (e2) {
-            if (e2.key === 'Enter') { e2.preventDefault(); inp.blur(); }
-            if (e2.key === 'Escape') {
-                td.__lwEditing = false;
-                td.textContent = old == null ? '' : String(old);
-            }
-        });
+        /* 下拉/日期：选中或选好日期即提交（change -> blur 走同一提交） */
+        if (et === 2 || et === 3) {
+            inp.addEventListener('change', function () { inp.blur(); });
+        } else {
+            inp.addEventListener('keydown', function (e2) {
+                if (e2.key === 'Enter') { e2.preventDefault(); inp.blur(); }
+                if (e2.key === 'Escape') {
+                    td.__lwEditing = false;
+                    td.textContent = old == null ? '' : String(old);
+                }
+            });
+        }
     };
 
     /* DBGrid 翻页（从最新节点取页号，闭包里的 node 是快照） */
