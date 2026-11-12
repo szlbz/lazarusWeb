@@ -1466,17 +1466,29 @@ var LW = (function () {
     function buildTabCtl(id, node) {
         var bar = document.getElementById('lw-tabbar2-' + id);
         if (!bar) return;
-        var html = '';
-        (node.tabitems || []).forEach(function (t, i) {
-            html += '<div class="lw-tab' + (i === (node.tabindex || 0) ? ' lw-active' : '') + '" data-ti="' + i + '">' + esc(t) + '</div>';
-        });
-        bar.innerHTML = html;
-        bar.querySelectorAll('.lw-tab').forEach(function (el) {
-            el.addEventListener('click', function () {
-                var i = parseInt(el.getAttribute('data-ti'), 10);
-                if ($lwHas(id, 'OnChange')) fire(id, 'OnChange', { val: String(i) });
+        /* 点击必须本地先切换高亮：服务端 TTabControl 没有独立的页内容
+           （客户区是公共的一块），树补丁只带新 tabindex，不会重建页签条；
+           之前只在建树时设一次 active，点了永远停在旧页签上。
+           OnChange 无条件回发：服务端 LWApplyValue 先同步 TabIndex（供
+           序列化和业务读取），RTTI 调用在没挂 handler 时是空操作 */
+        function render(active) {
+            if (S.ND[id]) S.ND[id].tabindex = active;
+            var html = '';
+            (node.tabitems || []).forEach(function (t, i) {
+                html += '<div class="lw-tab' + (i === active ? ' lw-active' : '') + '" data-ti="' + i + '">' + esc(t) + '</div>';
             });
-        });
+            bar.innerHTML = html;
+            bar.querySelectorAll('.lw-tab').forEach(function (el) {
+                el.addEventListener('click', function () {
+                    var i = parseInt(el.getAttribute('data-ti'), 10);
+                    var cur = (S.ND[id] && typeof S.ND[id].tabindex === 'number') ? S.ND[id].tabindex : 0;
+                    if (i === cur) return;
+                    render(i);
+                    fire(id, 'OnChange', { val: String(i) });
+                });
+            });
+        }
+        render(node.tabindex || 0);
     }
 
     /* TBoundLabel：按编辑框实测位置精修标签坐标（服务端量 CJK 会偏） */
@@ -2037,6 +2049,11 @@ var LW = (function () {
                 if (typeof n.active === 'number' && prev.active !== n.active && prev.active !== undefined) {
                     r.active = n.active;
                     buildTabbar(id, n);   /* 标签高亮 + 卡片可见性 */
+                }
+            } else if (n.kind === 'tabctl') {
+                /* 服务端改 TabIndex（代码赋值）时页签高亮跟着切 */
+                if (typeof n.tabindex === 'number' && prev.tabindex !== n.tabindex && prev.tabindex !== undefined) {
+                    buildTabCtl(id, n);
                 }
             } else if (n.kind === 'color') {
                 if (prev.value !== n.value) {

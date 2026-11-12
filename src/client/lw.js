@@ -1679,26 +1679,35 @@ var LW = (function () {
     }
 
     /* TTabControl：Tabs 字符串列表 + 公共客户区。
-       用单卡片 tabpanel 模拟：唯一的卡片承载所有子控件，
-       页签标题来自 tabitems，切换页签回传 OnChange。 */
+       每个 tabitem 建一张卡（之前只建一张卡、页签条上只有一项，点了
+       永远切不动）；子控件挂在初始活动卡上，切页签时把子控件集搬进
+       新卡（syncChildren 按 __lwParent 判断会销毁重建），保持"公共
+       客户区"语义。tabchange 无条件回传 OnChange —— 服务端
+       LWApplyValue 先同步 TabIndex，没挂 handler 时 RTTI 调用是空操作 */
     function buildTabCtl(node, cfg) {
+        var items = node.tabitems || [];
         var tcfg = {
             x: cfg.x, y: cfg.y, width: cfg.width, height: cfg.height,
             hidden: cfg.hidden, disabled: cfg.disabled,
-            activeTab: 0, border: false,
-            items: [{
-                title: esc((node.tabitems || [])[node.tabindex || 0] || ''),
-                layout: 'absolute', border: false, bodyPadding: 0
-            }]
+            activeTab: node.tabindex || 0, border: false,
+            items: items.map(function (t) {
+                return { title: esc(t), layout: 'absolute', border: false, bodyPadding: 0 };
+            })
         };
-        var tc = Ext.create('Ext.tab.Panel', tcfg);
-        var card = tc.items.getAt(0);
-        syncChildren(card, node);
-        if ((node.ev || []).indexOf('OnChange') >= 0) {
-            tc.on('tabchange', function () {
-                fire(node, 'OnChange', { val: String(node.tabindex || 0) });
-            });
+        if (!tcfg.items.length) {
+            tcfg.items = [{ title: '', layout: 'absolute', border: false, bodyPadding: 0 }];
         }
+        var tc = Ext.create('Ext.tab.Panel', tcfg);
+        function activeCard() {
+            return tc.items.getAt(tc.getActiveTab() ? tc.items.indexOf(tc.getActiveTab()) : 0);
+        }
+        syncChildren(activeCard(), node);
+        tc.on('tabchange', function (p, nc) {
+            var i = tc.items.indexOf(nc);
+            node.tabindex = i;
+            syncChildren(nc, node);
+            fire(node, 'OnChange', { val: String(i) });
+        });
         return tc;
     }
 
