@@ -981,7 +981,10 @@ var LW = (function () {
                         margin: '2 6'
                     });
                     b.on('change', function (cb, nv) {
-                        fire(node, 'OnClickCheck', { val: String(i) });
+                        fire(node, 'OnClickCheck', {
+                            val: String(i),
+                            checked: boxes.map(function (x) { return !!x.checked; })
+                        });
                         fire(node, 'OnClick', { val: String(i) });
                     });
                     wrap.add(b);
@@ -1497,7 +1500,11 @@ var LW = (function () {
             grid.on('edit', function (editor, ctx) {
                 var rec = ctx.record;
                 var col = parseInt(String(ctx.column.dataIndex).substring(1), 10) || 0;
-                var v = ctx.value == null ? '' : String(ctx.value);
+                var v = ctx.value == null ? '' : ctx.value;
+                /* 日期编辑器的 ctx.value 是 Date 对象：格式化成 ISO 串再回发，
+                   服务端 LWISOToDateTime 只认 'yyyy-mm-dd' */
+                if (v instanceof Date) v = Ext.Date.format(v, 'Y-m-d');
+                v = String(v);
                 fire(node, 'OnSetFieldValue', { val: v, row: rec.get('lwRow'), col: col });
             });
         }
@@ -1543,7 +1550,8 @@ var LW = (function () {
         }));
     }
 
-    /* 可编辑网格的列：dbColumns + 每列挂 textfield 编辑器（cedit=0 的列除外）。
+    /* 可编辑网格的列：dbColumns + 按列挂编辑器（cedit：0=只读 1=文本
+       2=PickList 下拉 3=日期选择，plist 按同下标带选项）。
        坑79：必须首建和补丁共用 —— 编辑回发后的树补丁走 reconfigure 重建
        列，若这里不带 editor，第一次编辑完成后 CellEditing 就再也起不来
        （只能改一个单元格）。 */
@@ -1551,8 +1559,21 @@ var LW = (function () {
         var cols = dbColumns(n);
         if (!n.readonly) {
             var eds = n.cedit || [];
+            var pls = n.plist || [];
             for (var i = 0; i < cols.length; i++) {
-                if (eds[i] !== 0) cols[i].editor = { xtype: 'textfield' };
+                if (eds[i] === 0) continue;
+                if (eds[i] === 2) {
+                    cols[i].editor = Ext.create('Ext.form.field.ComboBox', {
+                        editable: false,
+                        queryMode: 'local',
+                        store: pls[i] || []
+                    });
+                } else if (eds[i] === 3) {
+                    cols[i].editor = { xtype: 'datefield', format: 'Y-m-d',
+                                       altFormats: 'Y-m-d|Ymd|YmdHis' };
+                } else {
+                    cols[i].editor = { xtype: 'textfield' };
+                }
             }
         }
         return cols;
@@ -2039,7 +2060,10 @@ var LW = (function () {
                                 margin: '2 6'
                             });
                             b.on('change', function (cb, nv) {
-                                fire(n, 'OnClickCheck', { val: String(i) });
+                                fire(n, 'OnClickCheck', {
+                                    val: String(i),
+                                    checked: cmp.__lwBoxes.map(function (x) { return !!x.checked; })
+                                });
                                 fire(n, 'OnClick', { val: String(i) });
                             });
                             cmp.add(b);
