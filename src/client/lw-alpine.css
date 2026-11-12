@@ -434,6 +434,20 @@ html, body {
 .lw-btn-pressed { background: #cfe0f3 !important; border-color: #5c92cf !important; }
 .lw-nav, .lw-pg { min-width: 30px; padding: 2px 8px; }
 
+/* 独立按钮（wrapper 带 LCL 设计尺寸）：填满设计矩形并垂直居中。
+   writer 按 DPI 缩放下发尺寸（如 144dpi 设计 37px -> 21px），高度
+   小于按钮自然高度时原生 button 内容从顶部排布、底部溢出被裁，
+   文字视觉上贴底 —— flex 居中让溢出均匀分到上下两侧 */
+.lw-n > .lw-btn {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 100%;
+    height: 100%;
+}
+/* 工具条流式布局里的按钮保持自然尺寸 */
+.lw-n.lw-flow > .lw-btn { display: inline-block; width: auto; height: auto; }
+
 /* TBitBtn.Kind 图标字符 */
 .lw-btn.lw-bic-ok::before, .lw-btn.lw-bic-yes::before, .lw-btn.lw-bic-all::before,
 .lw-btn.lw-bic-yestoall::before { content: "\2713\00A0"; font-weight: bold; }
@@ -488,6 +502,16 @@ html, body {
 }
 .lw-ve-key { width: 110px; background: #f6f8fa; }
 .lw-ve-edit { cursor: text; min-width: 120px; }
+
+/* DBGrid 布尔列（服务端 cedit=4）：单元格内常驻勾选框，点一下即写回 */
+.lw-table td > .lw-chk {
+    display: block;
+    margin: 2px auto;
+    width: 14px;
+    height: 14px;
+    cursor: pointer;
+    accent-color: #4a86c8;
+}
 
 .lw-dbgrid {
     width: 100%;

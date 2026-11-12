@@ -716,6 +716,21 @@ var LW = (function () {
             (extra ? ',' + extra : '') + ')';
     }
 
+    /* DBGrid 单元格标记（首建与列变化重建共用一份，免得两处走样）：
+       布尔列（服务端 cedit=4）里常驻一个勾选框，点一下即写回；
+       其余列就是一段文本，点击由 $lwDbCell 换成对应编辑器。
+       注意 i/j/cell 是外层 x-for 的变量名，两处模板必须保持一致 */
+    function dbCellTd(dgid) {
+        return '<td @click.stop="$lwDbCell(\'' + dgid + '\', i, j, $event)">' +
+            '<template x-if="$lwChk(\'' + dgid + '\', j)">' +
+            '<input type="checkbox" class="lw-chk"' +
+            ' :checked="cell === \'1\' || cell === true"' +
+            ' @click.stop="$lwChkTap(\'' + dgid + '\', i, j, $event)"/>' +
+            '</template>' +
+            '<template x-if="!$lwChk(\'' + dgid + '\', j)"><span x-text="cell"></span></template>' +
+            '</td>';
+    }
+
     /* 内部标记（不含包装 div）。st = 状态对象，node = 最新 JSON */
     function innerOf(node, st) {
         var k = node.kind, id = node.id, r = '$lwN(\'' + id + '\')';
@@ -964,7 +979,7 @@ var LW = (function () {
                     '<template x-for="(row,i) in ' + r + '.rows" :key="i">' +
                     '<tr :class="i === ' + r + '.recno - 1 ? \'lw-sel\' : \'\'" @click="$lwDbRow(\'' + dgid + '\', i, $event)">' +
                     '<template x-for="(cell,j) in row" :key="j">' +
-                    '<td @click.stop="$lwDbCell(\'' + dgid + '\', i, j, $event)" x-text="cell"></td>' +
+                    dbCellTd(dgid) +
                     '</template></tr></template></tbody></table></div>' + pagerBar + '</div>';
             }
 
@@ -1140,14 +1155,33 @@ var LW = (function () {
         if ($lwHas(id, 'OnCellClick')) fire(id, 'OnCellClick', { row: row, col: 0 });
     };
 
+    /* DBGrid 布尔列（服务端 cedit=4）：单元格常驻勾选框，点一下即写回
+       '1'/'0'，走与文本编辑同一条 OnSetFieldValue 通道 —— 服务端
+       LWApplyDBGridEdit 用 AsBoolean 赋值。勾选框自己处理点击，
+       不再进 $lwDbCell 的"就地换编辑器"分支。 */
+    window.$lwChk = function (id, col) {
+        var n = S.ND[id];
+        if (!n || n.readonly) return false;
+        return ((n.cedit || [])[col]) === 4;
+    };
+
+    window.$lwChkTap = function (id, row, col, e) {
+        var el = e.currentTarget;
+        var v = el.checked ? '1' : '0';
+        var r = S.R[id];
+        /* 本地行数据先改，服务端确认后的树补丁会覆盖成权威值 */
+        if (r && r.rows && r.rows[row]) r.rows[row][col] = v;
+        fire(id, 'OnSetFieldValue', { val: v, row: row, col: col });
+    };
+
     window.$lwDbCell = function (id, row, col, e) {
         if ($lwHas(id, 'OnCellClick')) fire(id, 'OnCellClick', { row: row, col: col });
         var n = S.ND[id], r = S.R[id];
         if (!n || n.readonly || !r) return;
         /* 列编辑器类型（服务端 cedit）：0=只读 1=文本 2=PickList 下拉
-           3=日期选择。旧服务端只发 0/1，缺省当文本。 */
+           3=日期选择 4=复选框。旧服务端只发 0/1，缺省当文本。 */
         var et = (n.cedit || [])[col];
-        if (et === 0) return;
+        if (et === 0 || et === 4) return;
         if (et == null) et = 1;
         var td = e.currentTarget;
         if (td.__lwEditing) return;
@@ -2092,7 +2126,7 @@ var LW = (function () {
                 '<template x-for="(row,i) in $lwN(\'' + id + '\').rows" :key="i">' +
                 '<tr :class="i === $lwN(\'' + id + '\').recno - 1 ? \'lw-sel\' : \'\'" @click="$lwDbRow(\'' + id + '\', i, $event)">' +
                 '<template x-for="(cell,j) in row" :key="j">' +
-                '<td @click.stop="$lwDbCell(\'' + id + '\', i, j, $event)" x-text="cell"></td>' +
+                dbCellTd(id) +
                 '</template></tr></template></tbody></table>';
             gridBox.parentNode.replaceChild(fresh, gridBox);
             try { if (window.Alpine) Alpine.initTree(fresh); } catch (e) { }

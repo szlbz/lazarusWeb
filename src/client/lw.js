@@ -1489,6 +1489,15 @@ var LW = (function () {
                 while (td && td.tagName !== 'TD') td = td.parentNode;
                 if (td) col = td.cellIndex;
             } catch (x) { }
+            /* 布尔列（cedit=4）：点一格就切换并回发，和桌面端 TDBGrid
+               里的勾选框同一手感，不进编辑态（列上没挂编辑器） */
+            if (!node.readonly && ((node.cedit || [])[col] === 4)) {
+                var nv = !rec.get('c' + col);
+                rec.set('c' + col, nv);
+                try { grid.getView().refreshNode(idx); } catch (x) { }
+                fire(node, 'OnSetFieldValue', { val: nv ? '1' : '0', row: rec.get('lwRow'), col: col });
+                return;
+            }
             fire(node, 'OnCellClick', { row: rec.get('lwRow'), col: col });
         });
         grid.on('headerclick', function (ct, column) {
@@ -1528,6 +1537,20 @@ var LW = (function () {
         return out;
     }
 
+    /* 行数据 -> store 记录。布尔列（cedit=4）必须转成真正的 boolean：
+       服务端发的是 '1'/'0' 字符串，而 '0' 在 JS 里是真值，直接喂给
+       勾选框渲染器会把全表都画成选中 */
+    function gridRowObj(n, row, ri) {
+        var eds = n.cedit || [];
+        var o = { lwRow: ri };
+        for (var j = 0; j < row.length; j++) {
+            var v = row[j];
+            if (eds[j] === 4) v = (v === true || String(v) === '1');
+            o['c' + j] = v;
+        }
+        return o;
+    }
+
     /* 行数据 + 列定义的指纹；服务端在编辑态下不发 rows，指纹保持不变 */
     function dbSig(n) {
         return JSON.stringify(n.rows || null) + '#' + JSON.stringify(n.cols || null);
@@ -1544,9 +1567,7 @@ var LW = (function () {
        —— CellEditing 从此起不来，表现为"网格只能编辑一个单元格"。 */
     function fillGridRows(store, n) {
         store.loadData((n.rows || []).map(function (row, ri) {
-            var o = { lwRow: ri };
-            for (var j = 0; j < row.length; j++) o['c' + j] = row[j];
-            return o;
+            return gridRowObj(n, row, ri);
         }));
     }
 
@@ -1571,6 +1592,13 @@ var LW = (function () {
                 } else if (eds[i] === 3) {
                     cols[i].editor = { xtype: 'datefield', format: 'Y-m-d',
                                        altFormats: 'Y-m-d|Ymd|YmdHis' };
+                } else if (eds[i] === 4) {
+                    /* 布尔列：画一个勾选框，点击由 buildDBGrid 的 itemclick
+                       切换（不挂编辑器 —— 勾选框不需要进编辑态） */
+                    cols[i].align = 'center';
+                    cols[i].renderer = function (v) {
+                        return '<span class="lw-xchk' + (v ? ' lw-xchk-on' : '') + '"></span>';
+                    };
                 } else {
                     cols[i].editor = { xtype: 'textfield' };
                 }
@@ -2275,11 +2303,7 @@ var LW = (function () {
     }
 
     function buildGridStore(n) {
-        var data = (n.rows || []).map(function (row, ri) {
-            var o = { lwRow: ri };
-            for (var j = 0; j < row.length; j++) o['c' + j] = row[j];
-            return o;
-        });
+        var data = (n.rows || []).map(function (row, ri) { return gridRowObj(n, row, ri); });
         return Ext.create('Ext.data.Store', {
             fields: [{ name: 'lwRow', type: 'int' }].concat((n.cols || []).map(function (_, i) { return 'c' + i; })),
             data: data
