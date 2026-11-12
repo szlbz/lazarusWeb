@@ -6,4 +6,9 @@ lazarusWeb默认使用Alpine.js，也可以使用Ext js
 <img width="1840" height="1185" alt="QQ_2026-11-12_10-01-14" src="https://github.com/user-attachments/assets/5825dcfc-f786-458e-b54f-522d1488f5a4" />
 <img width="1825" height="1180" alt="QQ_2026-11-12_10-01-51" src="https://github.com/user-attachments/assets/ad10f597-bd4b-4b31-969b-7372a997715c" />
 <img width="1866" height="1183" alt="QQ_2026-11-12_10-02-09" src="https://github.com/user-attachments/assets/e3f15d71-38e9-4c88-b432-d71c7b952702" />
-
+<img width="1847" height="1188" alt="QQ_2026-11-12_10-07-21" src="https://github.com/user-attachments/assets/efdf4e8c-9740-40d7-9f9e-2054bfb98f16" />
+<img width="1851" height="1197" alt="QQ_2026-11-12_10-07-43" src="https://github.com/user-attachments/assets/687862cd-4041-4f46-a393-707ed1bd15ba" />
+<img width="1832" height="1189" alt="QQ_2026-11-12_10-07-59" src="https://github.com/user-attachments/assets/f5fac17d-2bfc-4b00-a402-88b11e2b3f10" />
+<img width="1814" height="1180" alt="QQ_2026-11-12_10-08-16" src="https://github.com/user-attachments/assets/05b32887-eaa8-4a95-bb19-1f7b6833d8af" />
+<img width="1821" height="1174" alt="QQ_2026-11-12_10-08-34" src="https://github.com/user-attachments/assets/2af69890-6d88-4697-aa17-f9b31520a5d0" />
+<img width="1815" height="1174" alt="QQ_2026-11-12_10-08-58" src="https://github.com/user-attachments/assets/0c056798-9033-4624-b9f6-86f110ff6a06" />
