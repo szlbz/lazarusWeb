@@ -129,6 +129,8 @@ html, body {
     color: #2b3a49;
     display: flex;
     align-items: center;
+    cursor: move;
+    user-select: none;
 }
 .lw-dlg-x {
     margin-left: auto;
@@ -221,9 +223,12 @@ html, body {
     color: #2b3a49;
     font-size: 13px;
 }
-.lw-win-cap { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+/* 标题占满剩余宽度：右侧图标（最大化/×）才能贴到标题栏最右。
+   不能用 margin-left:auto 推图标 —— flex 会把剩余空间平分给
+   多个 auto 边距，最大化图标会被顶到标题栏中间（坑：关于对话框）。
+   min-width:0 让 ellipsis 在 flex 里继续生效 */
+.lw-win-cap { flex: 1; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .lw-win-x {
-    margin-left: auto;
     cursor: pointer;
     color: #6c7a87;
     font-size: 18px;
@@ -232,9 +237,9 @@ html, body {
 }
 .lw-win-x:hover { color: #d9534f; }
 
-/* 右上角最大化/还原图标（对齐 Ext maximizable；排在 × 左边） */
+/* 右上角最大化/还原图标（对齐 Ext maximizable；排在 × 左边，
+   靠 .lw-win-cap 的 flex:1 推到最右） */
 .lw-win-max {
-    margin-left: auto;
     cursor: pointer;
     color: #6c7a87;
     font-size: 13px;

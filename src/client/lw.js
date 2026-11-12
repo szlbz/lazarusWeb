@@ -1783,7 +1783,7 @@ var LW = (function () {
             constrain: false,
             glyph: false,
             listeners: {
-                close: function () { fire(f, 'OnClose'); return false; }
+                close: function () { fire(f.id, 'OnClose'); return false; }
             }
         };
         if (!f.modal) cfg.closable = false;

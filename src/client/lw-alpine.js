@@ -1764,9 +1764,12 @@ var LW = (function () {
             win.__lwStatus = sb;
         }
 
-        /* 模态窗体右上角 × == OnClose */
+        /* 模态窗体右上角 × == OnClose。必须传 f.id：fire 的第一参数是
+           组件 id（S.ND 按 id 查），传节点对象服务端找不到组件，事件被
+           静默吞掉 —— × 点了没反应（服务端 lwdispatch 的
+           "OnClose on 模态窗体 -> SessionEndModal(mrCancel)" 永远收不到） */
         var xBtn = title.querySelector('.lw-win-x');
-        if (xBtn) xBtn.addEventListener('click', function () { fire(f, 'OnClose'); });
+        if (xBtn) xBtn.addEventListener('click', function () { fire(f.id, 'OnClose'); });
 
         /* 最大化/还原：CSS 类切换（!important 覆盖内联 left/top/w/h），
            尺寸变化由 ResizeObserver 统一重排布局与状态栏 */
@@ -2204,6 +2207,39 @@ var LW = (function () {
         closeDialog(true, btn.id, text);
     };
     window.$lwDlgClose = function () { closeDialog(false); };
+
+    /* 服务端对话框拖动：overlay 是 Alpine x-if 按需创建/销毁的，绑不到
+       固定元素上 —— 事件委托到 document。首次拖动把 flex 居中的窗口
+       固化成 position:fixed 显式坐标，之后跟随鼠标，松开即停。 */
+    document.addEventListener('mousedown', function (e) {
+        var t = e.target;
+        if (!t || !t.closest) return;
+        var title = t.closest('.lw-dlg-title');
+        if (!title) return;
+        if (t.classList.contains('lw-dlg-x')) return;   /* × 只负责关闭 */
+        var win = title.closest('.lw-dlg-win');
+        if (!win) return;
+        var r = win.getBoundingClientRect();
+        var sx = e.clientX - r.left, sy = e.clientY - r.top;
+        win.style.position = 'fixed';
+        win.style.left = r.left + 'px';
+        win.style.top = r.top + 'px';
+        win.style.marginTop = '0';
+        function mv(ev2) {
+            var x = Math.max(0, Math.min(window.innerWidth - 80, ev2.clientX - sx));
+            var y = Math.max(0, Math.min(window.innerHeight - 40, ev2.clientY - sy));
+            win.style.left = x + 'px';
+            win.style.top = y + 'px';
+        }
+        function up() {
+            document.removeEventListener('mousemove', mv);
+            document.removeEventListener('mouseup', up);
+        }
+        document.addEventListener('mousemove', mv);
+        document.addEventListener('mouseup', up);
+        e.preventDefault();
+    });
+
     window.$lwDlgKey = function (e) {
         if (e.key === 'Enter') {
             e.preventDefault();
