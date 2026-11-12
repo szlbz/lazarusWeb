@@ -471,12 +471,18 @@ end;
 procedure TLWWriter.WriteDBGrid(G: TDBGrid; O: TJSONObject);
 var
   ds: TDataSet;
-  cols, fields, cw, cedit, rows, row: TJSONArray;
+  cols, fields, cw, cedit, plist, rows, row: TJSONArray;
   i, cnt, rh: Integer;
+  k: Integer;
   bm: TBookmark;
   col: TColumn;
   f: TField;
   st: string;
+  cell: string;
+  items: TJSONArray;
+  { 每列的编辑器类型（下标与 G.Columns 一致，含隐藏列占位）：
+    1=text 2=PickList 下拉 3=日期选择 }
+  etv: array of Byte;
   { TLWDBGrid 扩展（分页/过滤/汇总）；普通 TDBGrid 时为 nil，行为完全不变 }
   lwg: TLWDBGrid;
   ft: string;
@@ -504,6 +510,8 @@ begin
   fields := TJSONArray.Create;
   cw := TJSONArray.Create;
   cedit := TJSONArray.Create;
+  plist := TJSONArray.Create;
+  SetLength(etv, G.Columns.Count);
   for i := 0 to G.Columns.Count - 1 do
   begin
     col := TColumn(G.Columns[i]);
@@ -517,16 +525,47 @@ begin
     JArrAddStr(fields, col.FieldName);
     cw.Add(lwDbColWidth(col));
     { 单元格可编辑：整表开了 dgEditing，且这一列没有单独只读
-      （列只读 / 字段只读，如自增主键）。前端据此决定挂不挂编辑器 }
+      （列只读 / 字段只读，如自增主键）。前端据此决定挂不挂编辑器。
+      编辑器类型：1=文本（默认）；2=下拉（TColumn.PickList 非空，
+      plist 按同下标带选项列表）；3=日期选择（日期/时间戳字段，
+      浏览器渲染成 date 输入，回传 ISO 'yyyy-mm-dd'）。
+      旧前端把任何非 0 当文本编辑器，新属性不影响旧版渲染。 }
     if (col.Field <> nil) and (not col.ReadOnly) and (not col.Field.ReadOnly) then
-      cedit.Add(1)
+    begin
+      if col.PickList.Count > 0 then
+      begin
+        etv[i] := 2;
+        cedit.Add(2);
+        items := TJSONArray.Create;
+        for k := 0 to col.PickList.Count - 1 do
+          items.Add(col.PickList[k]);
+        plist.Add(items);
+      end
+      else if (col.Field is TDateField) or (col.Field.ClassType = TDateTimeField) then
+      begin
+        etv[i] := 3;
+        cedit.Add(3);
+        plist.Add(TJSONArray.Create);
+      end
+      else
+      begin
+        etv[i] := 1;
+        cedit.Add(1);
+        plist.Add(TJSONArray.Create);
+      end;
+    end
     else
+    begin
+      etv[i] := 0;
       cedit.Add(0);
+      plist.Add(TJSONArray.Create);
+    end;
   end;
   O.Add('cols', cols);
   O.Add('fields', fields);
   O.Add('colwidths', cw);
   O.Add('cedit', cedit);
+  O.Add('plist', plist);
   O.Add('readonly', not (dgEditing in G.Options));
 
   rh := G.DefaultRowHeight;
@@ -612,8 +651,19 @@ begin
           f := col.Field;
           if f <> nil then
           begin
-            JArrAddStr(row, f.DisplayText);
-            if (not visible) and (Pos(ft, LowerCase(f.DisplayText)) > 0) then
+            if etv[i] = 3 then
+            begin
+              { 日期列：固定发 ISO 'yyyy-mm-dd'，前端 date 输入直接吃；
+                显示层也统一成这个无歧义格式 }
+              if f.IsNull then
+                cell := ''
+              else
+                cell := FormatDateTime('yyyy-mm-dd', f.AsDateTime);
+            end
+            else
+              cell := f.DisplayText;
+            JArrAddStr(row, cell);
+            if (not visible) and (Pos(ft, LowerCase(cell)) > 0) then
               visible := True;
           end
           else

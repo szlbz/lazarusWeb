@@ -243,6 +243,17 @@ begin
     Exit;
   end;
 
+  { TTabControl：与 TPageControl 同语义 —— 浏览器回传切换后的页签序号，
+    服务端同步 TabIndex。缺这条的话 tabctl 页签切不动（视觉与业务都停在旧页），
+    且 OnChange 处理器读 TabIndex 拿到的是旧值 }
+  if C is TTabControl then
+  begin
+    idx := StrToIntDef(s, -1);
+    if (idx >= 0) and (idx < TTabControl(C).Tabs.Count) then
+      TTabControl(C).TabIndex := idx;
+    Exit;
+  end;
+
   { TDateEdit / TTimeEdit：浏览器回传的是统一 ISO 串（见 lwwriter 的 iso）。
     直接写 Date/Time，控件显示由 LCL 自己刷新 }
   if C is TDateEdit then
@@ -326,14 +337,23 @@ begin
     Exit;
   end;
 
-  { TCheckGroup：浏览器回传 checked 布尔数组，逐项套用 }
+  { TCheckGroup：优先用浏览器回传的 checked 布尔数组逐项套用；
+    数组缺席（事件只带 idx+val，两个客户端的历史行为都这样）时退化为
+    单项写回 —— val 是该复选框的新状态（'1'/'0' 或 true/false），
+    保证业务代码 OnItemClick 里读 Checked[i] 拿到的是用户刚点的值 }
   if C is TCheckGroup then
   begin
     d2 := AReq.Find('checked');
     if d2 is TJSONArray then
+    begin
       for i := 0 to TCheckGroup(C).Items.Count - 1 do
         if i < TJSONArray(d2).Count then
           TCheckGroup(C).Checked[i] := TJSONArray(d2).Booleans[i];
+      Exit;
+    end;
+    idx := JGetInt(AReq, 'idx', -1);
+    if (idx >= 0) and (idx < TCheckGroup(C).Items.Count) then
+      TCheckGroup(C).Checked[idx] := (s = '1') or SameText(s, 'true');
     Exit;
   end;
 
@@ -417,6 +437,10 @@ begin
   end
   else if C is TSpinEdit then
     TSpinEdit(C).Value := StrToIntDef(s, TSpinEdit(C).Value)
+  else if C is TFloatSpinEdit then
+    { TFloatSpinEdit 与 TSpinEdit 是兄弟类（都继承 TCustomSpinEdit），
+      必须单独分支 —— 缺这条的话 floatspin 的值全部被丢弃 }
+    TFloatSpinEdit(C).Value := StrToFloatDef(s, TFloatSpinEdit(C).Value)
   else if C is TStringGrid then
   begin
     { 浏览器只送数据行序号（不含固定行），这里加回 FixedRows }
@@ -431,7 +455,13 @@ begin
   else if C is TProgressBar then
     TProgressBar(C).Position := StrToIntDef(s, TProgressBar(C).Position)
   else if C is TTrackBar then
-    TTrackBar(C).Position := StrToIntDef(s, TTrackBar(C).Position);
+    TTrackBar(C).Position := StrToIntDef(s, TTrackBar(C).Position)
+  else if C is TCustomEdit then
+    { TCustomEdit 兜底：TLabeledEdit / TCustomEditButton 族（editbtn：
+      TFileNameEdit / TDirectoryEdit / TCustomEditButton）等都是
+      TCustomEdit 子类而非 TEdit 子类 —— 缺这条的话这些控件的 Text
+      回写全部落空（writer 照发 OnChange val，服务端没有分支接） }
+    TCustomEdit(C).Text := s;
 end;
 
 procedure LWApplyGridPos(C: TComponent; AReq: TJSONObject);
@@ -547,6 +577,8 @@ var
   ds: TDataSet;
   f: TField;
   col: Integer;
+  v: string;
+  dtv: TDateTime;
 begin
   if not (C is TDBGrid) then Exit;
   G := TDBGrid(C);
@@ -560,10 +592,26 @@ begin
   f := G.Columns[col].Field;
   if (f = nil) or f.ReadOnly or G.Columns[col].ReadOnly then Exit;
 
+  v := JGetStr(AReq, 'val');
   try
     ds.Edit;
     try
-      f.AsString := JGetStr(AReq, 'val');
+      { 日期/时间字段：浏览器 date 选择器回传 ISO 'yyyy-mm-dd'，走
+        AsString 会被区域设置的 StrToDateTime 解析（'-' 分隔符未必
+        吃得下），这里先解析成 TDateTime 再赋 AsDateTime。
+        TTimeField 也是 TDateTimeField 后代但吃的是时间串，排除掉。 }
+      if ((f.ClassType = TDateTimeField) or (f is TDateField)) and (v <> '') then
+      begin
+        dtv := LWISOToDateTime(v, -1);
+        if dtv < 0 then
+        begin
+          ds.Cancel;
+          Exit;
+        end;
+        f.AsDateTime := dtv;
+      end
+      else
+        f.AsString := v;
     except
       ds.Cancel;
       Exit;
