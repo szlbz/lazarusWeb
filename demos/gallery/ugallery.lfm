@@ -500,6 +500,26 @@ object GalleryForm: TGalleryForm
         Width = 751
         Caption = '提示：TDateEdit/TTimeEdit 在浏览器端是 Ext 的 datefield/timefield，值以 ISO 格式回传。'
       end
+      object tcMain: TTabControl
+        Left = 24
+        Height = 200
+        Top = 424
+        Width = 880
+        OnChange = TcChange
+        TabIndex = 0
+        Tabs.Strings = (
+          '甲页签'
+          '乙页签'
+        )
+        TabOrder = 12
+        object lblTc: TLabel
+          Left = 16
+          Height = 24
+          Top = 40
+          Width = 466
+          Caption = 'TTabControl：页签是字符串列表，客户区是公共的一块。'
+        end
+      end
     end
     object tsPanel: TTabSheet
       Caption = '容器布局'
@@ -641,25 +661,25 @@ object GalleryForm: TGalleryForm
         Left = 24
         Height = 24
         Top = 18
-        Width = 207
+        Width = 448
         Caption = 'TStringGrid（可编辑，保存/调用 -> gridsave.json）：'
       end
       object btnSgSave: TButton
-        Left = 250
+        Left = 464
         Height = 30
-        Top = 14
+        Top = 16
         Width = 110
-        Caption = '保存网格'
-        TabOrder = 3
+        Caption = '保存'
+        TabOrder = 5
         OnClick = SgSaveClick
       end
       object btnSgLoad: TButton
-        Left = 370
+        Left = 576
         Height = 30
-        Top = 14
+        Top = 16
         Width = 110
-        Caption = '调用网格'
-        TabOrder = 4
+        Caption = '调用'
+        TabOrder = 6
         OnClick = SgLoadClick
       end
       object sgData: TStringGrid
@@ -709,7 +729,7 @@ object GalleryForm: TGalleryForm
         )
         ColWidths = (
           96
-          564
+          560
         )
       end
       object lbl19: TLabel
@@ -791,7 +811,7 @@ object GalleryForm: TGalleryForm
           end
           object tbtnSep: TToolButton
             Left = 71
-            Height = 8
+            Height = 33
             Top = 2
             Style = tbsSeparator
           end
@@ -1309,8 +1329,8 @@ object GalleryForm: TGalleryForm
           Left = 18
           Height = 24
           Top = 504
-          Width = 1607
-          Caption = '左边改格子 / 右边改控件，同一份数据实时联动；导航条是 TLWDBNavigator（nogui 友好）。两个网格都连 sqlite（gallery.db）：改一格即落库，重启进程数据不丢（删掉该文件即重建种子数据）。'
+          Width = 2241
+          Caption = '左边改格子 / 右边改控件，同一份数据实时联动；导航条是 TLWDBNavigator（nogui 友好）。两个网格都连 sqlite（gallery.db）：改一格即落库，重启进程数据不丢（删掉该文件即重建种子数据）。unit 列点击展开下拉选择（TColumn.PickList），made 列点击弹出日期选择。'
         end
       end
     end

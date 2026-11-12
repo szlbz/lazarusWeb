@@ -1,5 +1,5 @@
 {
-  lazarusWeb :: 全功能画廊（对照 uniGUI 的 mdemo 组织方式）
+  lazarusWeb :: 全功能画廊
   ------------------------------------------------------------------
   一个窗体 + TPageControl 十二个分类页 + 底部公共事件日志：
 
@@ -19,7 +19,8 @@
     tsMisc   定时器动态  TTimer 时钟/TProgressBar 自动步进/动态创建控件/
                          SendText/SendFile 下载/会话遮罩
     tsDB     数据感知    sqlite(gallery.db) + TDBGrid/TDBEdit/TDBMemo/
-                         TDBCheckBox/TDBComboBox + TLWDBNavigator，改一格即落库
+                         TDBCheckBox/TDBComboBox + TLWDBNavigator，改一格即落库；
+                         unit 列 PickList 下拉、made 列日期选择（框架 cedit=2/3）
     tsBig    大表分页    TLWDBGrid：sqlite 1000 行、每页 50、过滤条、qty 汇总
 
   ------------------------------------------------------------------
@@ -35,7 +36,7 @@
     3) 运行时行为：TFPTimer 工作线程、TBitBtn.Kind 的 nogui 降级、
        "动态创建控件"页里故意演示的运行时 Create。
 
-  这样与 uniGUI 的 mdemo 一致：窗体结构看 lfm，业务看代码。改界面的
+  窗体结构看 lfm，业务看代码。改界面的
   时候不要再回到"FormCreate 里 Create 一堆控件"的老路 —— 那样控件
   名、Tab 顺序、对齐都无法在设计器里维护，也没法被 lwaudit 静态检查。
 }
@@ -140,6 +141,9 @@ type
     btnSgSave: TButton;
     btnSgLoad: TButton;
     sgData: TStringGrid;
+    { tsEdit 的 TTabControl（回写审计：页签序号写回 TabIndex） }
+    tcMain: TTabControl;
+    lblTc: TLabel;
     lbl17: TLabel;
     dgMain: TDrawGrid;
     lbl18: TLabel;
@@ -240,6 +244,7 @@ type
     { tsPanel 事件 }
     procedure PanelAny(Sender: TObject);
     procedure CgItemClick(Sender: TObject; AIndex: Integer);
+    procedure TcChange(Sender: TObject);
     { tsGrid 事件 }
     procedure SgClick(Sender: TObject);
     function GridSavePath: string;
@@ -447,7 +452,7 @@ end;
 
 procedure TGalleryForm.FormCreate(Sender: TObject);
 begin
-  Caption := 'lazarusWeb · 全功能画廊（对照 uniGUI mdemo）';
+  Caption := 'lazarusWeb · 全功能画廊';
   Log('尺寸: Client=' + IntToStr(ClientWidth) + 'x' + IntToStr(ClientHeight) +
     ' Bound=' + IntToStr(Width) + 'x' + IntToStr(Height) +
     ' PPI=' + IntToStr(PixelsPerInch) + ' DesignPPI=' + IntToStr(DesignTimePPI) +
@@ -484,6 +489,7 @@ procedure TGalleryForm.SetupData;
   procedure EnsureDb;
   var
     i, n: Integer;
+    u: string;
   begin
     FTrans := TSQLTransaction.Create(Self);
     FConn := TSQLite3Connection.Create(Self);
@@ -496,10 +502,29 @@ procedure TGalleryForm.SetupData;
     FConn.Open;
     FConn.ExecuteDirect('PRAGMA busy_timeout=10000');
     { 列类型要用 VARCHAR 而不是 TEXT：sqlite3conn 把 TEXT 映射成 ftMemo，
-      writer 序列化时会输出 "(MEMO)" 占位符；VARCHAR(n) 才是 ftString }
+      writer 序列化时会输出 "(MEMO)" 占位符；VARCHAR(n) 才是 ftString。
+      unit = DBGrid 下拉选择演示（PickList）；made = 日期选择演示（DATE） }
     FConn.ExecuteDirect(
       'CREATE TABLE IF NOT EXISTS products(code VARCHAR(20) PRIMARY KEY, ' +
-      'name VARCHAR(60), price REAL, stock INTEGER, active BOOLEAN)');
+      'name VARCHAR(60), unit VARCHAR(10), made DATE, price REAL, ' +
+      'stock INTEGER, active BOOLEAN)');
+    { 老库没有 unit/made 列：ALTER 补上（新库会报 duplicate column，吞掉） }
+    try
+      FConn.ExecuteDirect('ALTER TABLE products ADD COLUMN unit VARCHAR(10)');
+    except
+    end;
+    try
+      FConn.ExecuteDirect('ALTER TABLE products ADD COLUMN made DATE');
+    except
+    end;
+    { 补出来的列是 NULL：按行号随手填上，界面上不留空 }
+    FConn.ExecuteDirect(
+      'UPDATE products SET unit = CASE rowid % 4 ' +
+      'WHEN 1 THEN ''个'' WHEN 2 THEN ''箱'' WHEN 3 THEN ''件'' ' +
+      'ELSE ''套'' END WHERE unit IS NULL');
+    FConn.ExecuteDirect(
+      'UPDATE products SET made = date(''2026-01-01'', ''+'' || (rowid - 1) || ' +
+      ''' day'') WHERE made IS NULL');
     FTrans.Commit;
     n := 0;
     with TSQLQuery.Create(nil) do
@@ -516,10 +541,20 @@ procedure TGalleryForm.SetupData;
     if n > 0 then
       Exit;
     for i := 1 to 20 do
+    begin
+      case i mod 4 of
+        1: u := '个';
+        2: u := '箱';
+        3: u := '件';
+      else
+        u := '套';
+      end;
       FConn.ExecuteDirect(Format(
-        'INSERT INTO products(code, name, price, stock, active) ' +
-        'VALUES (''P%.3d'', ''商品 %d'', %s, %d, %d)',
-        [i, i, FloatToStr(i * 3.5), i * 7, Ord(Odd(i))]));
+        'INSERT INTO products(code, name, unit, made, price, stock, active) ' +
+        'VALUES (''P%.3d'', ''商品 %d'', ''%s'', ''%s'', %s, %d, %d)',
+        [i, i, u, FormatDateTime('yyyy-mm-dd', EncodeDate(2026, 1, 1) + i - 1),
+         FloatToStr(i * 3.5), i * 7, Ord(Odd(i))]));
+    end;
     FTrans.Commit;
   end;
 
@@ -561,6 +596,8 @@ procedure TGalleryForm.SetupData;
     FTrans2.Commit;
   end;
 
+var
+  i: Integer;
 begin
   { tsDB：20 行商品，sqlite 落库 }
   EnsureDb;
@@ -569,7 +606,7 @@ begin
   qryData.Database := FConn;
   qryData.Transaction := FTrans;
   qryData.SQL.Text :=
-    'SELECT code, name, price, stock, active FROM products ORDER BY code';
+    'SELECT code, name, unit, made, price, stock, active FROM products ORDER BY code';
   { 单元格编辑 = Post：sqoAutoApplyUpdates 把 UPDATE 发进事务，
     sqoAutoCommit 随即提交，sqoKeepOpenOnCommit 保证数据集不被关掉
     —— 一行 Options 就实现"改一格即落库"，与桌面 LCL 的 Edit+Post 手感一致 }
@@ -589,6 +626,21 @@ begin
   dbcCode.DataSource := dsMem;
   navDb.DataSource := dsMem;
   grdDb.DataSource := dsMem;
+
+  { DBGrid 单元格下拉：unit 列的 TColumn.PickList。列没在 lfm 里定义，
+    访问 Columns 时 TDBGrid 会按字段自动生成（设计期结构 + 运行时补内容）。
+    PickList 非空的列序列化成 cedit=2，浏览器单元格点开就是 <select>，
+    选中即写库；made 是 TDateField，writer 自动标成 cedit=3（日期选择），
+    不用在这里多做任何事 }
+  for i := 0 to grdDb.Columns.Count - 1 do
+    if grdDb.Columns[i].FieldName = 'unit' then
+    begin
+      grdDb.Columns[i].PickList.Clear;
+      grdDb.Columns[i].PickList.Add('个');
+      grdDb.Columns[i].PickList.Add('箱');
+      grdDb.Columns[i].PickList.Add('件');
+      grdDb.Columns[i].PickList.Add('套');
+    end;
 
   { tsBig：1000 行物料，TLWDBGrid 显示层分页。同样走 sqlite（bigitems 表），
     独立连接/事务：只读展示，和 tsDB 的业务事务互不干扰（WAL 下两连接可并存） }
@@ -737,6 +789,14 @@ begin
     BoolToStr(cgSkills.Checked[AIndex], True));
 end;
 
+procedure TGalleryForm.TcChange(Sender: TObject);
+begin
+  { 回写审计：浏览器切 TTabControl 页签 -> 服务端 TabIndex 已同步，
+    这里读到的必须是新页签序号（坑 97 之前永远是 0） }
+  Log('Edit.TTabControl TabIndex=' + IntToStr(tcMain.TabIndex) +
+    ' [' + tcMain.Tabs[tcMain.TabIndex] + ']');
+end;
+
 { ============================ tsGrid 网格列表 ============================ }
 
 procedure TGalleryForm.SgClick(Sender: TObject);
@@ -805,8 +865,8 @@ var
 begin
   if not FileExists(GridSavePath) then
   begin
-    Log('Grid.调用 -> gridsave.json 不存在（先点"保存网格"）');
-    ShowMessage('gridsave.json 不存在，请先点"保存网格"');
+    Log('Grid.调用 -> gridsave.json 不存在（先点"保存"）');
+    ShowMessage('gridsave.json 不存在，请先点"保存"');
     Exit;
   end;
   fs := TFileStream.Create(GridSavePath, fmOpenRead or fmShareDenyNone);
