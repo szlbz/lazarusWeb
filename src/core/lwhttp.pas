@@ -192,9 +192,10 @@ type
       aRequest: TFPHTTPConnectionRequest);
     procedure WSPushCommand(ASession: TObject; const AJSON: string);
     { fphttpserver 的请求级异常回调。只做一件事：把"客户端提前断开"
-      这类写失败记一行日志 —— 它们已经被 fcl-web 捕获、连接被断开，
+      这类读/写失败记一行日志 —— 它们已经被 fcl-web 捕获、连接被断开，
       服务器照常服务，但 IDE 调试器会在 raise 处停下来弹框，看起来像
-      我们的 bug（见 NOTES 坑 73） }
+      我们的 bug（见 NOTES 坑 73；EReadError 是同一族在读侧的表现，
+      同样无害） }
     procedure HandleRequestError(Sender: TObject; E: Exception);
     property Store: TLWSessionStore read FStore;
     property Config: TLWServerConfig read FCfg;
@@ -1152,6 +1153,9 @@ begin
     新会话一律先创建登录窗体；主窗体等认证通过后由 lwlogin 创建 }
   if FCfg.LoginForm <> '' then
     fname := FCfg.LoginForm;
+
+  { 建窗体和首次序列化都在 lwapp / lwsession 内部串行了（LWLCLEnter），
+    这里保持顺序调用即可 }
   if (FFactory = nil) or (not FFactory(fname, f)) then
   begin
     Reply('{"ok":false,"err":"form not registered: ' + fname + '"}',
@@ -1916,11 +1920,11 @@ begin
     异常框，而没有任何线索说明它无害。
     断开类异常是正常现象，措辞降为 [info] 别吓人；其余（真正的服务端
     bug）保留 [warn] 并带上异常详情。 }
-  Benign := (E is EWriteError) or
+    Benign := (E is EWriteError) or (E is EReadError) or
     (Pos('socket', LowerCase(E.ClassName)) > 0) or
     (Pos('conn', LowerCase(E.ClassName)) > 0);
   if Benign then
-    LWLog('[info] 客户端已断开，本次响应中止（正常现象，无需处理）——' +
+    LWLog('[info] 客户端已断开，本次请求/响应中止（正常现象，无需处理）——' +
       '常见于浏览器关页签/刷新或请求超时取消；连接已被 fcl-web 自动回收，服务不受影响。')
   else
     LWLog('[warn] 处理请求时出错: ' + E.ClassName + ': ' + E.Message);

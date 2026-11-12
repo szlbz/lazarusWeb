@@ -292,8 +292,15 @@ destructor TLWSession.Destroy;
 var
   i: Integer;
 begin
-  for i := FForms.Count - 1 downto 0 do
-    TCustomForm(FForms[i]).Free;
+  { 释放窗体同样动 LCL 的全局字形/位图缓存，与"建窗体"互为竞态 ——
+    必须套同一个进程级闸门（否则关会话的线程能把正在首开的另一个会话搞崩） }
+  LWLCLEnter;
+  try
+    for i := FForms.Count - 1 downto 0 do
+      TCustomForm(FForms[i]).Free;
+  finally
+    LWLCLLeave;
+  end;
   FForms.Free;
   FIdOf.Free;
   FCompOf.Free;
@@ -530,7 +537,14 @@ begin
     其他序列化/事件互斥，否则并发 realloc 直接把堆写坏（见 FExec 注释） }
   LockExec;
   try
-    Result := BuildPayloadCore;
+    { 再套一层进程级闸门：writer 读控件属性会碰 LCL 的位图/画布缓存，
+      多个会话同时序列化（尤其刚建窗体那一刻）会踩坏 Graphics 的全局状态 }
+    LWLCLEnter;
+    try
+      Result := BuildPayloadCore;
+    finally
+      LWLCLLeave;
+    end;
   finally
     UnlockExec;
   end;

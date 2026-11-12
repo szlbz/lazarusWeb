@@ -99,8 +99,15 @@ begin
   i := GRegistry.IndexOf(AName);
   if i < 0 then Exit;
   cls := TFormClass(GRegistry.Objects[i]);
-  AForm := cls.Create(nil);
-  AForm.Name := LWStripUniqSuffix(AForm.Name);
+  { 建窗体要串行：TBitBtn 构造时会解码 LCLGlyphs 的标准字形位图，
+    多线程同时建会踩坏 Graphics/FPImage 的全局缓存（见 lwbase 的闸门注释） }
+  LWLCLEnter;
+  try
+    AForm := cls.Create(nil);
+    AForm.Name := LWStripUniqSuffix(AForm.Name);
+  finally
+    LWLCLLeave;
+  end;
   Result := True;
 end;
 

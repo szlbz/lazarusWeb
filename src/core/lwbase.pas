@@ -106,6 +106,21 @@ function BoolToInt(B: Boolean): Integer;
   窗体的依据（登录窗体 / 默认窗体 / 会话内查找），必须还原成设计期名字。 }
 function LWStripUniqSuffix(const AName: string): string;
 
+{ LCL 全局闸门 —— LCL 不是线程安全的，下面这些动作必须串行：
+    - 建窗体（TBitBtn 构造时会解码 LCLGlyphs 的标准字形位图）
+    - 释放窗体（销毁时释放字形/位图，同样动全局缓存）
+    - 序列化组件树（writer 读控件属性，含位图/画布度量）
+  几个线程同时干这些事会踩坏 Graphics / FPImage 的全局缓存，症状是同一
+  时刻冒出 FPImageException("Failed to get raw image description from
+  bitmap")、EConvertError、EAccessViolation 三连，随后进程直接死掉
+  （gallery demo 实测 5~6 个浏览器同时首开必崩）。
+
+  为什么只锁这三处：事件处理里可能有 ShowModal 阻塞几分钟，把事件也塞进
+  闸门会把所有会话一起冻住；而事件对控件的改写是"各改各的窗体"，实测并
+  发安全。TRTLCriticalSection 在同一线程内可重入，嵌套调用无需额外判断。 }
+procedure LWLCLEnter;
+procedure LWLCLLeave;
+
 { ---- JSON 读取辅助 ---- }
 function JGetStr(O: TJSONObject; const AName: string; const ADef: string = ''): string;
 function JGetInt(O: TJSONObject; const AName: string; ADef: Integer = 0): Integer;
@@ -331,5 +346,31 @@ begin
     if A.Items[i].AsString = S then
       Exit(True);
 end;
+
+{ ---------------- LCL 全局闸门 ---------------- }
+
+var
+  GLCLGate: TRTLCriticalSection;
+  GLCLGateReady: Boolean = False;
+
+procedure LWLCLEnter;
+begin
+  if GLCLGateReady then
+    EnterCriticalSection(GLCLGate);
+end;
+
+procedure LWLCLLeave;
+begin
+  if GLCLGateReady then
+    LeaveCriticalSection(GLCLGate);
+end;
+
+initialization
+  InitCriticalSection(GLCLGate);
+  GLCLGateReady := True;
+
+finalization
+  GLCLGateReady := False;
+  DoneCriticalSection(GLCLGate);
 
 end.
