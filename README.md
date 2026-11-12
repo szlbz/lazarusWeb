@@ -6,13 +6,15 @@
 这个在内网使用还是可以的，方便只会写lazarus普通桌面应用人，如果不使用第三方可视控件，可以很简单就可以转为Web应用。  
 lazarusWeb默认使用Alpine.js，也可以使用Ext js  
 # 特别说明：这个框架肯定有很多问题，只能用来验证lazarus桌面程序快速转为Web应用的可能和效果。  
-<img width="1879" height="1277" alt="QQ_2026-11-12_10-00-49" src="https://github.com/user-attachments/assets/5d491f53-0752-4eb3-8f02-be63c46e3fc4" />
-<img width="1840" height="1185" alt="QQ_2026-11-12_10-01-14" src="https://github.com/user-attachments/assets/5825dcfc-f786-458e-b54f-522d1488f5a4" />
-<img width="1825" height="1180" alt="QQ_2026-11-12_10-01-51" src="https://github.com/user-attachments/assets/ad10f597-bd4b-4b31-969b-7372a997715c" />
-<img width="1866" height="1183" alt="QQ_2026-11-12_10-02-09" src="https://github.com/user-attachments/assets/e3f15d71-38e9-4c88-b432-d71c7b952702" />
-<img width="1847" height="1188" alt="QQ_2026-11-12_10-07-21" src="https://github.com/user-attachments/assets/efdf4e8c-9740-40d7-9f9e-2054bfb98f16" />
-<img width="1851" height="1197" alt="QQ_2026-11-12_10-07-43" src="https://github.com/user-attachments/assets/687862cd-4041-4f46-a393-707ed1bd15ba" />
-<img width="1832" height="1189" alt="QQ_2026-11-12_10-07-59" src="https://github.com/user-attachments/assets/f5fac17d-2bfc-4b00-a402-88b11e2b3f10" />
-<img width="1814" height="1180" alt="QQ_2026-11-12_10-08-16" src="https://github.com/user-attachments/assets/05b32887-eaa8-4a95-bb19-1f7b6833d8af" />
-<img width="1821" height="1174" alt="QQ_2026-11-12_10-08-34" src="https://github.com/user-attachments/assets/2af69890-6d88-4697-aa17-f9b31520a5d0" />
-<img width="1815" height="1174" alt="QQ_2026-11-12_10-08-58" src="https://github.com/user-attachments/assets/0c056798-9033-4624-b9f6-86f110ff6a06" />
+<img width="1836" height="1271" alt="QQ_2026-11-12_17-10-34" src="https://github.com/user-attachments/assets/5b863786-318e-496f-85d9-c603eb295d5a" />
+<img width="1845" height="1269" alt="QQ_2026-11-12_17-11-14" src="https://github.com/user-attachments/assets/2f6bb2ff-cae0-4177-b82e-1032c1663d2c" />
+<img width="1821" height="1179" alt="QQ_2026-11-12_17-11-33" src="https://github.com/user-attachments/assets/6cf0fb0d-6586-470a-94ca-04641d33620e" />
+<img width="1815" height="1170" alt="QQ_2026-11-12_17-11-48" src="https://github.com/user-attachments/assets/305a37e0-0fae-4fb5-b123-fa741f96c0b5" />
+<img width="1815" height="1179" alt="QQ_2026-11-12_17-12-04" src="https://github.com/user-attachments/assets/c3ccde1f-ddb7-4089-8073-978f3d0dacaa" />
+<img width="1815" height="1184" alt="QQ_2026-11-12_17-12-21" src="https://github.com/user-attachments/assets/5748a74a-e25f-4aed-b3d5-fc23327430b8" />
+<img width="1815" height="1173" alt="QQ_2026-11-12_17-12-38" src="https://github.com/user-attachments/assets/54d084f1-e637-4b60-a2ed-7b5f97cccd4f" />
+<img width="1809" height="1177" alt="QQ_2026-11-12_17-13-01" src="https://github.com/user-attachments/assets/7fbe0270-3a95-424a-8c35-24fc87f50a05" />
+<img width="1815" height="1179" alt="QQ_2026-11-12_17-17-44" src="https://github.com/user-attachments/assets/92e18df9-9ca7-4565-9b78-1e73260f254c" />
+<img width="1817" height="1179" alt="QQ_2026-11-12_17-18-11" src="https://github.com/user-attachments/assets/8b8df772-352e-43ad-97e9-f559cfc02b66" />
+<img width="1813" height="1183" alt="QQ_2026-11-12_17-18-30" src="https://github.com/user-attachments/assets/2ab85842-8c4c-4ff4-8e67-926a38b408f2" />
+![Uploading QQ_2026-11-12_17-18-53.png…]()
