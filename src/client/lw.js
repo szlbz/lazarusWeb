@@ -627,6 +627,12 @@ var LW = (function () {
                    占上半部分，固定高度会在标签和编辑框之间白留一条（看起来
                    "间距偏大"）。auto 高度下盒子贴着文字走，间距就是 LabelSpacing。 */
                 if (node.boundfor) delete cfg.height;
+                /* TLabel.AutoSize：单行标签盒子缩到文字宽，文字贴 Left，
+                   Alignment(taCenter) 因此不起作用。nogui 服务端量不准 CJK
+                   字宽，宽高都不下发，绝对定位的 el 按内容自适应；
+                   带换行的保留服务端宽度、高度自适应。 */
+                if (node.autosize && !node.wordwrap) { delete cfg.width; delete cfg.height; }
+                else if (node.autosize) delete cfg.height;
                 c = addTo(Ext.create('Ext.Component', cfg), ct);
                 /* TLabeledEdit 的 TBoundLabel：服务端按编辑框边界给了初值，
                    但 lpLeft/lpRight 依赖标签真实宽度（nogui 服务端量 CJK

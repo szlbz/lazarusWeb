@@ -38,7 +38,10 @@ var LW = (function () {
         primary: false,
         multiTab: false,
         after: -1,
-        inflight: 0
+        inflight: 0,
+        tver: -1,     /* 已应用的树版本（增量补丁用；-1 = 未知，下帧要全量） */
+        nPatch: 0,    /* 收到并应用过的补丁数（诊断用，LW.stats() 可见） */
+        nFull: 0,     /* 收到过的全量树数 */
     };
 
     /* ---------------- 工具 ---------------- */
@@ -263,7 +266,10 @@ var LW = (function () {
 
     function applyEventResp(resp, err) {
         if (err) { log('event failed', err); return; }
-        if (resp && resp.ok) applyPayload(resp);
+        if (resp && resp.ok) {
+            if (resp.patch) applyPatch(resp);
+            else applyPayload(resp);
+        }
         else if (resp && resp.err) log('event err', resp.err);
     }
 
@@ -297,6 +303,11 @@ var LW = (function () {
         if (!S.sid) return;
         var node = S.ND[id];
         var payload = { sid: S.sid, id: id, ev: ev, tab: S.tab };
+        /* 增量补丁：patch=1 声明本前端懂 ops，tver 是已应用的树版本。
+           服务端 --patch=0 或没带这两个字段时一律回全量 —— 所以老缓存
+           js、Ext 渲染层不会因为服务端开了补丁而白屏 */
+        payload.patch = 1;
+        if (S.tver >= 0) payload.tver = S.tver;
         if (extra) Object.keys(extra).forEach(function (k) { payload[k] = extra[k]; });
         /* 带上窗体值快照：没挂 OnChange 的编辑框平时不回传值，服务端只有
            初始 Text —— 点"登录"会拿旧密码去校验。 */
@@ -1567,8 +1578,15 @@ var LW = (function () {
         w.style.top = (node.y || 0) + 'px';
         if (node.kind === 'label' || node.kind === 'static') {
             if (!node.boundfor) {
-                if (node.w) w.style.width = node.w + 'px';
-                if (node.h) w.style.height = node.h + 'px';
+                if (node.autosize && !node.wordwrap) {
+                    /* LCL AutoSize：单行标签盒子缩到文字宽，文字贴 Left，
+                       Alignment(taCenter) 因此不起作用。nogui 服务端量不准
+                       CJK 字宽，宽高都不下发，绝对定位的盒子按内容自适应
+                       （否则 taCenter 会在整窗宽的盒子里把文字推到中央）。 */
+                } else {
+                    if (node.w) w.style.width = node.w + 'px';
+                    if (node.h) w.style.height = node.h + 'px';
+                }
             }
         } else {
             if (node.w) w.style.width = node.w + 'px';
@@ -2105,6 +2123,178 @@ var LW = (function () {
         }
     }
 
+    /* ---------------- 增量补丁（服务端 --patch=1） ----------------
+       ops 形如 ["p",id,{props}] / ["a",父id,下标,node] / ["d",id] / ["m",id,父id,下标]。
+       和"全量重下"相比只是少传数据，界面上走的仍是同一套 patchNode /
+       createNode / destroyNode，所以两条路的渲染行为天然一致。
+
+       版本（tver）对不上、窗体不认识、节点找不到 —— 一律退回全量（refreshTree），
+       不尝试修补。丢帧/多页签/重连都靠这一条自愈，不需要重传队列。 */
+
+    function applyPatch(p) {
+        if (!p || !p.patch) return false;
+        S.nPatch++;
+        if (typeof p.base === 'number' && S.tver >= 0 && p.base !== S.tver) {
+            log('patch ver mismatch', p.base, S.tver);
+            S.tver = -1;
+            refreshTree();
+            return true;
+        }
+        var bad = false;
+        try {
+            p.patch.forEach(function (fp) {
+                var fm = S.forms[fp.f];
+                if (!fm) { bad = true; return; }
+                var idx = null, dirty = false;
+                (fp.ops || []).forEach(function (op) {
+                    if (!idx) idx = treeIndexOf(fp.f);
+                    var tag = op[0];
+                    if (tag === 'p') {
+                        applyPropsOp(fp.f, fm, op[1], op[2], idx);
+                    } else {
+                        applyStructOp(fp.f, fm, op, idx);
+                        dirty = true;
+                        idx = null;       /* 结构变了，索引作废，下一条重算 */
+                    }
+                });
+                if (dirty && !S.forms[fp.f]) bad = true;
+            });
+        } catch (e) {
+            log('patch failed', e);
+            bad = true;
+        }
+        if (bad) {
+            S.tver = -1;
+            refreshTree();
+            return true;
+        }
+        S.tver = (typeof p.tver === 'number') ? p.tver : -1;
+        return true;
+    }
+
+    /* 窗体当前的节点索引：id -> {n: 节点对象, p: 父节点} */
+    function treeIndexOf(formId) {
+        var fm = S.forms[formId];
+        var out = {};
+        if (!fm) return out;
+        (function walk(n, parent) {
+            out[n.id] = { n: n, p: parent };
+            (n.children || []).forEach(function (c) { walk(c, n); });
+        })(fm.f, null);
+        return out;
+    }
+
+    /* 容器上下文（createNode / runLayout 要的 ct） */
+    function ctOfNode(n, formId) {
+        if (!n || n.id === formId) {
+            var fm = S.forms[formId];
+            return fm ? { body: fm.body, winId: formId } : null;
+        }
+        var el = S.E[n.id];
+        if (!el) return null;
+        var body = el.querySelector('.lw-kids');
+        if (n.kind === 'tabs') body = el.querySelector('.lw-tabs-body');
+        if (!body) return null;
+        return {
+            body: body, winId: S.WIN[n.id], flow: (n.kind === 'toolbar'),
+            parentKind: n.kind, parentId: n.id
+        };
+    }
+
+    /* 按 list 的顺序把 body 里的元素排好（appendChild/insertBefore 都只是搬动，
+       不会重建，所以焦点和滚动位置都保得住） */
+    function reorderDom(body, list) {
+        if (!body) return;
+        var ref = null;
+        for (var i = list.length - 1; i >= 0; i--) {
+            var el = S.E[list[i].id];
+            if (!el) continue;
+            if (el.parentNode !== body || el.nextSibling !== ref) body.insertBefore(el, ref);
+            ref = el;
+        }
+    }
+
+    function applyPropsOp(formId, fm, id, props, idx) {
+        if (!props) return;
+        var cur = (id === formId) ? fm.f : S.ND[id];
+        if (!cur) return;
+        var merged = {};
+        Object.keys(cur).forEach(function (k) { merged[k] = cur[k]; });
+        Object.keys(props).forEach(function (k) {
+            /* null = 服务端明确"这个属性没了"（如 TImage 清空图片） */
+            merged[k] = props[k];
+        });
+        if (id === formId) {
+            fm.f = merged;
+            S.ND[id] = merged;
+            var cap = fm.el.querySelector('.lw-win-cap');
+            if (cap) cap.textContent = merged.caption || merged.name || '';
+            if (fm.__lwStatus && merged.status) {
+                fm.__lwStatus.innerHTML = merged.status.map(function (t) {
+                    return '<span class="lw-status-item">' + esc(t == null ? '' : String(t)) + '</span>';
+                }).join('');
+            }
+            if (merged.children) runLayout({ body: fm.body }, merged.children);
+            return;
+        }
+        var info = idx[id];
+        if (info && info.p && info.p.children) {
+            var at = info.p.children.indexOf(cur);
+            if (at >= 0) info.p.children[at] = merged;   /* 保持树里指向新对象 */
+        }
+        patchNode(merged);
+    }
+
+    function applyStructOp(formId, fm, op, idx) {
+        var tag = op[0];
+        var pid = (tag === 'a') ? op[1] : (tag === 'm' ? op[2] : 0);
+        var pnode = (pid === formId) ? fm.f : (pid ? S.ND[pid] : null);
+
+        if (tag === 'a') {
+            if (!pnode) return;
+            var arr = pnode.children || (pnode.children = []);
+            var at = op[2];
+            if (!(at >= 0) || at > arr.length) at = arr.length;
+            arr.splice(at, 0, op[3]);
+            var ct1 = ctOfNode(pnode, formId);
+            if (!ct1) return;
+            destroyNode(op[3].id);          /* 万一有残留 */
+            createNode(op[3], ct1);
+            reorderDom(ct1.body, arr);
+            runLayout(ct1, arr);
+            return;
+        }
+
+        if (tag === 'd') {
+            var info = idx[op[1]];
+            if (!info) return;
+            if (info.p && info.p.children) {
+                var k = info.p.children.indexOf(info.n);
+                if (k >= 0) info.p.children.splice(k, 1);
+            }
+            var ct2 = ctOfNode(info.p, formId);
+            destroyNode(op[1]);
+            if (ct2) runLayout(ct2, (info.p && info.p.children) || []);
+            return;
+        }
+
+        if (tag === 'm') {
+            if (!pnode) return;
+            var ma = pnode.children || [];
+            var mi = -1, q;
+            for (q = 0; q < ma.length; q++) if (ma[q].id === op[1]) { mi = q; break; }
+            if (mi < 0) return;
+            var mv = ma.splice(mi, 1)[0];
+            var mat = op[3];
+            if (!(mat >= 0) || mat > ma.length) mat = ma.length;
+            ma.splice(mat, 0, mv);
+            var ct3 = ctOfNode(pnode, formId);
+            if (!ct3) return;
+            reorderDom(ct3.body, ma);
+            runLayout(ct3, ma);
+        }
+    }
+
     /* dbgrid 列变化：整个网格块重建（表头列数变了，x-for 补不了） */
     function rebuildDbGrid(id, n) {
         var el = S.E[id];
@@ -2138,6 +2328,8 @@ var LW = (function () {
     function applyPayload(p) {
         if (!p || !p.forms) return;
         S.sid = p.sid || S.sid;
+        S.nFull++;
+        S.tver = (typeof p.tver === 'number') ? p.tver : -1;
         var seen = {};
         p.forms.forEach(function (f) {
             seen[f.id] = true;
@@ -2530,6 +2722,13 @@ var LW = (function () {
     return {
         start: start,
         reload: function () { boot(); },
-        sid: function () { return S.sid; }
+        sid: function () { return S.sid; },
+        /* 诊断：补丁/全量各来了多少次，当前树版本 */
+        stats: function () {
+            return { patch: S.nPatch, full: S.nFull, tver: S.tver };
+        },
+        /* 强制与服务器对一次全量（GET /lw/api/tree，不改任何业务状态）。
+           用途：页面看起来"不刷新"时手动校准，也是补丁一致性的验收入口 */
+        resync: function () { S.tver = -1; refreshTree(); }
     };
 })();
