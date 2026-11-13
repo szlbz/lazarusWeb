@@ -1,0 +1,102 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<CONFIG>
+  <Package Version="5">
+    <Name Value="lwdesign"/>
+    <Type Value="DesignTime"/>
+    <Author Value="lazarusWeb"/>
+    <License Value="LGPL"/>
+    <Description Value="lazarusWeb 设计期：两个新建工程向导、New Form 里的 TLWForm、组件面板（TLWDBGrid/TLWChart/TLWGauge/TLWColorPicker/TLWHTMLFrame/TLWPDFFrame/TLWDBNavigator/TLWFileUpload/TLWSideMenu/TLWReport）"/>
+    <Version Major="1" Minor="0"/>
+    <Files Count="14">
+      <Item1>
+        <Filename Value="lwdsgnregister.pas"/>
+        <HasRegisterProc Value="True"/>
+        <UnitName Value="lwdsgnregister"/>
+      </Item1>
+      <Item2>
+        <Filename Value="lwdesign_icons.lrs"/>
+        <Type Value="Binary"/>
+      </Item2>
+      <Item3>
+        <Filename Value="icons/TLWForm.png"/>
+        <Type Value="Binary"/>
+      </Item3>
+      <Item4>
+        <Filename Value="icons/TLWLoginForm.png"/>
+        <Type Value="Binary"/>
+      </Item4>
+      <Item5>
+        <Filename Value="icons/TLWFileUpload.png"/>
+        <Type Value="Binary"/>
+      </Item5>
+      <Item6>
+        <Filename Value="icons/TLWDBGrid.png"/>
+        <Type Value="Binary"/>
+      </Item6>
+      <Item7>
+        <Filename Value="icons/TLWDBNavigator.png"/>
+        <Type Value="Binary"/>
+      </Item7>
+      <Item8>
+        <Filename Value="icons/TLWChart.png"/>
+        <Type Value="Binary"/>
+      </Item8>
+      <Item9>
+        <Filename Value="icons/TLWGauge.png"/>
+        <Type Value="Binary"/>
+      </Item9>
+      <Item10>
+        <Filename Value="icons/TLWColorPicker.png"/>
+        <Type Value="Binary"/>
+      </Item10>
+      <Item11>
+        <Filename Value="icons/TLWHTMLFrame.png"/>
+        <Type Value="Binary"/>
+      </Item11>
+      <Item12>
+        <Filename Value="icons/TLWPDFFrame.png"/>
+        <Type Value="Binary"/>
+      </Item12>
+      <Item13>
+        <Filename Value="icons/gen_icons.py"/>
+        <Type Value="Text"/>
+      </Item13>
+      <Item14>
+        <Filename Value="icons/TLWSideMenu.png"/>
+        <Type Value="Binary"/>
+      </Item14>
+    </Files>
+    <CompatibilityMode Value="True"/>
+    <RequiredPkgs Count="4">
+      <Item1>
+        <PackageName Value="LCL"/>
+      </Item1>
+      <Item2>
+        <PackageName Value="IDEIntf"/>
+      </Item2>
+      <Item3>
+        <PackageName Value="lwcore"/>
+      </Item3>
+      <Item4>
+        <PackageName Value="lwserver"/>
+      </Item4>
+    </RequiredPkgs>
+    <UsageOptions>
+      <UnitPath Value="$(PkgOutDir)"/>
+    </UsageOptions>
+    <PublishOptions>
+      <Version Value="2"/>
+    </PublishOptions>
+    <CompilerOptions>
+      <Version Value="11"/>
+      <SearchPaths>
+        <UnitOutputDirectory Value="../lib/$(TargetCPU)-$(TargetOS)-$(LCLWidgetType)"/>
+      </SearchPaths>
+      <Linking>
+        <Debugging>
+          <GenerateDebugInfo Value="False"/>
+        </Debugging>
+      </Linking>
+    </CompilerOptions>
+  </Package>
+</CONFIG>
