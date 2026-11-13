@@ -245,6 +245,41 @@ begin
     LWLogFmt('[exit] %6d ms  %s', [Int64(GetTickCount64 - GTraceT0), AText]);
 end;
 
+{ ---------------- 事件耗时剖析（LW_PROF=1 打开） ----------------
+
+  单位：**微秒**。disp = 事件派发（业务代码 + BuildPayload 里的控件树重建），
+  json = 把树编码成文本，send = 写 socket。
+  为什么不用 GetTickCount64：Windows 上精度 15.6ms，正好和这里的单次事件
+  同量级，量出来全是 0/16 两个值，等于没测。计数器的实现统一放在
+  lwbase.LWNowUS（Windows 走 QPC，Unix 走 clock_gettime），这里只取时间差。
+  默认关闭；打开时每个事件一行，只适合短时间采样。 }
+var
+  GProfOn: Boolean = False;
+  GProfInit: Boolean = False;
+
+function LWProfOn: Boolean;
+begin
+  if not GProfInit then
+  begin
+    GProfInit := True;
+    GProfOn := GetEnvironmentVariable('LW_PROF') <> '';
+  end;
+  Result := GProfOn;
+end;
+
+{ 单调微秒计数 }
+function LWProfNow: Int64;
+begin
+  Result := LWNowUS;
+end;
+
+procedure LWProfLog(const ATag: string; ADisp, AJson, ASend: Int64; ABytes: Integer);
+begin
+  if not LWProfOn then Exit;
+  LWLogFmt('[prof] %s disp=%d us json=%d us send=%d us bytes=%d',
+    [ATag, ADisp, AJson, ASend, ABytes]);
+end;
+
 { ---------------- 活着的 WebSocket 连接 ---------------- }
 
 { 升级成功后 socket 的所有权从 fcl-web 移交给 WSUpgrade 里的帧循环，
@@ -1457,9 +1492,10 @@ procedure TLWServer.ApiEvent(var ARequest: TFPHTTPConnectionRequest;
   var AResponse: TFPHTTPConnectionResponse);
 var
   body: TJSONObject;
-  sid, err: string;
+  sid, err, sjson: string;
   s: TLWSession;
   payload: TJSONObject;
+  t0, t1, t2, t3: Int64;
 begin
   body := ParseBody(ARequest);
   if body = nil then
@@ -1484,9 +1520,11 @@ begin
         挂起期间仍可能发来第二个事件（连点 / 点别处 / 失败重试）。串行化
         同时保证"事件里再 BuildPayload"不会与其他序列化并发（见 TLWSession.FExec）}
       s.LockExec;
+      t0 := LWProfNow;
       try
         payload := LWHandleEvent(s, body, err);
       finally
+        t1 := LWProfNow;
         s.UnlockExec;
         LWSetCurrentTab('');
       end;
@@ -1497,7 +1535,14 @@ begin
         Exit;
       end;
       try
-        Reply(payload.AsJSON, 'application/json; charset=utf-8', 200, AResponse);
+        t2 := LWProfNow;
+        sjson := payload.AsJSON;
+        t3 := LWProfNow;
+        Reply(sjson, 'application/json; charset=utf-8', 200, AResponse);
+        if LWProfOn then
+          LWProfLog(Format('http ev=%s id=%d', [JGetStr(body, 'ev'),
+            JGetInt(body, 'id', 0)]),
+            t1 - t0, t3 - t2, LWProfNow - t3, Length(sjson));
       finally
         payload.Free;
       end;
@@ -1962,12 +2007,13 @@ procedure TLWServer.WSUpgrade(aConnection: TFPHTTPConnection;
   aRequest: TFPHTTPConnectionRequest);
 var
   sock: TSocketStream;
-  key, sid, txt, err: string;
+  key, sid, txt, err, sjson: string;
   op: Byte;
   s: TLWSession;
   body, payload: TJSONObject;
   okconn: Boolean;
   idle: Integer;
+  t0, t1, t2, t3: Int64;
 begin
   sock := aConnection.Socket;
   key := Trim(aRequest.CustomHeaders.Values['sec-websocket-key']);
@@ -2044,9 +2090,11 @@ begin
               { 与 HTTP 事件路径同一把执行锁：WS 帧事件与 HTTP 事件可能
                 同时到达（浏览器 WS 重连期间走 HTTP 兜底），必须串行 }
               s.LockExec;
+              t0 := LWProfNow;
               try
                 payload := LWHandleEvent(s, body, err);
               finally
+                t1 := LWProfNow;
                 s.UnlockExec;
                 LWSetCurrentTab('');
               end;
@@ -2055,7 +2103,16 @@ begin
                   okconn := lwwebsocket.WSSendText(sock,
                     '{"ok":false,"err":' + TJSONString.Create(err).AsJSON + '}')
                 else
-                  okconn := lwwebsocket.WSSendText(sock, payload.AsJSON);
+                begin
+                  t2 := LWProfNow;
+                  sjson := payload.AsJSON;
+                  t3 := LWProfNow;
+                  okconn := lwwebsocket.WSSendText(sock, sjson);
+                  if LWProfOn then
+                    LWProfLog(Format('ws ev=%s id=%d', [JGetStr(body, 'ev'),
+                      JGetInt(body, 'id', 0)]),
+                      t1 - t0, t3 - t2, LWProfNow - t3, Length(sjson));
+                end;
               finally
                 payload.Free;
               end;

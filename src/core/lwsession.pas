@@ -20,7 +20,7 @@ unit lwsession;
 interface
 
 uses
-  Classes, SysUtils, SyncObjs, Forms, Controls, fpjson, lwbase, lwwriter, lwform;
+  Classes, SysUtils, SyncObjs, Forms, Controls, fpjson, lwbase, lwwriter, lwform, lwdiff;
 
 const
   { 模态等待上限，防止浏览器崩溃后服务端线程永久悬挂 }
@@ -100,9 +100,25 @@ type
     { 挂到本会话上的页签数（>1 = 多页签共享，推送改走轮询游标） }
     FAttached: Integer;
     FMultiTab: Boolean;
+    { ---- 增量补丁（阶段 2，--patch=1 打开）----
+      FSnapForms 是"上一次已经交给浏览器的整棵树"，也是下一帧算 diff 的基线。
+      它的所有权在本对象；每次发全量时用新树替换。
+      FVerTree   当前树版本，客户端下次请求要带回来；对不上就发全量（自愈）。
+      为什么不做重传队列：丢帧/多页签/重连都靠"版本对不上 → 全量"兜底，
+      代价只是那一帧多 78KB，逻辑简单一个数量级。 }
+    FSnapForms: TJSONArray;
+    FVerTree: Integer;
+    FPatchOn: Boolean;
+    FClientVer: Integer;
+    FForceFull: Boolean;
     procedure SetFormWebVisible(AForm: TCustomForm; AValue: Boolean);
     { BuildPayload 的实际实现；对外只暴露带执行锁的 BuildPayload }
     function BuildPayloadCore: TJSONObject;
+    { 只序列化窗体数组（不含外壳），全量与补丁两条路都要用 }
+    function BuildFormsArray: TJSONArray;
+    { 调用方已持执行锁 + 进程闸门 }
+    function MakeFullPayload: TJSONObject;
+    procedure ReplaceSnap(AForms: TJSONArray);
   public
     constructor Create(const ASid: string; AMainForm: TCustomForm; const ARemoteIP: string);
     destructor Destroy; override;
@@ -121,6 +137,13 @@ type
 
     { 生成一次完整的组件树（含所有可见窗体） }
     function BuildPayload: TJSONObject;
+
+    { 事件响应：能补就补，否则全量。与 BuildPayload 的区别只有一点 ——
+      它会检查客户端带回的树版本（客户端没带 patch 能力时退化成全量） }
+    function BuildEventPayload: TJSONObject;
+    { 每个事件进来先登记：AClientVer = body.tver（-1 = 客户端不支持补丁）}
+    procedure BeginEventPatch(AClientVer: Integer; AForceFull: Boolean);
+    function PatchActive: Boolean;
 
     { 会话级执行锁：事件处理（LWHandleEvent）与 BuildPayload 都要持锁，
       防止两个请求线程并发操作同一棵 LCL 控件树（见 FExec 注释）。
@@ -206,6 +229,32 @@ type
 
 implementation
 
+{ 临时剖析（LW_DIFF_PROF=1）：单独量 diff 这一步花多少微秒。
+  计时统一走 lwbase.LWNowUS —— 本单元不再自己声明 kernel32 入口，
+  否则 Linux 下编不过（框架整体要跨平台）。 }
+var
+  GDiffProf: Boolean = False;
+  GDiffProfInit: Boolean = False;
+  GDiffQ0: Int64;
+
+procedure DiffProfStart;
+begin
+  if not GDiffProfInit then
+  begin
+    GDiffProfInit := True;
+    GDiffProf := GetEnvironmentVariable('LW_DIFF_PROF') <> '';
+  end;
+  if GDiffProf then GDiffQ0 := LWNowUS;
+end;
+
+procedure DiffProfStop(const AStats: TLWDiffStats);
+begin
+  if not GDiffProf then Exit;
+  Writeln(ErrOutput, '[diff] ', LWNowUS - GDiffQ0,
+    ' us  nodes=', AStats.Nodes, ' +', AStats.Added, ' -', AStats.Removed,
+    ' ~', AStats.Changed, ' m', AStats.Moved);
+end;
+
 procedure LWSetCurrentTab(const ATab: string);
 begin
   LWCurrentTab := ATab;
@@ -262,7 +311,11 @@ begin
   FForms := TList.Create;
   FIdOf := TStringList.Create;
   FIdOf.Sorted := True;
-  FIdOf.CaseSensitive := False;
+  { 键是十进制数字串，大小写毫无意义。**必须 True**：False 时有序表的
+    查找走 AnsiCompareText，Windows 上是带 locale 的 CompareStringW，
+    一次 ~10µs；每个节点序列化都要查一次 id，160 个节点就是 1.5ms
+    （和 lwdiff 那轮翻车同一个坑，见 NOTES 坑 100） }
+  FIdOf.CaseSensitive := True;
   FIdOf.Duplicates := dupIgnore;
   FCompOf := TFPList.Create;
   FCompOf.Add(nil); { id 从 1 开始，0 留空 }
@@ -280,6 +333,13 @@ begin
   FModalDone := TEvent.Create(nil, False, False, '');
   FDlgDone := TEvent.Create(nil, False, False, '');
   FLastAccess := Now;
+  { 增量补丁：进程级开关（--patch=1）。关着的时候快照/版本完全不维护，
+    老路径零开销 —— 这也是灰度期间出问题能一键退回的保证 }
+  FPatchOn := LWServerPatchMode;
+  FVerTree := 0;
+  FSnapForms := nil;
+  FClientVer := -1;
+  FForceFull := True;
   if AMainForm <> nil then
   begin
     if AMainForm is TLWForm then
@@ -302,6 +362,7 @@ begin
     LWLCLLeave;
   end;
   FForms.Free;
+  FSnapForms.Free;
   FIdOf.Free;
   FCompOf.Free;
   FVars.Free;
@@ -541,7 +602,7 @@ begin
       多个会话同时序列化（尤其刚建窗体那一刻）会踩坏 Graphics 的全局状态 }
     LWLCLEnter;
     try
-      Result := BuildPayloadCore;
+      Result := MakeFullPayload;
     finally
       LWLCLLeave;
     end;
@@ -550,7 +611,122 @@ begin
   end;
 end;
 
-function TLWSession.BuildPayloadCore: TJSONObject;
+procedure TLWSession.ReplaceSnap(AForms: TJSONArray);
+begin
+  if FSnapForms = AForms then Exit;
+  FSnapForms.Free;
+  FSnapForms := AForms;
+end;
+
+function TLWSession.MakeFullPayload: TJSONObject;
+var
+  arr: TJSONArray;
+begin
+  Result := TJSONObject.Create;
+  Result.Add('ok', True);
+  Result.Add('sid', FSid);
+  Result.Add('ver', LW_VERSION);
+
+  arr := BuildFormsArray;
+  if FPatchOn then
+  begin
+    { 版本 +1：客户端下一次请求必须带回它，否则下一帧发全量。
+      快照要留一份（payload 会带走 arr），克隆只在全量时发生 ——
+      正常事件走补丁，这条路一天走不了几次 }
+    Inc(FVerTree);
+    Result.Add('tver', FVerTree);
+    ReplaceSnap(TJSONArray(arr.Clone));
+  end;
+  Result.Add('forms', arr);
+end;
+
+function TLWSession.BuildEventPayload: TJSONObject;
+var
+  arr, patch: TJSONArray;
+  stats: TLWDiffStats;
+  useFull: Boolean;
+  nStruct: Integer;
+begin
+  LockExec;
+  try
+    LWLCLEnter;
+    try
+      Result := TJSONObject.Create;
+      Result.Add('ok', True);
+      Result.Add('sid', FSid);
+      Result.Add('ver', LW_VERSION);
+
+      arr := BuildFormsArray;
+      patch := nil;
+      useFull := True;
+      FillChar(stats, SizeOf(stats), 0);
+
+      if FPatchOn and (not FForceFull) and (FSnapForms <> nil) and
+         (FClientVer = FVerTree) then
+      begin
+        DiffProfStart;
+        patch := LWDiffForms(FSnapForms, arr, stats);
+        DiffProfStop(stats);
+        if patch <> nil then
+        begin
+          { 节点数太多就别玩补丁了：快照本身就占一份内存，
+            而且这种界面每次事件改动都很大，补丁省不了多少 }
+          if stats.Nodes > 3000 then
+          begin
+            FPatchOn := False;
+            FreeAndNil(patch);
+          end
+          else
+          begin
+            nStruct := stats.Added + stats.Removed;
+            { 结构大幅变化（换页签内容/重建列表）时全量更小也更可靠 }
+            useFull := (nStruct > 20) or (nStruct * 2 > stats.Nodes);
+            if useFull then FreeAndNil(patch);
+          end;
+        end;
+      end;
+
+      if useFull or (patch = nil) then
+      begin
+        Inc(FVerTree);
+        Result.Add('tver', FVerTree);
+        Result.Add('forms', arr);
+        if FPatchOn then
+          ReplaceSnap(TJSONArray(arr.Clone));
+        FForceFull := False;
+      end
+      else
+      begin
+        Result.Add('base', FVerTree);
+        Inc(FVerTree);
+        Result.Add('tver', FVerTree);
+        Result.Add('patch', patch);   { Result 接管 patch }
+        { 新树直接当基线：这里不用克隆，arr 反正不会被别人释放 }
+        ReplaceSnap(arr);
+      end;
+    finally
+      LWLCLLeave;
+    end;
+  finally
+    UnlockExec;
+  end;
+end;
+
+{ 每个事件开始时定基线：客户端报的树版本 + 它懂不懂补丁 }
+procedure TLWSession.BeginEventPatch(AClientVer: Integer; AForceFull: Boolean);
+begin
+  FClientVer := AClientVer;
+  { 客户端没声明补丁能力（老的缓存 js / Ext 渲染层）→ 一律全量。
+    这条比"服务端开关"更关键：开着 --patch=1 也不会把老客户端打死 }
+  FForceFull := AForceFull or (AClientVer < 0) or (not FPatchOn);
+end;
+
+function TLWSession.PatchActive: Boolean;
+begin
+  Result := FPatchOn and (FSnapForms <> nil);
+end;
+
+function TLWSession.BuildFormsArray: TJSONArray;
 var
   w: TLWWriter;
   arr: TJSONArray;
@@ -558,11 +734,6 @@ var
   f: TCustomForm;
   list: TList;
 begin
-  Result := TJSONObject.Create;
-  Result.Add('ok', True);
-  Result.Add('sid', FSid);
-  Result.Add('ver', LW_VERSION);
-
   { 复制一份窗体清单，避免序列化过程中被别的线程改动 }
   list := TList.Create;
   FLock.Enter;
@@ -595,7 +766,12 @@ begin
     w.Free;
     list.Free;
   end;
-  Result.Add('forms', arr);
+  Result := arr;
+end;
+
+function TLWSession.BuildPayloadCore: TJSONObject;
+begin
+  Result := MakeFullPayload;
 end;
 
 function TLWSession.ShowModalInSession(AForm: TCustomForm): Integer;

@@ -31,7 +31,7 @@ uses
   Classes, SysUtils, Variants, Graphics, Controls, Forms, StdCtrls, ExtCtrls, ComCtrls,
   Grids, Menus, Buttons, MaskEdit, Spin, CheckLst, ValEdit, TypInfo, LCLProc, fpjson,
   EditBtn, GroupedEdit, DB, DBCtrls, DBGrids, lwbase, lwform, lwfileupload, lwdbnav, lwweb,
-  lwchart, lwdbgrid, lwui;
+  lwchart, lwdbgrid, lwui, lwrlog;
 
 type
   TLWWriter = class
@@ -44,6 +44,7 @@ type
     function WriteMenuItems(MI: TMenuItem): TJSONArray;
     function StatusPanels(SB: TStatusBar): TJSONArray;
     procedure WriteKindProps(C: TControl; const AKind: string; O: TJSONObject);
+    procedure WriteKindPropsBody(C: TControl; const AKind: string; O: TJSONObject);
     function MakeBase(C: TControl; const AKind: string): TJSONObject;
     procedure WriteImage(C: TImage; O: TJSONObject);
     procedure WritePicture(pic: TPicture; AStretch, ACenter: Boolean;
@@ -51,6 +52,8 @@ type
     procedure WriteGrid(G: TStringGrid; O: TJSONObject);
     procedure WriteDrawGrid(G: TDrawGrid; O: TJSONObject);
     procedure WriteDBGrid(G: TDBGrid; O: TJSONObject);
+    function DBCellsRow(G: TDBGrid; const AEtv: array of Byte;
+      const AFilter: string; out AVisible: Boolean): TJSONArray;
     procedure WriteLookupCombo(L: TDBLookupComboBox; O: TJSONObject);
     procedure WriteLookupList(L: TDBLookupListBox; O: TJSONObject);
     procedure WriteLookupItems(AListSource: TDataSource;
@@ -61,11 +64,87 @@ type
     function TreeNodeJson(N: TTreeNode): TJSONObject;
   public
     constructor Create(AIds: TLWIdFunc);
+    destructor Destroy; override;
     function WriteForm(AForm: TCustomForm; AIsModal: Boolean): TJSONObject;
     function WriteControl(C: TControl): TJSONObject;
   end;
 
+{ 临时剖析：按 kind 打印耗时（LW_KIND_PROF=1 时才有数据）}
+procedure LWKindProfReport;
+
 implementation
+
+{ ---- 临时剖析：按 kind 累计 WriteKindProps 的耗时（LW_KIND_PROF=1 打开）---- }
+var
+  GKindProfOn: Boolean = False;
+  GKindProfInit: Boolean = False;
+  GKindT0: Int64 = 0;
+  GWalkT0: Int64 = 0;
+  GKindNames: array of string;
+  GKindCnt: array of Integer;
+  GKindUS: array of Int64;
+
+procedure KindProfAdd(const AKind: string; AUS: Int64);
+var
+  i: Integer;
+begin
+  if not GKindProfOn then Exit;
+  for i := 0 to High(GKindNames) do
+    if GKindNames[i] = AKind then
+    begin
+      Inc(GKindCnt[i]);
+      Inc(GKindUS[i], AUS);
+      Exit;
+    end;
+  i := Length(GKindNames);
+  SetLength(GKindNames, i + 1);
+  SetLength(GKindCnt, i + 1);
+  SetLength(GKindUS, i + 1);
+  GKindNames[i] := AKind;
+  GKindCnt[i] := 1;
+  GKindUS[i] := AUS;
+end;
+
+procedure KindProfStart;
+begin
+  if not GKindProfInit then
+  begin
+    GKindProfInit := True;
+    GKindProfOn := GetEnvironmentVariable('LW_KIND_PROF') <> '';
+  end;
+  if not GKindProfOn then Exit;
+  GKindT0 := LWNowUS;
+end;
+
+procedure KindProfStop(const AKind: string);
+begin
+  if not GKindProfOn then Exit;
+  KindProfAdd(AKind, LWNowUS - GKindT0);
+end;
+
+procedure LWKindProfReport;
+var
+  i, j: Integer;
+  s: string;
+  n: string;
+  c: Integer;
+  u: Int64;
+begin
+  if High(GKindNames) < 0 then Exit;
+  for i := 0 to High(GKindNames) - 1 do
+    for j := 0 to High(GKindNames) - 1 - i do
+      if GKindUS[j] < GKindUS[j + 1] then
+      begin
+        n := GKindNames[j]; GKindNames[j] := GKindNames[j + 1]; GKindNames[j + 1] := n;
+        c := GKindCnt[j]; GKindCnt[j] := GKindCnt[j + 1]; GKindCnt[j + 1] := c;
+        u := GKindUS[j]; GKindUS[j] := GKindUS[j + 1]; GKindUS[j + 1] := u;
+      end;
+  s := '';
+  for i := 0 to High(GKindNames) do
+    s := s + GKindNames[i] + '=' + IntToStr(GKindCnt[i]) + '/' + IntToStr(GKindUS[i]) + 'us ';
+  WriteLn(StdErr, '[kindprof] ' + s);
+end;
+
 
 { 控件内部自己造出来的辅助控件（如 TStringGrid 的 TStringCellEditor），
   它们不出现在对象检视器里，也不应该发到浏览器 }
@@ -190,6 +269,11 @@ begin
   FIds := AIds;
 end;
 
+destructor TLWWriter.Destroy;
+begin
+  inherited Destroy;
+end;
+
 function TLWWriter.NodeId(C: TComponent): Integer;
 begin
   if not Assigned(FIds) then Exit(0);
@@ -216,9 +300,12 @@ var
   PL: PPropList;
   n, i: Integer;
   M: TMethod;
+  evT0: Int64;
 begin
   Result := TJSONArray.Create;
   if C = nil then Exit;
+  if GKindProfOn then
+    evT0 := LWNowUS;
   n := GetPropList(C, PL);
   if n > 0 then
   begin
@@ -236,6 +323,8 @@ begin
   end;
   if AForceClick and (not JArrHasStr(Result, 'OnClick')) then
     JArrAddStr(Result, 'OnClick');
+  if GKindProfOn then
+    KindProfAdd('~events', LWNowUS - evT0);
 end;
 
 function TLWWriter.MakeBase(C: TControl; const AKind: string): TJSONObject;
@@ -468,6 +557,58 @@ begin
   if Result > 400 then Result := 400;
 end;
 
+{ 把"当前记录"按可见列取成一行单元格文本。
+  AFilter 非空时顺带判断这行是否命中（命中/未命中写进 AVisible）；
+  AFilter 为空时 AVisible 恒真，调用方可以据此跳过不需要下发的行。 }
+function TLWWriter.DBCellsRow(G: TDBGrid; const AEtv: array of Byte;
+  const AFilter: string; out AVisible: Boolean): TJSONArray;
+var
+  i: Integer;
+  col: TColumn;
+  f: TField;
+  cell: string;
+begin
+  Result := TJSONArray.Create;
+  AVisible := (AFilter = '');
+  for i := 0 to G.Columns.Count - 1 do
+  begin
+    col := TColumn(G.Columns[i]);
+    if not col.Visible then Continue;
+    f := col.Field;
+    if f = nil then
+    begin
+      JArrAddStr(Result, '');
+      Continue;
+    end;
+    case AEtv[i] of
+      3:
+        begin
+          { 日期列：固定发 ISO 'yyyy-mm-dd'，前端 date 输入直接吃；
+            显示层也统一成这个无歧义格式 }
+          if f.IsNull then
+            cell := ''
+          else
+            cell := FormatDateTime('yyyy-mm-dd', f.AsDateTime);
+        end;
+      4:
+        begin
+          { 布尔列：发 '1'/'0' 作为勾选框状态。不走 DisplayText ——
+            那可能是 True/False，也可能被业务改成"是/否"，前端没法当
+            布尔值用 }
+          if (not f.IsNull) and f.AsBoolean then
+            cell := '1'
+          else
+            cell := '0';
+        end;
+    else
+      cell := f.DisplayText;
+    end;
+    JArrAddStr(Result, cell);
+    if (not AVisible) and (Pos(AFilter, LowerCase(cell)) > 0) then
+      AVisible := True;
+  end;
+end;
+
 procedure TLWWriter.WriteDBGrid(G: TDBGrid; O: TJSONObject);
 var
   ds: TDataSet;
@@ -481,7 +622,7 @@ var
   cell: string;
   items: TJSONArray;
   { 每列的编辑器类型（下标与 G.Columns 一致，含隐藏列占位）：
-    1=text 2=PickList 下拉 3=日期选择 }
+    1=text 2=PickList 下拉 3=日期选择 4=复选框（布尔列） }
   etv: array of Byte;
   { TLWDBGrid 扩展（分页/过滤/汇总）；普通 TDBGrid 时为 nil，行为完全不变 }
   lwg: TLWDBGrid;
@@ -528,11 +669,20 @@ begin
       （列只读 / 字段只读，如自增主键）。前端据此决定挂不挂编辑器。
       编辑器类型：1=文本（默认）；2=下拉（TColumn.PickList 非空，
       plist 按同下标带选项列表）；3=日期选择（日期/时间戳字段，
-      浏览器渲染成 date 输入，回传 ISO 'yyyy-mm-dd'）。
+      浏览器渲染成 date 输入，回传 ISO 'yyyy-mm-dd'）；4=复选框
+      （布尔字段，单元格常驻勾选框，点一下即写回 '1'/'0'）。
       旧前端把任何非 0 当文本编辑器，新属性不影响旧版渲染。 }
     if (col.Field <> nil) and (not col.ReadOnly) and (not col.Field.ReadOnly) then
     begin
-      if col.PickList.Count > 0 then
+      { 布尔列优先判定：这类字段不需要 PickList / 日期编辑器，
+        LCL 桌面端 TDBGrid 也是直接画一个勾选框 }
+      if col.Field is TBooleanField then
+      begin
+        etv[i] := 4;
+        cedit.Add(4);
+        plist.Add(TJSONArray.Create);
+      end
+      else if col.PickList.Count > 0 then
       begin
         etv[i] := 2;
         cedit.Add(2);
@@ -637,43 +787,28 @@ begin
 
   bm := ds.GetBookmark;
   ds.DisableControls;
+  if GKindProfOn then
+    GWalkT0 := LWNowUS;
   try
     try
       ds.First;
       while (not ds.Eof) and (cnt < LW_MAX_GRID_ROWS) do
       begin
-        row := TJSONArray.Create;
-        visible := (ft = '');
-        for i := 0 to G.Columns.Count - 1 do
-        begin
-          col := TColumn(G.Columns[i]);
-          if not col.Visible then Continue;
-          f := col.Field;
-          if f <> nil then
-          begin
-            if etv[i] = 3 then
-            begin
-              { 日期列：固定发 ISO 'yyyy-mm-dd'，前端 date 输入直接吃；
-                显示层也统一成这个无歧义格式 }
-              if f.IsNull then
-                cell := ''
-              else
-                cell := FormatDateTime('yyyy-mm-dd', f.AsDateTime);
-            end
-            else
-              cell := f.DisplayText;
-            JArrAddStr(row, cell);
-            if (not visible) and (Pos(ft, LowerCase(cell)) > 0) then
-              visible := True;
-          end
-          else
-            JArrAddStr(row, '');
-        end;
+        row := nil;
+        if ft = '' then
+          visible := True
+        else
+          { 有过滤时绕不开：得先拿到每格的文本才能判断这行命中不命中 }
+          row := DBCellsRow(G, etv, ft, visible);
+
         if visible then
         begin
           Inc(filtered);
           Inc(matchIdx);
-          lwgMatchesAdd(lwg, ds.GetBookmark);
+          { 只有 TLWDBGrid 才需要匹配行书签。原来是先建书签再判空 ——
+            普通 TDBGrid 每行白造一个书签，且没有任何人释放它 }
+          if lwg <> nil then
+            lwgMatchesAdd(lwg, ds.GetBookmark);
           { 当前记录在匹配序列里的位置（recno 按页内行号发）}
           try
             if curMatch < 0 then
@@ -681,27 +816,33 @@ begin
                 curMatch := matchIdx;
           except
           end;
-          if (sumField <> nil) and visible then
+          if sumField <> nil then
           begin
             sumVal := sumVal + sumField.AsFloat;
             Inc(sumCnt);
           end;
           if (matchIdx >= pageStart) and (matchIdx < pageEnd) then
           begin
+            { 到这里才真正读字段：1000 行的表只发 50 行，
+              另外 950 行的 DisplayText 原来全是白算的 }
+            if row = nil then
+              row := DBCellsRow(G, etv, '', visible);
             rows.Add(row);
+            row := nil;          { 交给 rows 拥有 }
             Inc(cnt);
-          end
-          else
-            row.Free;
-        end
-        else
-          row.Free;
+          end;
+        end;
+
+        if row <> nil then
+          row.Free;              { 不在本页 / 被过滤掉 }
         ds.Next;
       end;
     except
       { 遍历中途出错就返回已取到的部分，不影响其它控件序列化 }
     end;
   finally
+    if GKindProfOn then
+      KindProfAdd('~walk', LWNowUS - GWalkT0);
     if bm <> nil then
     begin
       try
@@ -990,6 +1131,16 @@ begin
 end;
 
 procedure TLWWriter.WriteKindProps(C: TControl; const AKind: string; O: TJSONObject);
+begin
+  KindProfStart;
+  try
+    WriteKindPropsBody(C, AKind, O);
+  finally
+    KindProfStop(AKind);
+  end;
+end;
+
+procedure TLWWriter.WriteKindPropsBody(C: TControl; const AKind: string; O: TJSONObject);
 var
   items, vals: TJSONArray;
   bts: TJSONArray;
@@ -1019,6 +1170,12 @@ begin
       O.Add('wordwrap', TLabel(C).WordWrap);
       O.Add('textalign', Ord(TLabel(C).Alignment));
       O.Add('layout', Ord(TLabel(C).Layout));
+      { AutoSize=True 时 LCL 把盒子缩到文字宽，Alignment（taCenter）因此
+        不起作用、文字贴着 Left。nogui 虚拟显示器量不准 CJK 字宽，直接把
+        设计期宽度（约等于整窗宽）下发、浏览器再对盒子做 text-align:center，
+        标题就会被推到窗中央（About 对话框标题跑中间就是这个）。
+        把 AutoSize 下发，浏览器端让 DOM 自适应宽度，与真实 LCL 一致。 }
+      O.Add('autosize', TLabel(C).AutoSize);
     end;
     { TBoundLabel（TLabeledEdit 的标签）：nogui 下 LCL 的锚点没机会解析，
       位置是 (0,0)。按 LCL 的 DoPositionLabel 语义（枚举 lpAbove/lpBelow/
@@ -1478,10 +1635,17 @@ begin
       （TCustomPanel 系），不是 TCustomEdit，因此必须按 TCustomEditButton 转 }
     O.Add('text', (C as TCustomEditButton).Text);
     O.Add('readonly', (C as TCustomEditButton).ReadOnly);
-    if AKind = 'dateedit' then
-      O.Add('iso', FormatDateTime('yyyy-mm-dd', TDateEdit(C).Date))
-    else
-      O.Add('iso', FormatDateTime('hh:nn:ss', TTimeEdit(C).Time));
+    { Date/Time 可能是脏值（DB 里塞过垃圾日期时 Date=天文数字），直接
+      FormatDateTime 会抛 EConvertError —— 坑 107 复测时 deDate 就是这样。
+      降级成空 iso（前端显示 text），不要让整个控件降级。 }
+    try
+      if AKind = 'dateedit' then
+        O.Add('iso', FormatDateTime('yyyy-mm-dd', TDateEdit(C).Date))
+      else
+        O.Add('iso', FormatDateTime('hh:nn:ss', TTimeEdit(C).Time));
+    except
+      O.Add('iso', '');
+    end;
   end
   else if AKind = 'unknown' then
     O.Add('unsupported', True);
@@ -1513,14 +1677,32 @@ var
   kind: string;
   o: TJSONObject;
 begin
-  kind := KindOf(C);
-  o := MakeBase(C, kind);
-  WriteKindProps(C, kind, o);
-  if C is TWinControl then
-    o.Add('children', WriteChildren(TWinControl(C)))
-  else
-    o.Add('children', TJSONArray.Create);
-  Result := o;
+  o := nil;
+  kind := '';
+  try
+    kind := KindOf(C);
+    o := MakeBase(C, kind);
+    WriteKindProps(C, kind, o);
+    if C is TWinControl then
+      o.Add('children', WriteChildren(TWinControl(C)))
+    else
+      o.Add('children', TJSONArray.Create);
+    Result := o;
+  except
+    on E: Exception do
+    begin
+      { 坑 107：单控件序列化失败不炸整个 payload —— 降级成带 err 的占位节点。
+        前端只少一块内容，其余控件照常下发；请求本身不 500。
+        （半途丢弃的 o 直接释放重建，不带半截数据。） }
+      o.Free;
+      if kind = '' then
+        kind := 'unknown';
+      Result := MakeBase(C, kind);
+      Result.Add('err', E.ClassName + ': ' + E.Message);
+      LWLogFmt('[writer] 控件 %s (%s) 序列化失败，已降级: %s',
+        [C.Name, C.ClassName, E.Message]);
+    end;
+  end;
 end;
 
 function TLWWriter.WriteMenuItems(MI: TMenuItem): TJSONArray;

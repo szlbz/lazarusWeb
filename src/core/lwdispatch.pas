@@ -610,6 +610,11 @@ begin
         end;
         f.AsDateTime := dtv;
       end
+      { 布尔字段：前端勾选框回传 '1'/'0'。AsString 走的是
+        TBooleanField 的文本解析（认得的是它自己的 DisplayValues，
+        未设时是 True/False），'1'/'0' 未必吃得下，直接转布尔 }
+      else if f is TBooleanField then
+        f.AsBoolean := (v = '1') or (SameText(v, 'true')) or (SameText(v, 'yes'))
       else
         f.AsString := v;
     except
@@ -828,6 +833,10 @@ begin
   Result := nil;
   id := JGetInt(AReq, 'id', 0);
   ev := JGetStr(AReq, 'ev');
+  { 增量补丁：客户端带回它已应用的树版本（tver）+ 是否支持补丁（patch=1）。
+    没带（老缓存 / Ext 渲染层）就一律发全量 —— 这样开着 --patch=1 也不会
+    把老前端打死。判定放进会话，两条事件路径（HTTP / WS）自动都生效 }
+  S.BeginEventPatch(JGetInt(AReq, 'tver', -1), not JGetBool(AReq, 'patch', False));
   c := S.CompById(id);
   if c = nil then
   begin
@@ -900,7 +909,7 @@ begin
     LWCurrentSession := nil;
   end;
 
-  Result := S.BuildPayload;
+  Result := S.BuildEventPayload;
 end;
 
 end.

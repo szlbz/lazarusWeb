@@ -123,6 +123,8 @@ type
     function LearnSessionSid(var AResponse: TFPHTTPConnectionResponse): string;
     function WorkerURL(AIndex: Integer; const APathAndQuery: string): string;
     function RequestSid(var ARequest: TFPHTTPConnectionRequest): string;
+    { 事件帧 sid 在 JSON body 里的提取（见实现注释） }
+    function BodySid(ARequest: TFPHTTPConnectionRequest): string;
     procedure HandleRequest(Sender: TObject; var ARequest: TFPHTTPConnectionRequest;
       var AResponse: TFPHTTPConnectionResponse);
     procedure Route(var ARequest: TFPHTTPConnectionRequest;
@@ -208,7 +210,8 @@ end;
 procedure TLWWorker.Launch(const ACfg: TLWHyperConfig; AIndex: Integer);
 var
   i: Integer;
-  args: TStringList;
+  s: string;
+  args, extra: TStringList;
 begin
   Kill;
   args := TStringList.Create;
@@ -217,11 +220,21 @@ begin
     args.Add('--nogui');
     if ACfg.Root <> '' then args.Add('--root=' + ACfg.Root);
     if ACfg.Theme <> '' then args.Add('--theme=' + ACfg.Theme);
+    { 注意：不能直接 args.DelimitedText := ExtraArgs —— 给 DelimitedText 赋值
+      会先 Clear 整个列表，把上面刚加的 --port/--nogui 全部抹掉（坑 106：
+      worker 因此拿默认端口 8090 起来，撞上 lwhyper 自己的监听口，无限重启。
+      只要带了 --worker-args 就必现）。必须拆到临时列表再 AddStrings 追加。 }
     if ACfg.ExtraArgs <> '' then
     begin
-      args.StrictDelimiter := True;
-      args.Delimiter := ' ';
-      args.DelimitedText := ACfg.ExtraArgs;
+      extra := TStringList.Create;
+      try
+        extra.StrictDelimiter := True;
+        extra.Delimiter := ' ';
+        extra.DelimitedText := ACfg.ExtraArgs;
+        args.AddStrings(extra);
+      finally
+        extra.Free;
+      end;
     end;
     args.Add('--log=' + LogPath);
     Proc := TProcess.Create(nil);
@@ -231,6 +244,10 @@ begin
     {$IFDEF MSWINDOWS}
     Proc.Options := Proc.Options + [poNoConsole];
     {$ENDIF}
+    s := '';
+    for i := 0 to args.Count - 1 do
+      s := s + ' ' + args[i];
+    LWLogFmt('[hyper] launch #%d port=%d exe=%s args=%s', [AIndex + 1, Port, ACfg.WorkerExe, s]);
     Proc.Execute;
   finally
     args.Free;
@@ -645,6 +662,32 @@ begin
     Result := Trim(ARequest.GetCustomHeader('X-LW-Sid'));
 end;
 
+{ 事件帧的 sid 也可以在 JSON body 里（服务端测试 / 直连客户端的
+  POST /lw/api/event 就只发 body，不带 ?sid=）。不提取的话 PickWorker
+  走轮询兜底，事件会被转到另一个 worker，worker 回 410 "session gone"
+  —— 真前端不受影响（URL 永远带 sid），但任何走 body 的客户端都会
+  被粘性路由漏掉。 }
+function TLWHyperServer.BodySid(ARequest: TFPHTTPConnectionRequest): string;
+var
+  j: TJSONData;
+begin
+  Result := '';
+  if (ARequest.Content = '') or
+     (ARequest.ContentType <> 'application/json') then
+    Exit;
+  try
+    j := GetJSON(ARequest.Content);
+    try
+      if j.JSONType = jtObject then
+        Result := Trim(TJSONObject(j).Get('sid', ''));
+    finally
+      j.Free;
+    end;
+  except
+    Result := '';
+  end;
+end;
+
 procedure TLWHyperServer.Reply(const AText, AMime: string; ACode: Integer;
   var AResponse: TFPHTTPConnectionResponse);
 begin
@@ -681,6 +724,8 @@ begin
   method := UpperCase(ARequest.Method);
   p := PathPart(ARequest.URL);
   sid := RequestSid(ARequest);
+  if sid = '' then
+    sid := BodySid(ARequest);
 
   if FCfg.Verbose then
     LWLogFmt('[hyper] %s %s (sid=%s)', [method, p, sid]);

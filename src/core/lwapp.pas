@@ -58,6 +58,38 @@ implementation
 uses
   lwws, lwdlg, lwdbnav, lwpanel, lwrlog, lwconfig;
 
+type
+  { 坑 107：无头 widgetset 上的"异常对话框"是颗雷。
+    TApplication.ShowException -> PromptUser -> DialogImageList.LoadImage /
+    TLCLGlyphs.GetImageIndex -> ImageList.ScaleImage -> TLazIntfImage.LoadFromBitmap
+    -> 虚拟 widgetset 没有 RawImage -> FPImageException
+    （"Failed to get raw image description from bitmap"）。
+    这颗雷会**吞掉真正的原始异常**再炸出来：40 并发压测看到的 FPImageException
+    就是某个 FormCreate 异常的"替身"，真凶全被盖住。
+    所以统一接管 Application.OnException：无头线程 / 工作线程只记日志，绝不弹窗；
+    只有 GUI 构建且异常发生在主线程（真实 widgetset）才允许 ShowException。 }
+  TLWAppExceptionHandler = class
+  public
+    procedure HandleException(Sender: TObject; E: Exception);
+  end;
+
+var
+  GExcHandler: TLWAppExceptionHandler = nil;
+
+procedure TLWAppExceptionHandler.HandleException(Sender: TObject; E: Exception);
+begin
+  if Sender is TComponent then
+    LWLog('[lw] unhandled ' + E.ClassName + ': ' + E.Message +
+      '  (at ' + TComponent(Sender).Name + ')')
+  else
+    LWLog('[lw] unhandled ' + E.ClassName + ': ' + E.Message);
+  {$IFNDEF LCLnogui}
+  { 真实 widgetset + 主线程：弹窗安全（GUI 面板应用保留可见性） }
+  if GetCurrentThreadId = MainThreadID then
+    Application.ShowException(E);
+  {$ENDIF}
+end;
+
 var
   GRegistry: TStringList = nil;   { 名字 -> TFormClass，已排序，用于查表 }
   GOrder: TStringList = nil;      { 注册顺序，决定默认窗体与 /lw/api/forms 顺序 }
@@ -304,6 +336,10 @@ var
     if ini.Has(['extdir', 'extjs', 'extroot']) then
       GCfg.ExtDir := Trim(ini.Str(['extdir', 'extjs', 'extroot'], ''));
 
+    { 增量补丁（阶段 2）：1/0。灰度期间默认 0，出事直接改回 0 重启 }
+    if ini.Has(['patch']) then
+      LWServerPatchMode := ini.Int(['patch'], 0) <> 0;
+
     { 浏览器渲染层：ext（Ext JS，需要 ext-<版本> 目录）| alpine（Alpine.js，
       内置 src\client\alpine.min.js，不需要 ext 目录）。协议两者完全一致 }
     if ini.Has(['client']) then
@@ -330,6 +366,13 @@ begin
   begin
     SetTextAutoFlush(Output, True);
     SetTextAutoFlush(ErrOutput, True);
+  end;
+
+  { 坑 107：先接管异常，再允许建任何窗体 }
+  if GExcHandler = nil then
+  begin
+    GExcHandler := TLWAppExceptionHandler.Create;
+    Application.OnException := @GExcHandler.HandleException;
   end;
 
   EnsureRegistry;
@@ -433,6 +476,10 @@ begin
       GCfg.TrustProxy := True
     else if arg = '--nogui' then
       GCfg.NoUI := True
+    else if ValueOf('--patch=', val) then
+      LWServerPatchMode := (Trim(val) = '1') or SameText(Trim(val), 'true')
+    else if arg = '--patch' then
+      LWServerPatchMode := True
     else if ValueOf('--log=', val) then
       GCfg.LogFile := val
     else if (arg = '--help') or (arg = '-h') then
@@ -452,6 +499,7 @@ begin
       WriteLn('  --ajax-cors           /lw/ajax/* 回 CORS 头（第三方站点直接调）');
       WriteLn('  --trust-proxy         在 nginx/Caddy 反代后面：取 X-Forwarded-For 作客户端 IP');
       WriteLn('  --nogui               GUI 构建下也不弹服务端面板（服务化部署）');
+      WriteLn('  --patch=1             增量补丁（事件只回变化的 ops，默认关；老前端自动退回全量）');
       WriteLn('  --log=path            把服务端日志追加写入文件');
       WriteLn('已注册窗体: ' + FormNames);
       Halt(0);

@@ -121,9 +121,23 @@ function LWStripUniqSuffix(const AName: string): string;
 procedure LWLCLEnter;
 procedure LWLCLLeave;
 
+{ ---- 增量补丁总开关（lwapp 解析 --patch=1 后置位）----
+  置 False 时 TLWSession 完全不维护树快照与版本号，走老的全量路径。
+  放全局而不是放配置记录：lwsession 不能依赖 lwhttp（会循环引用）。 }
+var
+  LWServerPatchMode: Boolean = False;
+
+{ ---- 单调微秒时钟 ----
+  剖析用。GetTickCount64 的精度在 Windows 上是 15.6ms（Linux 上 1ms），
+  量一次 1~2ms 的 diff 全是 0 或者 16，等于没测，所以必须用高精度计数器。
+  Windows 走 QueryPerformanceCounter，Unix 走 gettimeofday —— 两条分支
+  都返回"微秒"这一个语义，调用方不用关心平台。
+  注意：这里刻意不是"只在 Windows 上定义、别处不实现"，那样 Linux 下会
+  直接"标识符未定义"编不过（这条踩过）。 }
+function LWNowUS: Int64;
+
 { ---- JSON 读取辅助 ---- }
-function JGetStr(O: TJSONObject; const AName: string; const ADef: string = ''): string;
-function JGetInt(O: TJSONObject; const AName: string; ADef: Integer = 0): Integer;
+function JGetStr(O: TJSONObject; const AName: string; const ADef: string = ''): string;function JGetInt(O: TJSONObject; const AName: string; ADef: Integer = 0): Integer;
 function JGetBool(O: TJSONObject; const AName: string; ADef: Boolean = False): Boolean;
 function JGetObj(O: TJSONObject; const AName: string): TJSONObject;
 { fpjson 的 TJSONArray.Add 对字符串常量有重载歧义，统一走这两个helper }
@@ -131,6 +145,52 @@ procedure JArrAddStr(A: TJSONArray; const S: string);
 function JArrHasStr(A: TJSONArray; const S: string): Boolean;
 
 implementation
+
+{$IFDEF UNIX}
+uses
+  { fpgettimeofday 只在 Unix 单元里（BaseUnix 没有），签名收的是指针 }
+  Unix;
+{$ENDIF}
+
+{$IFDEF MSWINDOWS}
+function QueryPerformanceCounter(out lpPerformanceCount: Int64): LongBool;
+  stdcall; external 'kernel32' name 'QueryPerformanceCounter';
+function QueryPerformanceFrequency(out lpFrequency: Int64): LongBool;
+  stdcall; external 'kernel32' name 'QueryPerformanceFrequency';
+{$ENDIF}
+
+var
+  GNowUSFreq: Int64 = 0;
+
+function LWNowUS: Int64;
+{$IFDEF MSWINDOWS}
+var
+  c: Int64;
+{$ENDIF}
+{$IFDEF UNIX}
+var
+  tv: TTimeVal;
+{$ENDIF}
+begin
+  {$IFDEF MSWINDOWS}
+  if GNowUSFreq = 0 then
+  begin
+    if (not QueryPerformanceFrequency(GNowUSFreq)) or (GNowUSFreq <= 0) then
+      GNowUSFreq := 1000;
+  end;
+  QueryPerformanceCounter(c);
+  Result := c * 1000000 div GNowUSFreq;
+  {$ELSE}
+  {$IFDEF UNIX}
+  if fpgettimeofday(@tv, nil) = 0 then
+    Result := Int64(tv.tv_sec) * 1000000 + Int64(tv.tv_usec)
+  else
+    Result := Int64(GetTickCount64) * 1000;
+  {$ELSE}
+  Result := Int64(GetTickCount64) * 1000;
+  {$ENDIF}
+  {$ENDIF}
+end;
 
 function IsLWClickEvent(const AName: string): Boolean;
 begin
