@@ -627,6 +627,12 @@ var LW = (function () {
                    占上半部分，固定高度会在标签和编辑框之间白留一条（看起来
                    "间距偏大"）。auto 高度下盒子贴着文字走，间距就是 LabelSpacing。 */
                 if (node.boundfor) delete cfg.height;
+                /* TLabel.AutoSize：单行标签盒子缩到文字宽，文字贴 Left，
+                   Alignment(taCenter) 因此不起作用。nogui 服务端量不准 CJK
+                   字宽，宽高都不下发，绝对定位的 el 按内容自适应；
+                   带换行的保留服务端宽度、高度自适应。 */
+                if (node.autosize && !node.wordwrap) { delete cfg.width; delete cfg.height; }
+                else if (node.autosize) delete cfg.height;
                 c = addTo(Ext.create('Ext.Component', cfg), ct);
                 /* TLabeledEdit 的 TBoundLabel：服务端按编辑框边界给了初值，
                    但 lpLeft/lpRight 依赖标签真实宽度（nogui 服务端量 CJK
@@ -1128,10 +1134,14 @@ var LW = (function () {
             case 'scrollbox':
             case 'frame':
                 cfg.layout = 'absolute';
-                cfg.border = (node.border === 'single');
+                /* bevel(bvRaised/bvLowered) 也给边框，caption 非缺省时居中显示，
+                   scrollbox 恒可滚（LCL ScrollBox 语义，见 lw-alpine.js 同分支） */
+                cfg.border = (node.border === 'single' || !!node.bevel);
                 cfg.header = false;
                 cfg.bodyStyle = node.bg ? 'background:' + node.bg : '';
-                if (node.autoscroll) cfg.autoScroll = true;
+                if (node.autoscroll || node.kind === 'scrollbox') cfg.autoScroll = true;
+                if (node.caption && node.caption !== node.name)
+                    cfg.html = '<div class="lw-panel-cap">' + esc(node.caption) + '</div>';
                 c = Ext.create('Ext.panel.Panel', cfg);
                 addTo(c, ct);
                 syncChildren(c, node);
@@ -1489,6 +1499,15 @@ var LW = (function () {
                 while (td && td.tagName !== 'TD') td = td.parentNode;
                 if (td) col = td.cellIndex;
             } catch (x) { }
+            /* 布尔列（cedit=4）：点一格就切换并回发，和桌面端 TDBGrid
+               里的勾选框同一手感，不进编辑态（列上没挂编辑器） */
+            if (!node.readonly && ((node.cedit || [])[col] === 4)) {
+                var nv = !rec.get('c' + col);
+                rec.set('c' + col, nv);
+                try { grid.getView().refreshNode(idx); } catch (x) { }
+                fire(node, 'OnSetFieldValue', { val: nv ? '1' : '0', row: rec.get('lwRow'), col: col });
+                return;
+            }
             fire(node, 'OnCellClick', { row: rec.get('lwRow'), col: col });
         });
         grid.on('headerclick', function (ct, column) {
@@ -1528,6 +1547,20 @@ var LW = (function () {
         return out;
     }
 
+    /* 行数据 -> store 记录。布尔列（cedit=4）必须转成真正的 boolean：
+       服务端发的是 '1'/'0' 字符串，而 '0' 在 JS 里是真值，直接喂给
+       勾选框渲染器会把全表都画成选中 */
+    function gridRowObj(n, row, ri) {
+        var eds = n.cedit || [];
+        var o = { lwRow: ri };
+        for (var j = 0; j < row.length; j++) {
+            var v = row[j];
+            if (eds[j] === 4) v = (v === true || String(v) === '1');
+            o['c' + j] = v;
+        }
+        return o;
+    }
+
     /* 行数据 + 列定义的指纹；服务端在编辑态下不发 rows，指纹保持不变 */
     function dbSig(n) {
         return JSON.stringify(n.rows || null) + '#' + JSON.stringify(n.cols || null);
@@ -1544,9 +1577,7 @@ var LW = (function () {
        —— CellEditing 从此起不来，表现为"网格只能编辑一个单元格"。 */
     function fillGridRows(store, n) {
         store.loadData((n.rows || []).map(function (row, ri) {
-            var o = { lwRow: ri };
-            for (var j = 0; j < row.length; j++) o['c' + j] = row[j];
-            return o;
+            return gridRowObj(n, row, ri);
         }));
     }
 
@@ -1571,6 +1602,13 @@ var LW = (function () {
                 } else if (eds[i] === 3) {
                     cols[i].editor = { xtype: 'datefield', format: 'Y-m-d',
                                        altFormats: 'Y-m-d|Ymd|YmdHis' };
+                } else if (eds[i] === 4) {
+                    /* 布尔列：画一个勾选框，点击由 buildDBGrid 的 itemclick
+                       切换（不挂编辑器 —— 勾选框不需要进编辑态） */
+                    cols[i].align = 'center';
+                    cols[i].renderer = function (v) {
+                        return '<span class="lw-xchk' + (v ? ' lw-xchk-on' : '') + '"></span>';
+                    };
                 } else {
                     cols[i].editor = { xtype: 'textfield' };
                 }
@@ -1679,26 +1717,35 @@ var LW = (function () {
     }
 
     /* TTabControl：Tabs 字符串列表 + 公共客户区。
-       用单卡片 tabpanel 模拟：唯一的卡片承载所有子控件，
-       页签标题来自 tabitems，切换页签回传 OnChange。 */
+       每个 tabitem 建一张卡（之前只建一张卡、页签条上只有一项，点了
+       永远切不动）；子控件挂在初始活动卡上，切页签时把子控件集搬进
+       新卡（syncChildren 按 __lwParent 判断会销毁重建），保持"公共
+       客户区"语义。tabchange 无条件回传 OnChange —— 服务端
+       LWApplyValue 先同步 TabIndex，没挂 handler 时 RTTI 调用是空操作 */
     function buildTabCtl(node, cfg) {
+        var items = node.tabitems || [];
         var tcfg = {
             x: cfg.x, y: cfg.y, width: cfg.width, height: cfg.height,
             hidden: cfg.hidden, disabled: cfg.disabled,
-            activeTab: 0, border: false,
-            items: [{
-                title: esc((node.tabitems || [])[node.tabindex || 0] || ''),
-                layout: 'absolute', border: false, bodyPadding: 0
-            }]
+            activeTab: node.tabindex || 0, border: false,
+            items: items.map(function (t) {
+                return { title: esc(t), layout: 'absolute', border: false, bodyPadding: 0 };
+            })
         };
-        var tc = Ext.create('Ext.tab.Panel', tcfg);
-        var card = tc.items.getAt(0);
-        syncChildren(card, node);
-        if ((node.ev || []).indexOf('OnChange') >= 0) {
-            tc.on('tabchange', function () {
-                fire(node, 'OnChange', { val: String(node.tabindex || 0) });
-            });
+        if (!tcfg.items.length) {
+            tcfg.items = [{ title: '', layout: 'absolute', border: false, bodyPadding: 0 }];
         }
+        var tc = Ext.create('Ext.tab.Panel', tcfg);
+        function activeCard() {
+            return tc.items.getAt(tc.getActiveTab() ? tc.items.indexOf(tc.getActiveTab()) : 0);
+        }
+        syncChildren(activeCard(), node);
+        tc.on('tabchange', function (p, nc) {
+            var i = tc.items.indexOf(nc);
+            node.tabindex = i;
+            syncChildren(nc, node);
+            fire(node, 'OnChange', { val: String(i) });
+        });
         return tc;
     }
 
@@ -1783,7 +1830,7 @@ var LW = (function () {
             constrain: false,
             glyph: false,
             listeners: {
-                close: function () { fire(f, 'OnClose'); return false; }
+                close: function () { fire(f.id, 'OnClose'); return false; }
             }
         };
         if (!f.modal) cfg.closable = false;
@@ -2266,11 +2313,7 @@ var LW = (function () {
     }
 
     function buildGridStore(n) {
-        var data = (n.rows || []).map(function (row, ri) {
-            var o = { lwRow: ri };
-            for (var j = 0; j < row.length; j++) o['c' + j] = row[j];
-            return o;
-        });
+        var data = (n.rows || []).map(function (row, ri) { return gridRowObj(n, row, ri); });
         return Ext.create('Ext.data.Store', {
             fields: [{ name: 'lwRow', type: 'int' }].concat((n.cols || []).map(function (_, i) { return 'c' + i; })),
             data: data

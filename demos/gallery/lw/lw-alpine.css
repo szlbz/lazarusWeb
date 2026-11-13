@@ -129,6 +129,8 @@ html, body {
     color: #2b3a49;
     display: flex;
     align-items: center;
+    cursor: move;
+    user-select: none;
 }
 .lw-dlg-x {
     margin-left: auto;
@@ -221,9 +223,12 @@ html, body {
     color: #2b3a49;
     font-size: 13px;
 }
-.lw-win-cap { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+/* 标题占满剩余宽度：右侧图标（最大化/×）才能贴到标题栏最右。
+   不能用 margin-left:auto 推图标 —— flex 会把剩余空间平分给
+   多个 auto 边距，最大化图标会被顶到标题栏中间（坑：关于对话框）。
+   min-width:0 让 ellipsis 在 flex 里继续生效 */
+.lw-win-cap { flex: 1; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .lw-win-x {
-    margin-left: auto;
     cursor: pointer;
     color: #6c7a87;
     font-size: 18px;
@@ -232,9 +237,9 @@ html, body {
 }
 .lw-win-x:hover { color: #d9534f; }
 
-/* 右上角最大化/还原图标（对齐 Ext maximizable；排在 × 左边） */
+/* 右上角最大化/还原图标（对齐 Ext maximizable；排在 × 左边，
+   靠 .lw-win-cap 的 flex:1 推到最右） */
 .lw-win-max {
-    margin-left: auto;
     cursor: pointer;
     color: #6c7a87;
     font-size: 13px;
@@ -372,6 +377,7 @@ html, body {
 }
 .lw-group-body {
     flex: 1;
+    box-sizing: border-box;   /* 无此规则时 flex 拉伸宽 + 左右 padding 会溢出边框 20px，伪造横向滚动条 */
     padding: 4px 10px;
     overflow: auto;
     display: flex;
@@ -379,7 +385,30 @@ html, body {
     gap: 4px;
 }
 .lw-group-abs .lw-group-body { position: relative; }
+/* abs 版（TGroupBox）子控件是 LCL 客户区坐标，1:1 映射：去掉流式版的 padding，
+   否则整体右移 10px/下移 4px，内容底边超出容器 -> 伪造纵向滚动条（LCL 里没有） */
+.lw-group-abs .lw-group-body { padding: 0; }
+/* LCL 的 TGroupBox 客户区原点在边框内侧几像素，标题文字悬浮在客户区顶部。
+   若标题占流式高度（~20px），子控件整体下移、底部内容被裁（编辑框底边 120 > body 106）。
+   改为绝对定位叠加：子区从边框内侧铺满，坐标与 LCL 一致，标题画在上面 */
+.lw-group-abs { position: relative; }
+.lw-group-abs .lw-group-title { position: absolute; top: 2px; left: 10px; z-index: 2; }
+.lw-group-abs .lw-group-body { position: absolute; inset: 0; }
 .lw-group-abs .lw-kids { position: absolute; }
+
+/* TPanel/TScrollBox 的 Caption（非缺省值时由模板渲染）：
+   绝对居中、不挡鼠标（面板还要接收点击），面板透明时它就是唯一可见内容 */
+.lw-panel-cap {
+    position: absolute;
+    left: 4px;
+    right: 4px;
+    top: 50%;
+    transform: translateY(-50%);
+    text-align: center;
+    color: #33475b;
+    font-size: 12px;
+    pointer-events: none;
+}
 
 /* ---------- 基础控件 ---------- */
 .lw-label { line-height: 1.4; }
@@ -428,6 +457,20 @@ html, body {
 .lw-btn:active { background: #dbe7f5; }
 .lw-btn-pressed { background: #cfe0f3 !important; border-color: #5c92cf !important; }
 .lw-nav, .lw-pg { min-width: 30px; padding: 2px 8px; }
+
+/* 独立按钮（wrapper 带 LCL 设计尺寸）：填满设计矩形并垂直居中。
+   writer 按 DPI 缩放下发尺寸（如 144dpi 设计 37px -> 21px），高度
+   小于按钮自然高度时原生 button 内容从顶部排布、底部溢出被裁，
+   文字视觉上贴底 —— flex 居中让溢出均匀分到上下两侧 */
+.lw-n > .lw-btn {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 100%;
+    height: 100%;
+}
+/* 工具条流式布局里的按钮保持自然尺寸 */
+.lw-n.lw-flow > .lw-btn { display: inline-block; width: auto; height: auto; }
 
 /* TBitBtn.Kind 图标字符 */
 .lw-btn.lw-bic-ok::before, .lw-btn.lw-bic-yes::before, .lw-btn.lw-bic-all::before,
@@ -483,6 +526,62 @@ html, body {
 }
 .lw-ve-key { width: 110px; background: #f6f8fa; }
 .lw-ve-edit { cursor: text; min-width: 120px; }
+
+/* ---------- drawgrid 自绘单元格（$lwDrawCell） ---------- */
+/* 进度条：细槽 + 填充条 + 百分比文本 */
+.lw-cbar {
+    position: relative;
+    display: inline-block;
+    vertical-align: middle;
+    min-width: 90px;
+    height: 14px;
+    background: #e8edf2;
+    border-radius: 7px;
+    overflow: hidden;
+}
+.lw-cbar-fill {
+    position: absolute;
+    left: 0; top: 0;
+    height: 100%;
+    border-radius: 7px;
+    transition: width .25s;
+}
+.lw-cbar-text {
+    position: relative;
+    z-index: 1;
+    font-size: 10px;
+    line-height: 14px;
+    padding-left: 5px;
+    color: #1b2b3a;
+    text-shadow: 0 0 2px #fff;
+}
+/* 彩色徽章 */
+.lw-chip {
+    display: inline-block;
+    font-size: 11px;
+    line-height: 1;
+    padding: 3px 8px;
+    border-radius: 9px;
+    border: 1px solid;
+    vertical-align: middle;
+}
+/* 星级评分 */
+.lw-stars { font-size: 13px; letter-spacing: 1px; vertical-align: middle; }
+.lw-star-on  { color: #f59e0b; }
+.lw-star-off { color: #c9d3dd; }
+.lw-star-text { margin-left: 4px; font-size: 11px; color: #64748b; letter-spacing: 0; }
+/* 迷你折线图 */
+.lw-spark { display: inline-block; vertical-align: middle; }
+
+/* DBGrid 布尔列（服务端 cedit=4）：单元格内常驻勾选框，点一下即写回 */
+.lw-table td > .lw-chk {
+    display: block;
+    margin: 2px auto;
+    width: 14px;
+    height: 14px;
+    cursor: pointer;
+    accent-color: #4a86c8;
+}
 
 .lw-dbgrid {
     width: 100%;

@@ -38,7 +38,10 @@ var LW = (function () {
         primary: false,
         multiTab: false,
         after: -1,
-        inflight: 0
+        inflight: 0,
+        tver: -1,     /* 已应用的树版本（增量补丁用；-1 = 未知，下帧要全量） */
+        nPatch: 0,    /* 收到并应用过的补丁数（诊断用，LW.stats() 可见） */
+        nFull: 0,     /* 收到过的全量树数 */
     };
 
     /* ---------------- 工具 ---------------- */
@@ -263,7 +266,10 @@ var LW = (function () {
 
     function applyEventResp(resp, err) {
         if (err) { log('event failed', err); return; }
-        if (resp && resp.ok) applyPayload(resp);
+        if (resp && resp.ok) {
+            if (resp.patch) applyPatch(resp);
+            else applyPayload(resp);
+        }
         else if (resp && resp.err) log('event err', resp.err);
     }
 
@@ -297,6 +303,11 @@ var LW = (function () {
         if (!S.sid) return;
         var node = S.ND[id];
         var payload = { sid: S.sid, id: id, ev: ev, tab: S.tab };
+        /* 增量补丁：patch=1 声明本前端懂 ops，tver 是已应用的树版本。
+           服务端 --patch=0 或没带这两个字段时一律回全量 —— 所以老缓存
+           js、Ext 渲染层不会因为服务端开了补丁而白屏 */
+        payload.patch = 1;
+        if (S.tver >= 0) payload.tver = S.tver;
         if (extra) Object.keys(extra).forEach(function (k) { payload[k] = extra[k]; });
         /* 带上窗体值快照：没挂 OnChange 的编辑框平时不回传值，服务端只有
            初始 Text —— 点"登录"会拿旧密码去校验。 */
@@ -716,6 +727,21 @@ var LW = (function () {
             (extra ? ',' + extra : '') + ')';
     }
 
+    /* DBGrid 单元格标记（首建与列变化重建共用一份，免得两处走样）：
+       布尔列（服务端 cedit=4）里常驻一个勾选框，点一下即写回；
+       其余列就是一段文本，点击由 $lwDbCell 换成对应编辑器。
+       注意 i/j/cell 是外层 x-for 的变量名，两处模板必须保持一致 */
+    function dbCellTd(dgid) {
+        return '<td @click.stop="$lwDbCell(\'' + dgid + '\', i, j, $event)">' +
+            '<template x-if="$lwChk(\'' + dgid + '\', j)">' +
+            '<input type="checkbox" class="lw-chk"' +
+            ' :checked="cell === \'1\' || cell === true"' +
+            ' @click.stop="$lwChkTap(\'' + dgid + '\', i, j, $event)"/>' +
+            '</template>' +
+            '<template x-if="!$lwChk(\'' + dgid + '\', j)"><span x-text="cell"></span></template>' +
+            '</td>';
+    }
+
     /* 内部标记（不含包装 div）。st = 状态对象，node = 最新 JSON */
     function innerOf(node, st) {
         var k = node.kind, id = node.id, r = '$lwN(\'' + id + '\')';
@@ -916,12 +942,17 @@ var LW = (function () {
                     if (gw[j] > 0) st += ';width:' + gw[j] + 'px;min-width:' + gw[j] + 'px';
                     ths += '<th style="' + st + '" x-text="' + r + '.cols[' + j + ']"></th>';
                 });
+                /* drawgrid 单元格支持自绘标记（@bar/@chip/@spark/@stars），
+                   由 $lwDrawCell 解析成 HTML；TStringGrid 保持纯文本 x-text */
+                var cellTd = (k === 'drawgrid')
+                    ? '<td style="height:' + grh + 'px" @click="$lwGridCellClick($el, \'' + id + '\', i, j)" x-html="$lwDrawCell(cell)"></td>'
+                    : '<td style="height:' + grh + 'px" @click="$lwGridCellClick($el, \'' + id + '\', i, j)" x-text="cell"></td>';
                 return '<div class="lw-grid lw-boxed"><table class="lw-table"><thead><tr>' + ths +
                     '</tr></thead><tbody>' +
                     '<template x-for="(row,i) in ' + r + '.rows" :key="i">' +
                     '<tr :class="i===' + r + '.idx ? \'lw-sel\' : \'\'">' +
                     '<template x-for="(cell,j) in row" :key="j">' +
-                    '<td style="height:' + grh + 'px" @click="$lwGridCellClick($el, \'' + id + '\', i, j)" x-text="cell"></td>' +
+                    cellTd +
                     '</template></tr></template></tbody></table></div>';
             }
 
@@ -964,7 +995,7 @@ var LW = (function () {
                     '<template x-for="(row,i) in ' + r + '.rows" :key="i">' +
                     '<tr :class="i === ' + r + '.recno - 1 ? \'lw-sel\' : \'\'" @click="$lwDbRow(\'' + dgid + '\', i, $event)">' +
                     '<template x-for="(cell,j) in row" :key="j">' +
-                    '<td @click.stop="$lwDbCell(\'' + dgid + '\', i, j, $event)" x-text="cell"></td>' +
+                    dbCellTd(dgid) +
                     '</template></tr></template></tbody></table></div>' + pagerBar + '</div>';
             }
 
@@ -1004,14 +1035,27 @@ var LW = (function () {
             case 'panel':
             case 'scrollbox':
             case 'frame':
-                return '<div class="lw-body' + (node.border === 'single' ? ' lw-boxed' : '') +
-                    '" style="background:' + (node.bg || 'transparent') + (node.autoscroll ? ';overflow:auto' : '') +
-                    '"><div class="lw-kids"></div></div>';
+                { /* TPanel/TScrollBox/TFrame：bevel(bvRaised/bvLowered) 映射边框，
+                    caption 非缺省值时居中显示（设计器里 Caption=控件名的不渲染，
+                    服务端已过滤，这里双保险），scrollbox 内容超出视口必须可滚
+                    （LCL ScrollBox 的滚动语义，否则超出部分"看不见"） */
+                  var bevCls = (node.border === 'single' || node.bevel) ? ' lw-boxed' : '';
+                  var pOvf = (node.autoscroll || k === 'scrollbox') ? ';overflow:auto' : '';
+                  var pCap = (node.caption && node.caption !== node.name) ?
+                      '<div class="lw-panel-cap" x-text="' + r + '.cap"></div>' : '';
+                  return '<div class="lw-body' + bevCls +
+                      '" style="background:' + (node.bg || 'transparent') + pOvf +
+                      '">' + pCap + '<div class="lw-kids"></div></div>';
+                }
 
             case 'groupbox':
+                /* TGroupBox：AutoScroll=false 时 LCL 只裁剪不滚动。
+                   恒 overflow:auto 会因映射误差（标题条高度近似）伪造出
+                   比控件矮一大截的滚动条（AutoScroll 关着却出现滚动条） */
                 return '<div class="lw-group lw-group-abs' + (node.border !== 'none' ? ' lw-boxed' : '') + '">' +
                     '<div class="lw-group-title" x-text="' + r + '.cap"></div>' +
-                    '<div class="lw-body lw-group-body"><div class="lw-kids"></div></div></div>';
+                    '<div class="lw-body lw-group-body" style="overflow:' + (node.autoscroll ? 'auto' : 'hidden') +
+                    '"><div class="lw-kids"></div></div></div>';
 
             case 'tabs':
                 return '<div class="lw-tabs"><div class="lw-tabbar" id="lw-tabbar-' + id + '"></div>' +
@@ -1054,6 +1098,72 @@ var LW = (function () {
         if (!r) return;
         r.idx = i;
         if ($lwHas(id, 'OnClick')) fire(id, 'OnClick', { val: String(i) });
+    };
+
+    /* ---------------- drawgrid 单元格自绘标记 ----------------
+       nogui 是无头 widgetset（假 DC），LCL 级 OnDrawCell 画不出像素，
+       自绘只能在浏览器端做：服务端往 Cells 里放标记字符串，
+       这里解析成 HTML（进度条/徽章/迷你图/星级），纯文本原样转义。
+       标记语法（大小写敏感，必须整格以 @ 开头）：
+         @bar(72)          @bar(72,#dc2626)      进度条（0-100，缺省蓝色）
+         @chip(通过,#16a34a)                    彩色徽章（颜色可省）
+         @spark(4,6,3,8,5) @spark(4,6,3,#16a34a) 迷你折线图（末参为 #色 时是颜色）
+         @stars(4.5)                             星级评分（0-5） */
+    window.$lwDrawCell = function (cell) {
+        var s = String(cell == null ? '' : cell);
+        if (s.charAt(0) !== '@') return esc(s);
+        var i = s.indexOf('('), j = s.lastIndexOf(')');
+        if (i < 1 || j <= i) return esc(s);
+        var kind = s.slice(0, i);
+        var parts = s.slice(i + 1, j).split(',');
+        var colorOf = function (v, def) {
+            v = String(v || '').trim();
+            return (/^#[0-9a-fA-F]{3,8}$/.test(v)) ? v : def;
+        };
+        var k;
+        if (kind === '@bar') {
+            var pct = parseFloat(parts[0]);
+            if (isNaN(pct)) return esc(s);
+            pct = Math.max(0, Math.min(100, pct));
+            var bc = colorOf(parts[1], '#2563eb');
+            return '<div class="lw-cbar"><div class="lw-cbar-fill" style="width:' + pct +
+                '%;background:' + bc + '"></div><span class="lw-cbar-text">' + pct + '%</span></div>';
+        }
+        if (kind === '@chip') {
+            var cc = colorOf(parts[1], '#2563eb');
+            return '<span class="lw-chip" style="color:' + cc + ';background:' + cc +
+                '22;border-color:' + cc + '">' + esc(String(parts[0] || '').trim()) + '</span>';
+        }
+        if (kind === '@stars') {
+            var v = parseFloat(parts[0]);
+            if (isNaN(v)) return esc(s);
+            v = Math.max(0, Math.min(5, v));
+            var full = Math.floor(v), half = (v - full) >= 0.5;
+            var out = '<span class="lw-stars">';
+            for (k = 0; k < 5; k++) {
+                out += '<span class="' + (k < full || (k === full && half) ? 'lw-star-on' : 'lw-star-off') +
+                    '">' + (k < full ? '★' : (k === full && half ? '⯪' : '★')) + '</span>';
+            }
+            return out + '<span class="lw-star-text">' + v + '</span></span>';
+        }
+        if (kind === '@spark') {
+            var sc = colorOf(parts[parts.length - 1], null);
+            var vals = (sc ? parts.slice(0, -1) : parts).map(parseFloat).filter(function (x) { return !isNaN(x); });
+            if (vals.length < 2) return esc(s);
+            var W = 120, H = 22, P = 3;
+            var mn = Math.min.apply(null, vals), mx = Math.max.apply(null, vals);
+            var rng = (mx - mn) || 1;
+            var pts = vals.map(function (x, n) {
+                var px = P + n * (W - 2 * P) / (vals.length - 1);
+                var py = H - P - (x - mn) * (H - 2 * P) / rng;
+                return px.toFixed(1) + ',' + py.toFixed(1);
+            }).join(' ');
+            var lx = pts.split(' ')[vals.length - 1].split(',');
+            return '<svg class="lw-spark" width="' + W + '" height="' + H + '" viewBox="0 0 ' + W + ' ' + H + '">' +
+                '<polyline fill="none" stroke="' + (sc || '#2563eb') + '" stroke-width="1.5" points="' + pts + '"/>' +
+                '<circle cx="' + lx[0] + '" cy="' + lx[1] + '" r="2.2" fill="' + (sc || '#2563eb') + '"/></svg>';
+        }
+        return esc(s);
     };
 
     window.$lwGridCellClick = function (td, id, row, col) {
@@ -1140,14 +1250,33 @@ var LW = (function () {
         if ($lwHas(id, 'OnCellClick')) fire(id, 'OnCellClick', { row: row, col: 0 });
     };
 
+    /* DBGrid 布尔列（服务端 cedit=4）：单元格常驻勾选框，点一下即写回
+       '1'/'0'，走与文本编辑同一条 OnSetFieldValue 通道 —— 服务端
+       LWApplyDBGridEdit 用 AsBoolean 赋值。勾选框自己处理点击，
+       不再进 $lwDbCell 的"就地换编辑器"分支。 */
+    window.$lwChk = function (id, col) {
+        var n = S.ND[id];
+        if (!n || n.readonly) return false;
+        return ((n.cedit || [])[col]) === 4;
+    };
+
+    window.$lwChkTap = function (id, row, col, e) {
+        var el = e.currentTarget;
+        var v = el.checked ? '1' : '0';
+        var r = S.R[id];
+        /* 本地行数据先改，服务端确认后的树补丁会覆盖成权威值 */
+        if (r && r.rows && r.rows[row]) r.rows[row][col] = v;
+        fire(id, 'OnSetFieldValue', { val: v, row: row, col: col });
+    };
+
     window.$lwDbCell = function (id, row, col, e) {
         if ($lwHas(id, 'OnCellClick')) fire(id, 'OnCellClick', { row: row, col: col });
         var n = S.ND[id], r = S.R[id];
         if (!n || n.readonly || !r) return;
         /* 列编辑器类型（服务端 cedit）：0=只读 1=文本 2=PickList 下拉
-           3=日期选择。旧服务端只发 0/1，缺省当文本。 */
+           3=日期选择 4=复选框。旧服务端只发 0/1，缺省当文本。 */
         var et = (n.cedit || [])[col];
-        if (et === 0) return;
+        if (et === 0 || et === 4) return;
         if (et == null) et = 1;
         var td = e.currentTarget;
         if (td.__lwEditing) return;
@@ -1466,17 +1595,29 @@ var LW = (function () {
     function buildTabCtl(id, node) {
         var bar = document.getElementById('lw-tabbar2-' + id);
         if (!bar) return;
-        var html = '';
-        (node.tabitems || []).forEach(function (t, i) {
-            html += '<div class="lw-tab' + (i === (node.tabindex || 0) ? ' lw-active' : '') + '" data-ti="' + i + '">' + esc(t) + '</div>';
-        });
-        bar.innerHTML = html;
-        bar.querySelectorAll('.lw-tab').forEach(function (el) {
-            el.addEventListener('click', function () {
-                var i = parseInt(el.getAttribute('data-ti'), 10);
-                if ($lwHas(id, 'OnChange')) fire(id, 'OnChange', { val: String(i) });
+        /* 点击必须本地先切换高亮：服务端 TTabControl 没有独立的页内容
+           （客户区是公共的一块），树补丁只带新 tabindex，不会重建页签条；
+           之前只在建树时设一次 active，点了永远停在旧页签上。
+           OnChange 无条件回发：服务端 LWApplyValue 先同步 TabIndex（供
+           序列化和业务读取），RTTI 调用在没挂 handler 时是空操作 */
+        function render(active) {
+            if (S.ND[id]) S.ND[id].tabindex = active;
+            var html = '';
+            (node.tabitems || []).forEach(function (t, i) {
+                html += '<div class="lw-tab' + (i === active ? ' lw-active' : '') + '" data-ti="' + i + '">' + esc(t) + '</div>';
             });
-        });
+            bar.innerHTML = html;
+            bar.querySelectorAll('.lw-tab').forEach(function (el) {
+                el.addEventListener('click', function () {
+                    var i = parseInt(el.getAttribute('data-ti'), 10);
+                    var cur = (S.ND[id] && typeof S.ND[id].tabindex === 'number') ? S.ND[id].tabindex : 0;
+                    if (i === cur) return;
+                    render(i);
+                    fire(id, 'OnChange', { val: String(i) });
+                });
+            });
+        }
+        render(node.tabindex || 0);
     }
 
     /* TBoundLabel：按编辑框实测位置精修标签坐标（服务端量 CJK 会偏） */
@@ -1521,8 +1662,15 @@ var LW = (function () {
         w.style.top = (node.y || 0) + 'px';
         if (node.kind === 'label' || node.kind === 'static') {
             if (!node.boundfor) {
-                if (node.w) w.style.width = node.w + 'px';
-                if (node.h) w.style.height = node.h + 'px';
+                if (node.autosize && !node.wordwrap) {
+                    /* LCL AutoSize：单行标签盒子缩到文字宽，文字贴 Left，
+                       Alignment(taCenter) 因此不起作用。nogui 服务端量不准
+                       CJK 字宽，宽高都不下发，绝对定位的盒子按内容自适应
+                       （否则 taCenter 会在整窗宽的盒子里把文字推到中央）。 */
+                } else {
+                    if (node.w) w.style.width = node.w + 'px';
+                    if (node.h) w.style.height = node.h + 'px';
+                }
             }
         } else {
             if (node.w) w.style.width = node.w + 'px';
@@ -1764,9 +1912,12 @@ var LW = (function () {
             win.__lwStatus = sb;
         }
 
-        /* 模态窗体右上角 × == OnClose */
+        /* 模态窗体右上角 × == OnClose。必须传 f.id：fire 的第一参数是
+           组件 id（S.ND 按 id 查），传节点对象服务端找不到组件，事件被
+           静默吞掉 —— × 点了没反应（服务端 lwdispatch 的
+           "OnClose on 模态窗体 -> SessionEndModal(mrCancel)" 永远收不到） */
         var xBtn = title.querySelector('.lw-win-x');
-        if (xBtn) xBtn.addEventListener('click', function () { fire(f, 'OnClose'); });
+        if (xBtn) xBtn.addEventListener('click', function () { fire(f.id, 'OnClose'); });
 
         /* 最大化/还原：CSS 类切换（!important 覆盖内联 left/top/w/h），
            尺寸变化由 ResizeObserver 统一重排布局与状态栏 */
@@ -2035,6 +2186,11 @@ var LW = (function () {
                     r.active = n.active;
                     buildTabbar(id, n);   /* 标签高亮 + 卡片可见性 */
                 }
+            } else if (n.kind === 'tabctl') {
+                /* 服务端改 TabIndex（代码赋值）时页签高亮跟着切 */
+                if (typeof n.tabindex === 'number' && prev.tabindex !== n.tabindex && prev.tabindex !== undefined) {
+                    buildTabCtl(id, n);
+                }
             } else if (n.kind === 'color') {
                 if (prev.value !== n.value) {
                     var sw = el.querySelector('.lw-swatch');
@@ -2048,6 +2204,178 @@ var LW = (function () {
             var body = el.querySelector('.lw-kids');
             if (n.kind === 'tabs') body = el.querySelector('.lw-tabs-body');
             if (body) syncChildren({ body: body, winId: S.WIN[id], flow: (n.kind === 'toolbar'), parentKind: n.kind, parentId: id }, n);
+        }
+    }
+
+    /* ---------------- 增量补丁（服务端 --patch=1） ----------------
+       ops 形如 ["p",id,{props}] / ["a",父id,下标,node] / ["d",id] / ["m",id,父id,下标]。
+       和"全量重下"相比只是少传数据，界面上走的仍是同一套 patchNode /
+       createNode / destroyNode，所以两条路的渲染行为天然一致。
+
+       版本（tver）对不上、窗体不认识、节点找不到 —— 一律退回全量（refreshTree），
+       不尝试修补。丢帧/多页签/重连都靠这一条自愈，不需要重传队列。 */
+
+    function applyPatch(p) {
+        if (!p || !p.patch) return false;
+        S.nPatch++;
+        if (typeof p.base === 'number' && S.tver >= 0 && p.base !== S.tver) {
+            log('patch ver mismatch', p.base, S.tver);
+            S.tver = -1;
+            refreshTree();
+            return true;
+        }
+        var bad = false;
+        try {
+            p.patch.forEach(function (fp) {
+                var fm = S.forms[fp.f];
+                if (!fm) { bad = true; return; }
+                var idx = null, dirty = false;
+                (fp.ops || []).forEach(function (op) {
+                    if (!idx) idx = treeIndexOf(fp.f);
+                    var tag = op[0];
+                    if (tag === 'p') {
+                        applyPropsOp(fp.f, fm, op[1], op[2], idx);
+                    } else {
+                        applyStructOp(fp.f, fm, op, idx);
+                        dirty = true;
+                        idx = null;       /* 结构变了，索引作废，下一条重算 */
+                    }
+                });
+                if (dirty && !S.forms[fp.f]) bad = true;
+            });
+        } catch (e) {
+            log('patch failed', e);
+            bad = true;
+        }
+        if (bad) {
+            S.tver = -1;
+            refreshTree();
+            return true;
+        }
+        S.tver = (typeof p.tver === 'number') ? p.tver : -1;
+        return true;
+    }
+
+    /* 窗体当前的节点索引：id -> {n: 节点对象, p: 父节点} */
+    function treeIndexOf(formId) {
+        var fm = S.forms[formId];
+        var out = {};
+        if (!fm) return out;
+        (function walk(n, parent) {
+            out[n.id] = { n: n, p: parent };
+            (n.children || []).forEach(function (c) { walk(c, n); });
+        })(fm.f, null);
+        return out;
+    }
+
+    /* 容器上下文（createNode / runLayout 要的 ct） */
+    function ctOfNode(n, formId) {
+        if (!n || n.id === formId) {
+            var fm = S.forms[formId];
+            return fm ? { body: fm.body, winId: formId } : null;
+        }
+        var el = S.E[n.id];
+        if (!el) return null;
+        var body = el.querySelector('.lw-kids');
+        if (n.kind === 'tabs') body = el.querySelector('.lw-tabs-body');
+        if (!body) return null;
+        return {
+            body: body, winId: S.WIN[n.id], flow: (n.kind === 'toolbar'),
+            parentKind: n.kind, parentId: n.id
+        };
+    }
+
+    /* 按 list 的顺序把 body 里的元素排好（appendChild/insertBefore 都只是搬动，
+       不会重建，所以焦点和滚动位置都保得住） */
+    function reorderDom(body, list) {
+        if (!body) return;
+        var ref = null;
+        for (var i = list.length - 1; i >= 0; i--) {
+            var el = S.E[list[i].id];
+            if (!el) continue;
+            if (el.parentNode !== body || el.nextSibling !== ref) body.insertBefore(el, ref);
+            ref = el;
+        }
+    }
+
+    function applyPropsOp(formId, fm, id, props, idx) {
+        if (!props) return;
+        var cur = (id === formId) ? fm.f : S.ND[id];
+        if (!cur) return;
+        var merged = {};
+        Object.keys(cur).forEach(function (k) { merged[k] = cur[k]; });
+        Object.keys(props).forEach(function (k) {
+            /* null = 服务端明确"这个属性没了"（如 TImage 清空图片） */
+            merged[k] = props[k];
+        });
+        if (id === formId) {
+            fm.f = merged;
+            S.ND[id] = merged;
+            var cap = fm.el.querySelector('.lw-win-cap');
+            if (cap) cap.textContent = merged.caption || merged.name || '';
+            if (fm.__lwStatus && merged.status) {
+                fm.__lwStatus.innerHTML = merged.status.map(function (t) {
+                    return '<span class="lw-status-item">' + esc(t == null ? '' : String(t)) + '</span>';
+                }).join('');
+            }
+            if (merged.children) runLayout({ body: fm.body }, merged.children);
+            return;
+        }
+        var info = idx[id];
+        if (info && info.p && info.p.children) {
+            var at = info.p.children.indexOf(cur);
+            if (at >= 0) info.p.children[at] = merged;   /* 保持树里指向新对象 */
+        }
+        patchNode(merged);
+    }
+
+    function applyStructOp(formId, fm, op, idx) {
+        var tag = op[0];
+        var pid = (tag === 'a') ? op[1] : (tag === 'm' ? op[2] : 0);
+        var pnode = (pid === formId) ? fm.f : (pid ? S.ND[pid] : null);
+
+        if (tag === 'a') {
+            if (!pnode) return;
+            var arr = pnode.children || (pnode.children = []);
+            var at = op[2];
+            if (!(at >= 0) || at > arr.length) at = arr.length;
+            arr.splice(at, 0, op[3]);
+            var ct1 = ctOfNode(pnode, formId);
+            if (!ct1) return;
+            destroyNode(op[3].id);          /* 万一有残留 */
+            createNode(op[3], ct1);
+            reorderDom(ct1.body, arr);
+            runLayout(ct1, arr);
+            return;
+        }
+
+        if (tag === 'd') {
+            var info = idx[op[1]];
+            if (!info) return;
+            if (info.p && info.p.children) {
+                var k = info.p.children.indexOf(info.n);
+                if (k >= 0) info.p.children.splice(k, 1);
+            }
+            var ct2 = ctOfNode(info.p, formId);
+            destroyNode(op[1]);
+            if (ct2) runLayout(ct2, (info.p && info.p.children) || []);
+            return;
+        }
+
+        if (tag === 'm') {
+            if (!pnode) return;
+            var ma = pnode.children || [];
+            var mi = -1, q;
+            for (q = 0; q < ma.length; q++) if (ma[q].id === op[1]) { mi = q; break; }
+            if (mi < 0) return;
+            var mv = ma.splice(mi, 1)[0];
+            var mat = op[3];
+            if (!(mat >= 0) || mat > ma.length) mat = ma.length;
+            ma.splice(mat, 0, mv);
+            var ct3 = ctOfNode(pnode, formId);
+            if (!ct3) return;
+            reorderDom(ct3.body, ma);
+            runLayout(ct3, ma);
         }
     }
 
@@ -2072,7 +2400,7 @@ var LW = (function () {
                 '<template x-for="(row,i) in $lwN(\'' + id + '\').rows" :key="i">' +
                 '<tr :class="i === $lwN(\'' + id + '\').recno - 1 ? \'lw-sel\' : \'\'" @click="$lwDbRow(\'' + id + '\', i, $event)">' +
                 '<template x-for="(cell,j) in row" :key="j">' +
-                '<td @click.stop="$lwDbCell(\'' + id + '\', i, j, $event)" x-text="cell"></td>' +
+                dbCellTd(id) +
                 '</template></tr></template></tbody></table>';
             gridBox.parentNode.replaceChild(fresh, gridBox);
             try { if (window.Alpine) Alpine.initTree(fresh); } catch (e) { }
@@ -2084,6 +2412,8 @@ var LW = (function () {
     function applyPayload(p) {
         if (!p || !p.forms) return;
         S.sid = p.sid || S.sid;
+        S.nFull++;
+        S.tver = (typeof p.tver === 'number') ? p.tver : -1;
         var seen = {};
         p.forms.forEach(function (f) {
             seen[f.id] = true;
@@ -2204,6 +2534,39 @@ var LW = (function () {
         closeDialog(true, btn.id, text);
     };
     window.$lwDlgClose = function () { closeDialog(false); };
+
+    /* 服务端对话框拖动：overlay 是 Alpine x-if 按需创建/销毁的，绑不到
+       固定元素上 —— 事件委托到 document。首次拖动把 flex 居中的窗口
+       固化成 position:fixed 显式坐标，之后跟随鼠标，松开即停。 */
+    document.addEventListener('mousedown', function (e) {
+        var t = e.target;
+        if (!t || !t.closest) return;
+        var title = t.closest('.lw-dlg-title');
+        if (!title) return;
+        if (t.classList.contains('lw-dlg-x')) return;   /* × 只负责关闭 */
+        var win = title.closest('.lw-dlg-win');
+        if (!win) return;
+        var r = win.getBoundingClientRect();
+        var sx = e.clientX - r.left, sy = e.clientY - r.top;
+        win.style.position = 'fixed';
+        win.style.left = r.left + 'px';
+        win.style.top = r.top + 'px';
+        win.style.marginTop = '0';
+        function mv(ev2) {
+            var x = Math.max(0, Math.min(window.innerWidth - 80, ev2.clientX - sx));
+            var y = Math.max(0, Math.min(window.innerHeight - 40, ev2.clientY - sy));
+            win.style.left = x + 'px';
+            win.style.top = y + 'px';
+        }
+        function up() {
+            document.removeEventListener('mousemove', mv);
+            document.removeEventListener('mouseup', up);
+        }
+        document.addEventListener('mousemove', mv);
+        document.addEventListener('mouseup', up);
+        e.preventDefault();
+    });
+
     window.$lwDlgKey = function (e) {
         if (e.key === 'Enter') {
             e.preventDefault();
@@ -2443,6 +2806,13 @@ var LW = (function () {
     return {
         start: start,
         reload: function () { boot(); },
-        sid: function () { return S.sid; }
+        sid: function () { return S.sid; },
+        /* 诊断：补丁/全量各来了多少次，当前树版本 */
+        stats: function () {
+            return { patch: S.nPatch, full: S.nFull, tver: S.tver };
+        },
+        /* 强制与服务器对一次全量（GET /lw/api/tree，不改任何业务状态）。
+           用途：页面看起来"不刷新"时手动校准，也是补丁一致性的验收入口 */
+        resync: function () { S.tver = -1; refreshTree(); }
     };
 })();

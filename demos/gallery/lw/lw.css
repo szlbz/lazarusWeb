@@ -247,3 +247,46 @@ html, body {
 .x-keyboard-mode .x-form-cb-checked .x-form-checkbox-focus.x-form-checkbox-default {
     background-position: -15px -15px !important;
 }
+
+/* ---------------- DBGrid 布尔列（服务端 cedit=4）----------------
+   点击整格切换（lw.js 的 itemclick 里处理），纯 CSS 画勾选框，
+   不依赖 crisp 主题的雪碧图，深浅色都不跑位 */
+.lw-xchk {
+    display: inline-block;
+    width: 13px;
+    height: 13px;
+    border: 1px solid #9fb0c0;
+    border-radius: 2px;
+    background: #fff;
+    box-sizing: border-box;
+    vertical-align: middle;
+}
+.lw-xchk-on {
+    position: relative;
+    background: #4a86c8;
+    border-color: #4a86c8;
+}
+.lw-xchk-on::after {
+    content: "";
+    position: absolute;
+    left: 3px;
+    top: 0;
+    width: 4px;
+    height: 8px;
+    border: solid #fff;
+    border-width: 0 2px 2px 0;
+    transform: rotate(45deg);
+}
+
+/* TPanel/TScrollBox 的 Caption（非缺省值时渲染）：绝对居中、不挡鼠标 */
+.lw-panel-cap {
+    position: absolute;
+    left: 4px;
+    right: 4px;
+    top: 50%;
+    transform: translateY(-50%);
+    text-align: center;
+    color: #33475b;
+    font-size: 12px;
+    pointer-events: none;
+}
