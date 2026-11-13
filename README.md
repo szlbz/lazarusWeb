@@ -4,18 +4,18 @@ Lazarus 桌面程序的 Web 化运行时 —— 参考 uniGUI 的思路，但用
 
 ```
 浏览器 (Ext JS 7.0.0 或 Alpine.js) 服务端 (Lazarus, nogui widgetset)
-┌──────────────────────────┐  HTTP  ┌───────────────────────────────┐
-│ lw.js 渲染/协调器         │ ←────→ │ lwhttp  fcl-web 多线程服务器    │
-│ Ext.window/panel/grid/... │  JSON  │ lwsession 每标签页一棵 LCL 控件树│
-│ WS传事件/长轮询游标收推送  │        │ lwwriter LCL树→JSON            │
-│                          │        │ lwdispatch 事件→RTTI 调业务代码 │
-└──────────────────────────┘        │ lwws nogui 补丁(虚拟显示器/画布)│
-                                    └───────────────────────────────┘
+┌──────────────────────────┐  HTTP  ┌─────────────────────────────────┐
+│ lw.js 渲染/协调器         │ ←────→ │ lwhttp  fcl-web 多线程服务器     │
+│ Ext.window/panel/grid/...│  JSON  │ lwsession 每标签页一棵 LCL 控件树│
+│ WS传事件/长轮询游标收推送  │        │ lwwriter LCL树→JSON             │
+│                          │        │ lwdispatch 事件→RTTI 调业务代码  │
+└──────────────────────────┘        │ lwws nogui 补丁(虚拟显示器/画布) │
+                                    └────────────────────────────────┘
 ```
 
 ## 环境要求
 
-- FPC 3.3.1 + Lazarus（本机位于 `c:\111\fpc`、`c:\111\lazarus`）
+- FPC 3.3.1 + Lazarus
 - Ext JS 7.0.0（GPLv3 版，**可选**：发布包不包含，需自行从 Sencha 官方渠道获取后放入 `ext-7.0.0\`；不放置时默认使用内置的 Alpine.js 渲染层）
 
 ## 跨平台构建矩阵（宿主 → 目标）
@@ -45,10 +45,6 @@ lazbuild --os=linux --cpu=mips64el --ws=nogui \
 # → gallery_nogui-mips64el-linux（ELF，约 6.5MB 代码段；ld 的 abicalls
 #   混链警告可忽略）
 ```
-
-> 坑：`--cpu=mips64` 会被 `ppcrossmips64el` 拒绝（`Unsupported target
-> architecture -Pmips64`），CPU 名要写 `mips64el`；另外在 `.lpi` 里手写
-> `<TargetOS>` 不生效，切目标必须走命令行三个参数（见 `docs/NOTES.md` 坑 117/119）。
 
 Linux 宿主上直接 `lazbuild` 各 demo 的 `.lpi` 即可；`build.sh` 与
 `build.bat` 功能等价。目录/文件名在 Unix 下区分大小写，详见下一节。
@@ -84,14 +80,6 @@ Linux 宿主上直接 `lazbuild` 各 demo 的 `.lpi` 即可；`build.sh` 与
 | `demos/dbaware` | **DB 感知控件全家桶**（TDBText/TDBListBox/TDBRadioGroup/TDBLookup*/TDBImage 数据感知实测；主窗体 87 个对象，`uAwareMain.lfm` 866 行） |
 | `demos/dialogs` | **对话框示例**（ShowMessage/MessageDlg/InputQuery/QuestionDlg/MessageBox/OpenDialog/SaveDialog） |
 | `demos/gallery` | **全功能画廊**（对标 uniGUI 全功能 Demo：12 页 60+ 控件 —— 标准控件/按钮/扩展输入/容器/网格/工具条/图表/HTML·PDF·上传/对话框/定时器/DB 感知/大表分页，`tests/t_gallery.py` 50 项回归） |
-| `tools/lwnew.exe` | 命令行生成工程骨架（与 IDE 向导同一份模板） |
-| `tools/lwaudit.exe` | LCL 控件支持度审计 → `docs/CONTROL_MATRIX.md` |
-| `tools/lwdbcheck.exe` | **DB 感知审计**（每个控件绑真实数据集测显示/同步/回写）→ `docs/DB_AWARE_MATRIX.md` |
-| `tools/lwconvert.exe` | **普通 LCL 应用一键转 Web**：基类/uses/启动代码/工程文件全部改写，输出可直接编译 |
-| `tools/lwconvert_gui.exe` | lwconvert 的 **GUI 版**：选目录→分析/转换→看报告（与控制台版共用 `lwconvert_core.pas`） |
-| `tools/lwhyper.exe` | **专用负载均衡器**（对标 uniGUI Hyper Server，见下节） |
-| `tools/lwhyper_gui.exe` | lwhyper 的 **GUI 版**：配置/启动/停止、worker 明细表、实时日志、托盘常驻（与控制台版共用 `src/core/lwhyper.pas`） |
-| `lazarusWeb.ini.sample` | 配置文件模板（`Port` / `Theme` / `ExtDir`，见「配置文件（INI）」） |
 | `docs/MAPPING.md` | 控件/属性映射表 |
 | `docs/CONTROL_MATRIX.md` | **66 个可视控件的实测支持度矩阵**（自动生成） |
 | `docs/DB_AWARE_MATRIX.md` | **12 个 DB 感知控件的实测矩阵**（绑定/显示/同步/回写，自动生成） |
@@ -230,19 +218,6 @@ MyApp/
   src/client/lw.css    3 KB
 ```
 
-**Ext 精简版**：lazarusWeb 只引用 4 类 Ext 路径（`ext-all.js`、六主题的
-`theme-<t>-all.css` 及其同目录 `_1`/`_2` 分卷与 `images/`/字体资源、charts
-包的 `charts.js` 与 `charts-all.css`），其余（RTL、locale、ux、其余主题、
-SDK 源码、示例……）全都不需要。运行 `tools\make_ext_min.bat` 即可从完整版
-提取出约 23 MB 的 `ext-<版本>-min\`，改名 `ext-<版本>` 就是部署目录——已
-穷尽校验：2856 条 CSS `url()` 引用与完整版逐一比对零缺失、`ext-all.js`
-字节级一致，`t_dbaware.py` 134 项回归在精简树上全绿。
-
-**注意**：只拷了 ext 目录而没拷 `lw.js` 时，服务照常启动，但浏览器会
-**白屏**（Ext 加载完等不到渲染脚本，`/lw/lw.js` 404）。启动横幅会明确
-警告这一点。回退查找能救「部署目录在仓库附近」的情况（逐级向上找
-`src/client/`）；彻底独立的部署请务必带上这两个文件。
-
 验证：启动后看横幅的 `Root :` 行，或
 `curl -o /dev/null -w "%{http_code}" http://127.0.0.1:8090/lw/lw.js`（应为 200）。
 
@@ -380,21 +355,6 @@ URL 里 **不会**出现服务端路径：`SendFile` 把文件登记成一次性
 用独立数据库连接做附件写库，不打断正在编辑的主记录 —— 详见
 `demos\db\README.md` 的"附件是怎么接的"。
 
-HTTP 级回归测试（服务启动后直接 `python tests\t_xxx.py`）：
-
-| 脚本 | 覆盖 |
-|---|---|
-| `tests\t_files.py` | 上传/下载/CSV 导出，28 项 |
-| `tests\t_attach.py` | db 演示商品附件（上传/改名/下载/删除/换行刷新），42 项 |
-| `tests\t_db.py` | db 演示增删改查/排序/过滤（开跑前自动复位种子数据），35 项 |
-| `tests\t_dbaware.py` | **DB 感知控件全家桶**（kind/下发值/点行同步/回写/落库/导航），134 项 |
-| `tests\t_dialog.py` | **对话框**（7 类对话框的推送 → 答复 → 线程唤醒 → 返回值），36 项 |
-| `tests\t_dbaware2.py` | dbaware 的菜单/窗口切换/权限/大表分页，46 项 |
-| `tests\t_multitab.py` | 多页签共享会话 + 定向对话框 + 双会话隔离，22 项 |
-| `tests\t_config.py` | 配置文件（INI）/ExtDir/端口优先级/自动发现，19 项 |
-| `tests\t_convert.py` | `lwconvert` 转换标准 LCL 工程 → 能跑，29 项 |
-| `tests\t_hyper.py` | `lwhyper` 负载均衡（worker 崩溃重启 / 会话兜底），20 项 |
-
 ## 对话框（ShowMessage / MessageDlg / TOpenDialog …）
 
 **业务代码一行都不用改**。LCL 的这些函数在服务端被改道成"浏览器里弹模态框"，
@@ -482,37 +442,6 @@ end;
 | `GET /lw/ajax/<名字>` | **自定义 AJAX 端点**：`TLWApp.AddAjax(name, handler)` 注册，第三方 JS 直接 fetch |
 | `GET /lw/healthz` | 健康检查（LB/k8s 探针）：`{"ok":true,"sessions":..,"uptime":..}` |
 | `GET /ext/<版本>/<路径>` | Ext JS 静态资源（两版本并存） |
-
-## 迁移工具（普通 Lazarus 应用 → lazarusWeb）
-
-```
-tools\build_convert.bat                          :: 编译转换器（一次；Linux/macOS 用 tools/build.sh convert）
-tools\lwconvert.exe <项目目录> --convert <输出目录>
-```
-
-也可以用 GUI 版 `tools\lwconvert_gui.exe`（`tools\build_convert_gui.bat`
-编译）：选源目录 →「支持度分析」或「开始转换」→ 结果与警告直接显示在窗口，
-一键打开报告/输出目录；输出目录留空自动用「源目录 + `_web`」。两个版本共用
-`lwconvert_core.pas`，转换结果一字不差。
-
-一条命令完成转换，输出目录里的工程**直接可 lazbuild 编译**：
-
-| 转换内容 | 规则 |
-|---|---|
-| 窗体基类 | `TxxxForm = class(TForm)` → `class(TLWForm)`，`uses` 自动补 `lwform` |
-| 事件 | **不用改**：`.lfm` 原样保留，事件方法经 RTTI 接线 |
-| 启动代码 | `Application.CreateForm(TX, X)` → `TLWApp.Register(TX);`（顺序＝注册顺序，第一个是默认窗体），`Application.Run` → `TLWApp.Run`，`uses` 补 `lwapp` |
-| 工程文件 | 重新生成 `.lpi`：`LCLWidgetType=nogui`、`OtherUnitFiles` 指向 `<lazarusWeb>\src\core`、窗体单元补 `HasResources`（`.lfm` 才会进资源） |
-| 数据模块 | `TDataModule` 的 `CreateForm` 保留（全局建一次，所有会话共享），报告里标注 |
-| 对话框 | 不用改：`ShowMessage` / `MessageDlg` / `InputQuery` / `TOpenDialog` 由 `lwdlg` 自动改道到浏览器 |
-
-同时产出 `lwconvert-report.md`：逐文件改写清单、窗体注册顺序、每个窗体的
-控件支持度（读 `docs/CONTROL_MATRIX.md`，与实测能力一致）、警告与待办、
-编译运行命令。不给 `--convert` 时只做支持度分析（写 `lwreport.md`）。
-
-已用 `tests/fixtures/lclapp`（一份标准 LCL 工程：菜单 + 8 个控件 + 模态子窗体）
-做端到端回归 `tests/t_convert.py`：转换 → 编译 → 启动 → HTTP 断言（含
-**模态窗体往返**：点按钮 → Form2 推送 → 点 OK → 返回值回到调用方）。
 
 
 ## 控件支持度（实测）
@@ -785,3 +714,15 @@ Copyright (c) 2026 szlbz(秋风) QQ:315795176
 - 项目自有的 `lw-alpine.js` / `lw-alpine.css` 为原创代码，以 MIT 分发
   （文件头部含 SPDX 声明）；
 - Alpine 渲染层是框架默认渲染层，部署无需任何外部下载。
+
+<img width="1836" height="1271" alt="QQ_2026-11-12_17-10-34" src="https://github.com/user-attachments/assets/5b863786-318e-496f-85d9-c603eb295d5a" />
+<img width="1845" height="1269" alt="QQ_2026-11-12_17-11-14" src="https://github.com/user-attachments/assets/2f6bb2ff-cae0-4177-b82e-1032c1663d2c" />
+<img width="1821" height="1179" alt="QQ_2026-11-12_17-11-33" src="https://github.com/user-attachments/assets/6cf0fb0d-6586-470a-94ca-04641d33620e" />
+<img width="1815" height="1170" alt="QQ_2026-11-12_17-11-48" src="https://github.com/user-attachments/assets/305a37e0-0fae-4fb5-b123-fa741f96c0b5" />
+<img width="1815" height="1179" alt="QQ_2026-11-12_17-12-04" src="https://github.com/user-attachments/assets/c3ccde1f-ddb7-4089-8073-978f3d0dacaa" />
+<img width="1815" height="1184" alt="QQ_2026-11-12_17-12-21" src="https://github.com/user-attachments/assets/5748a74a-e25f-4aed-b3d5-fc23327430b8" />
+<img width="1815" height="1173" alt="QQ_2026-11-12_17-12-38" src="https://github.com/user-attachments/assets/54d084f1-e637-4b60-a2ed-7b5f97cccd4f" />
+<img width="1809" height="1177" alt="QQ_2026-11-12_17-13-01" src="https://github.com/user-attachments/assets/7fbe0270-3a95-424a-8c35-24fc87f50a05" />
+<img width="1815" height="1179" alt="QQ_2026-11-12_17-17-44" src="https://github.com/user-attachments/assets/92e18df9-9ca7-4565-9b78-1e73260f254c" />
+<img width="1817" height="1179" alt="QQ_2026-11-12_17-18-11" src="https://github.com/user-attachments/assets/8b8df772-352e-43ad-97e9-f559cfc02b66" />
+<img width="1824" height="1173" alt="QQ_2026-11-13_09-15-53" src="https://github.com/user-attachments/assets/90ca9690-cba7-48da-bb30-1cefebaad4d1" />
