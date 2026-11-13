@@ -462,15 +462,28 @@ end;
 { TDrawGrid 没有字符串 Cells（自绘网格），但行列结构与列宽必须发给
   浏览器端 —— 之前没有这个分支，gallery 的 TDrawGrid 渲染成空白格。
   内容按空字符串下发（前端画 5x5 空格子，固定行/列样式照常）。 }
+{ TDrawGrid 没有 Cells/Objects 字符串存储（那是 TCustomStringGrid 的）。
+  自绘标记文本放在 lwui 的 TLWDrawCellStore 仓库里（LWSetDrawCellText
+  写入、以网格为 Owner 挂靠），writer 从仓库读取。 }
+function LWDrawGridCellText(G: TDrawGrid; c, r: Integer): string;
+begin
+  Result := LWGetDrawCellText(G, c, r);
+end;
+
 procedure TLWWriter.WriteDrawGrid(G: TDrawGrid; O: TJSONObject);
 var
   cols, rows, cw: TJSONArray;
   row: TJSONArray;
   c, r, rmax, rh: Integer;
 begin
+  { 表头列名取固定行第 0 行的 Cells（TDrawGrid 没有独立 HeaderText，
+    惯例：FixedRows>=1 时第 0 行就是列标题；FixedRows=0 则列名为空 } ;
   cols := TJSONArray.Create;
   for c := 0 to G.ColCount - 1 do
-    JArrAddStr(cols, '');
+    if G.FixedRows > 0 then
+      JArrAddStr(cols, LWDrawGridCellText(G, c, 0))
+    else
+      JArrAddStr(cols, '');
   O.Add('cols', cols);
 
   cw := TJSONArray.Create;
@@ -478,6 +491,11 @@ begin
     cw.Add(G.ColWidths[c]);
   O.Add('colwidths', cw);
 
+  { 自 2026-11-13 起下发真实单元格文本：DrawGrid 单元格可以放自绘标记
+    （@bar(72) / @chip(文本,颜色) / @spark(v1,v2…) / @stars(4.5)），
+    浏览器端 $lwDrawCell 把标记渲染成进度条/徽章/迷你图/星级；
+    nogui 是无头 widgetset（假 DC），LCL 级 OnDrawCell 画不出像素，
+    自绘只能在浏览器端做 —— 这是框架唯一可行路径 }
   rows := TJSONArray.Create;
   rmax := G.RowCount - 1;
   if rmax > LW_MAX_GRID_ROWS then rmax := LW_MAX_GRID_ROWS;
@@ -485,7 +503,7 @@ begin
   begin
     row := TJSONArray.Create;
     for c := 0 to G.ColCount - 1 do
-      JArrAddStr(row, '');
+      JArrAddStr(row, LWDrawGridCellText(G, c, r));
     rows.Add(row);
   end;
   O.Add('rows', rows);

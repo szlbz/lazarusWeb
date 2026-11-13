@@ -80,6 +80,16 @@ type
 procedure LWShowScreenMask(const AText: string = '');
 procedure LWHideScreenMask;
 
+{ TDrawGrid 自绘单元格（2026-11-13）：nogui 是无头 widgetset（假 DC），
+  LCL 级 OnDrawCell 画不出像素，自绘只能在浏览器端做 —— 业务往单元格里
+  放"自绘标记"字符串（@bar/@chip/@spark/@stars，见客户端 $lwDrawCell），
+  writer 下发、浏览器渲染。TDrawGrid 没有 Cells/Objects 字符串存储
+  （那是 TCustomStringGrid 的），文本由 TLWDrawCellStore 承载：
+  仓库组件以网格为 Owner（网格销毁时自动释放，无会话泄漏）。 }
+procedure LWSetDrawCellText(G: TControl; ACol, ARow: Integer; const S: string);
+function LWGetDrawCellText(G: TControl; ACol, ARow: Integer): string;
+procedure LWClearDrawCellText(G: TControl);
+
 implementation
 
 uses
@@ -156,6 +166,105 @@ begin
   finally
     cmd.Free;
   end;
+end;
+
+{ ---------------- TDrawGrid 自绘单元格 ---------------- }
+
+{ 文本仓库：挂在网格组件上（Owner=网格，FindComponent 定位）。
+  key = 'col,row'（负数也能定位固定行/列），value = 标记文本。 }
+type
+  TLWDrawCellStore = class(TComponent)
+  private
+    FData: TStringList;
+    function KeyOf(ACol, ARow: Integer): string;
+  public
+    constructor Create(AOwner: TComponent); override;
+    destructor Destroy; override;
+    procedure SetText(ACol, ARow: Integer; const S: string);
+    function GetText(ACol, ARow: Integer): string;
+    procedure Clear;
+  end;
+
+const
+  LW_DRAWCELL_STORE = 'LWDrawCellStore';
+
+function LWFindDrawCellStore(G: TComponent; ANeeded: Boolean): TLWDrawCellStore;
+begin
+  Result := G.FindComponent(LW_DRAWCELL_STORE) as TLWDrawCellStore;
+  if (Result = nil) and ANeeded then
+  begin
+    Result := TLWDrawCellStore.Create(G);
+    Result.Name := LW_DRAWCELL_STORE;
+  end;
+end;
+
+constructor TLWDrawCellStore.Create(AOwner: TComponent);
+begin
+  inherited Create(AOwner);
+  FData := TStringList.Create;
+  FData.Sorted := True;
+  FData.Duplicates := dupError;
+end;
+
+destructor TLWDrawCellStore.Destroy;
+begin
+  FData.Free;
+  inherited Destroy;
+end;
+
+function TLWDrawCellStore.KeyOf(ACol, ARow: Integer): string;
+begin
+  Result := IntToStr(ACol) + ',' + IntToStr(ARow);
+end;
+
+procedure TLWDrawCellStore.SetText(ACol, ARow: Integer; const S: string);
+begin
+  { FData 是 'col,row=文本' 的 name=value 列表，必须走 Values[]/IndexOfName
+    （IndexOf 匹配整行，裸 key 永远找不到 —— 踩过一次） }
+  if S = '' then
+    FData.Values[KeyOf(ACol, ARow)] := ''
+  else
+    FData.Values[KeyOf(ACol, ARow)] := S;
+end;
+
+function TLWDrawCellStore.GetText(ACol, ARow: Integer): string;
+begin
+  Result := FData.Values[KeyOf(ACol, ARow)];
+end;
+
+procedure TLWDrawCellStore.Clear;
+begin
+  FData.Clear;
+end;
+
+procedure LWSetDrawCellText(G: TControl; ACol, ARow: Integer; const S: string);
+var
+  store: TLWDrawCellStore;
+begin
+  if G = nil then Exit;
+  store := LWFindDrawCellStore(G, True);
+  store.SetText(ACol, ARow, S);
+end;
+
+function LWGetDrawCellText(G: TControl; ACol, ARow: Integer): string;
+var
+  store: TLWDrawCellStore;
+begin
+  Result := '';
+  if G = nil then Exit;
+  store := LWFindDrawCellStore(G, False);
+  if store <> nil then
+    Result := store.GetText(ACol, ARow);
+end;
+
+procedure LWClearDrawCellText(G: TControl);
+var
+  store: TLWDrawCellStore;
+begin
+  if G = nil then Exit;
+  store := LWFindDrawCellStore(G, False);
+  if store <> nil then
+    store.Clear;
 end;
 
 end.
