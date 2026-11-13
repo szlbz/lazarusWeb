@@ -47,9 +47,12 @@
 - **TDBGrid**（只读可用）：表格浏览，前端只读
 - **TDBText**（只读可用）：只读标签
 - **TDBImage**（只读可用）：图片字段
-- **TDBNavigator**（完全可用）：lfm 里照写 TDBNavigator，运行时自动落到
-  `TLWDBNavigator`（lwdbnav.pas，覆盖 UpdateButtons 跳过 LCLGlyphs 位图
-  加载 —— 原版在 nogui 下 Create 即抛 FPImageException）。浏览器端画图标，
+- **TDBNavigator**（完全可用）：lfm 里必须写真实类名 `TLWDBNavigator` 并
+  `RegisterClass(TLWDBNavigator)`（lwdbnav.pas，覆盖 UpdateButtons 跳过 LCLGlyphs 位图
+  加载 —— 原版在 nogui 下 Create 即抛 FPImageException）。
+  早期文档写的"RegisterClassAlias 让 lfm 照写 TDBNavigator"方案已被坑 29/41 推翻
+  （alias 顶替不了已注册类名）；代码侧也可用 `LWNewNavigator()` 工厂。
+  浏览器端画图标，
   点击回传 `OnClick + val=按钮名`，服务端转 `BtnClick()`；
   first/prior/next/last 的 Enabled 由框架按 `RecNo` 兜底计算（SQLdb 的
   BOF/EOF 在 RecNo 导航后不可靠）。SQLdb 下 Delete/Post 进缓存，
