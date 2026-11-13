@@ -65,13 +65,18 @@
       <UnitOutputDirectory Value="lib/$(TargetCPU)-$(TargetOS)"/>
     </SearchPaths>
     <CodeGeneration>
-      <TargetCPU Value="mips64el"/>
-      <TargetOS Value="linux"/>
-    </CodeGeneration>
+                </CodeGeneration>
     <Linking>
       <Debugging>
         <DebugInfoType Value="dsDwarf3"/>
       </Debugging>
     </Linking>
   </CompilerOptions>
+  <Debugging>
+    <Exceptions>
+      <Item>
+        <Name Value="ESQLDatabaseError"/>
+      </Item>
+    </Exceptions>
+  </Debugging>
 </CONFIG>

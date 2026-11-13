@@ -1,33 +1,38 @@
 object AboutForm: TAboutForm
+  Left = 0
+  Height = 330
+  Top = 0
+  Width = 630
   Caption = '关于 lazarusWeb'
-  ClientWidth = 420
-  ClientHeight = 220
+  ClientHeight = 330
+  ClientWidth = 630
+  DesignTimePPI = 144
+  LCLVersion = '4.8.0.0'
   OnCreate = FormCreate
-  LCLVersion = '4.2'
   object lblTitle: TLabel
-    Left = 20
+    Left = 30
     Height = 30
-    Top = 16
+    Top = 24
     Width = 380
     Alignment = taCenter
     Caption = 'lazarusWeb 0.9.0 · 全功能画廊'
-    Font.Height = -16
+    Font.Height = -24
     Font.Style = [fsBold]
     ParentFont = False
   end
   object lblBody: TLabel
-    Left = 20
+    Left = 30
     Height = 90
-    Top = 56
+    Top = 84
     Width = 380
     Caption = '纯 Pascal 服务端 + 真实 LCL 控件 + Ext JS 前端。'
     WordWrap = True
   end
   object btnClose: TButton
-    Left = 160
-    Height = 32
-    Top = 170
-    Width = 100
+    Left = 240
+    Height = 48
+    Top = 255
+    Width = 150
     Caption = '关闭'
     ModalResult = 1
     TabOrder = 0

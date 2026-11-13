@@ -59,8 +59,8 @@
     </Target>
     <SearchPaths>
       <IncludeFiles Value="$(ProjOutDir)"/>
-      <UnitOutputDirectory Value="lib\$(TargetCPU)-$(TargetOS)"/>
-      <OtherUnitFiles Value="..\..\src\core"/>
+      <UnitOutputDirectory Value="lib/$(TargetCPU)-$(TargetOS)"/>
+      <OtherUnitFiles Value="../../src/core"/>
     </SearchPaths>
     <Linking>
       <Options>

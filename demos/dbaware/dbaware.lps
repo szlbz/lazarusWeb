@@ -33,6 +33,7 @@
         <ComponentName Value="AwareForm"/>
         <HasResources Value="True"/>
         <ResourceBaseClass Value="Form"/>
+        <IsVisibleTab Value="True"/>
         <TopLine Value="561"/>
         <CursorPos X="13" Y="581"/>
         <UsageCount Value="27"/>
@@ -49,7 +50,6 @@
       </Unit>
       <Unit>
         <Filename Value="..\..\src\core\lwhttp.pas"/>
-        <IsVisibleTab Value="True"/>
         <EditorIndex Value="1"/>
         <TopLine Value="477"/>
         <CursorPos X="41" Y="501"/>

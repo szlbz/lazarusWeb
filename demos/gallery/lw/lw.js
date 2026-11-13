@@ -1,5 +1,6 @@
 /*
  * lazarusWeb :: lw.js  —— 浏览器端运行时（Ext JS classic 7.x）
+ * SPDX-License-Identifier: MIT  (c) 2026 szlbz(秋风) QQ:315795176 -- 见仓库根目录 LICENSE
  * ------------------------------------------------------------------
  * 职责：
  *   1. 向服务端要一棵组件树（JSON）；

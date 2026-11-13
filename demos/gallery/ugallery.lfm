@@ -729,7 +729,7 @@ object GalleryForm: TGalleryForm
         )
         ColWidths = (
           96
-          560
+          534
         )
       end
       object lbl19: TLabel
@@ -1029,8 +1029,8 @@ object GalleryForm: TGalleryForm
         Left = 978
         Height = 24
         Top = 654
-        Width = 342
-        Caption = '（上传落到会话目录，服务端拿完整路径）'
+        Width = 495
+        Caption = '（上传落到 exe 旁 uploads\<会话号>\，服务端拿完整路径）'
       end
     end
     object tsDlg: TTabSheet

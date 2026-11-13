@@ -25,7 +25,7 @@ implementation
 procedure TAboutForm.FormCreate(Sender: TObject);
 begin
   lblBody.Caption :=
-    '纯 Pascal 服务端 + 真实 LCL 控件 + Ext JS 前端。' + LineEnding +
+    '纯 Pascal 服务端 + 真实 LCL 控件 + Alpine.js或Ext JS 前端。' + LineEnding +
     '这个窗体是真实的 TLWForm（.lfm 加载），' + LineEnding +
     '通过 ShowModal 在浏览器里以模态窗口显示。';
 end;

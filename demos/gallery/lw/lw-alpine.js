@@ -1,5 +1,6 @@
 /*
  * lazarusWeb :: lw-alpine.js —— 浏览器端运行时（Alpine.js 3.x）
+ * SPDX-License-Identifier: MIT  (c) 2026 szlbz(秋风) QQ:315795176 -- 见仓库根目录 LICENSE
  * ------------------------------------------------------------------
  * 与 lw.js（Ext JS 版）协议完全一致，只是渲染层从 Ext 组件树换成
  * 「服务端 JSON 树 -> 绝对定位 DOM + Alpine 响应式绑定」：
