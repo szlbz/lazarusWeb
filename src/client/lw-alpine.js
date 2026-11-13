@@ -1017,10 +1017,17 @@ var LW = (function () {
                 return '<img class="lw-img" :src="' + r + '.src" :style="' + r + '.src ? \'\' : \'visibility:hidden\'" @click="' + evAttr(id, 'OnClick') + '"/>';
 
             case 'htmlframe':
-                return '<div class="lw-htmlframe lw-boxed" id="lw-hf-' + id + '"></div>';
-
-            case 'pdfframe':
-                return '<div class="lw-pdfframe lw-boxed" id="lw-pdf-' + id + '"></div>';
+            case 'pdfframe': {
+                /* TLWHTMLFrame / TLWPDFFrame：宿主是 TCustomPanel，边框跟随
+                   LCL 的 BevelOuter（默认 bvRaised）+ BorderStyle，与 panel
+                   分支同语义。bevel 未下发（旧服务端）时按 LCL 默认值
+                   bvRaised 处理 —— 默认有边框；BevelOuter=bvNone 且
+                   BorderStyle=bsNone 才是无边框 */
+                var fNoBev = (node.bevel === 0 || node.bevel === 'none') && node.border !== 'single';
+                var fCls = fNoBev ? '' : ' lw-boxed';
+                return '<div class="lw-' + k + fCls + '" id="lw-' +
+                    (k === 'htmlframe' ? 'hf' : 'pdf') + '-' + id + '"></div>';
+            }
 
             case 'chart':
                 return '<div class="lw-chart lw-boxed" id="lw-ch-' + id + '"></div>';
