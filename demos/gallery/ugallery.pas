@@ -20,7 +20,8 @@
                          SendText/SendFile 下载/会话遮罩
     tsDB     数据感知    sqlite(gallery.db) + TDBGrid/TDBEdit/TDBMemo/
                          TDBCheckBox/TDBComboBox + TLWDBNavigator，改一格即落库；
-                         unit 列 PickList 下拉、made 列日期选择（框架 cedit=2/3）
+                         unit 列 PickList 下拉、made 列日期选择、active 列勾选框
+                         （框架按字段类型自动出 cedit=2/3/4）
     tsBig    大表分页    TLWDBGrid：sqlite 1000 行、每页 50、过滤条、qty 汇总
 
   ------------------------------------------------------------------
@@ -481,6 +482,10 @@ end;
 
 { ============================ 数据层 ============================ }
 
+var
+  GDbEnsured: Boolean = False;    { DDL/种子每进程只做一次（坑 107）}
+  GBigDbEnsured: Boolean = False;
+
 procedure TGalleryForm.SetupData;
 
   { 表不存在就建；空库灌 20 行种子。以前是纯内存 TBufDataset ——
@@ -501,6 +506,10 @@ procedure TGalleryForm.SetupData;
     FConn.Params.Add('journal_mode=WAL');
     FConn.Open;
     FConn.ExecuteDirect('PRAGMA busy_timeout=10000');
+    if GDbEnsured then
+      Exit;   { DDL/UPDATE 每进程只做一遍：40 并发建会话时每个会话都跑一遍
+                CREATE/ALTER/UPDATE，写锁竞争直接 "database is locked"
+                （坑 107 复测抓到的真凶之一） }
     { 列类型要用 VARCHAR 而不是 TEXT：sqlite3conn 把 TEXT 映射成 ftMemo，
       writer 序列化时会输出 "(MEMO)" 占位符；VARCHAR(n) 才是 ftString。
       unit = DBGrid 下拉选择演示（PickList）；made = 日期选择演示（DATE） }
@@ -526,6 +535,7 @@ procedure TGalleryForm.SetupData;
       'UPDATE products SET made = date(''2026-01-01'', ''+'' || (rowid - 1) || ' +
       ''' day'') WHERE made IS NULL');
     FTrans.Commit;
+    GDbEnsured := True;
     n := 0;
     with TSQLQuery.Create(nil) do
     try
@@ -571,10 +581,13 @@ procedure TGalleryForm.SetupData;
     FConn2.Params.Add('journal_mode=WAL');
     FConn2.Open;
     FConn2.ExecuteDirect('PRAGMA busy_timeout=10000');
+    if GBigDbEnsured then
+      Exit;
     FConn2.ExecuteDirect(
       'CREATE TABLE IF NOT EXISTS bigitems(id INTEGER PRIMARY KEY, ' +
       'name VARCHAR(60), qty INTEGER, price REAL)');
     FTrans2.Commit;
+    GBigDbEnsured := True;
     n := 0;
     with TSQLQuery.Create(nil) do
     try
@@ -627,12 +640,14 @@ begin
   navDb.DataSource := dsMem;
   grdDb.DataSource := dsMem;
 
-  { DBGrid 单元格下拉：unit 列的 TColumn.PickList。列没在 lfm 里定义，
-    访问 Columns 时 TDBGrid 会按字段自动生成（设计期结构 + 运行时补内容）。
-    PickList 非空的列序列化成 cedit=2，浏览器单元格点开就是 <select>，
-    选中即写库；made 是 TDateField，writer 自动标成 cedit=3（日期选择），
-    不用在这里多做任何事 }
+  { DBGrid 单元格编辑器（框架按列类型自动判定，这里只挑一处做样板）：
+    - unit：TColumn.PickList 非空 -> cedit=2，点开是 <select>，选中即写库；
+    - made：TDateField -> cedit=3，点开是日期选择器；
+    - active：TBooleanField -> cedit=4，单元格常驻勾选框，点一下即写回 '1'/'0'。
+    列没在 lfm 里定义，访问 Columns 时 TDBGrid 会按字段自动生成
+    （设计期结构 + 运行时补内容），所以只需要在这里补列级属性 }
   for i := 0 to grdDb.Columns.Count - 1 do
+  begin
     if grdDb.Columns[i].FieldName = 'unit' then
     begin
       grdDb.Columns[i].PickList.Clear;
@@ -640,7 +655,10 @@ begin
       grdDb.Columns[i].PickList.Add('箱');
       grdDb.Columns[i].PickList.Add('件');
       grdDb.Columns[i].PickList.Add('套');
-    end;
+    end
+    else if grdDb.Columns[i].FieldName = 'active' then
+      grdDb.Columns[i].Title.Caption := '上架';
+  end;
 
   { tsBig：1000 行物料，TLWDBGrid 显示层分页。同样走 sqlite（bigitems 表），
     独立连接/事务：只读展示，和 tsDB 的业务事务互不干扰（WAL 下两连接可并存） }
