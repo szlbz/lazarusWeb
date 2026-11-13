@@ -1,6 +1,0 @@
-<?xml version="1.0" encoding="UTF-8"?>
-<CONFIG>
-  <Compiler Value="C:\111\fpc\bin\x86_64-win64\fpc.exe" Date="1567004938"/>
-  <Params Value="-MObjFPC -Scgi -O1 -g -gl -l -vewnhibq -FuC:\LazarusWeb\demos\dbaware\ -FuC:\111\lazarus\lcl\units\x86_64-win64\win32 -FuC:\111\lazarus\lcl\units\x86_64-win64 -FuC:\111\lazarus\components\freetype\lib\x86_64-win64 -FuC:\111\lazarus\components\lazutils\lib\x86_64-win64 -FuC:\111\lazarus\packager\units\x86_64-win64 -oC:\LazarusWeb\demos\dbaware\dbaware.exe -dLCL -dLCLwin32 -WG dbaware.lpr"/>
-  <Complete Value="False"/>
-</CONFIG>
