@@ -1626,7 +1626,9 @@ begin
   else if AKind = 'chart' then
   begin
     { TLWChart（uniChart 对应物）：类型 + X 轴标签 + 系列数组。
-      数值逐行解析（Values 每行一个点），解析失败按 0 处理 }
+      数值逐行解析（Values 每行一个点），解析失败按 0 处理。
+      bevel/border 与 htmlframe/pdfframe 同语义（宿主 TCustomPanel，
+      BevelOuter 默认 bvRaised → 浏览器端画 1px 边） }
     case TLWChart(C).ChartType of
       ctBar: O.Add('charttype', 'bar');
       ctPie: O.Add('charttype', 'pie');
@@ -1650,6 +1652,8 @@ begin
       items.Add(b);
     end;
     O.Add('series', items);
+    O.Add('bevel', Ord(TCustomPanel(C).BevelOuter));
+    O.Add('border', BorderStyleToStr(TCustomPanel(C).BorderStyle));
   end
   else if (AKind = 'dateedit') or (AKind = 'timeedit') then
   begin
