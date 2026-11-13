@@ -827,3 +827,18 @@ html, body {
 
 /* 单元格编辑器（dbgrid/valeditor 就地输入框） */
 .lw-table td .lw-input { height: 22px; padding: 1px 4px; }
+
+/* 就地编辑"覆盖模式"（$lwDbCell / $lwVeEdit）：编辑器绝对定位铺满整个
+   td，原文本留在文档流里当尺寸撑子 —— 进入/退出编辑前后行高、列宽
+   一个像素都不变（固定 22px 的旧方案参与行高计算，整行必然跳动）。
+   padding 2px 7px + 1px 边框 = td 的 3px 8px 内边距，光标落点不偏移 */
+.lw-table td.lw-cell-edit { position: relative; }
+.lw-table td.lw-cell-edit .lw-input {
+    position: absolute;
+    left: 0;
+    top: 0;
+    width: 100%;
+    height: 100%;
+    padding: 2px 7px;
+    border-radius: 0;
+}

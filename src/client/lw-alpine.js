@@ -1238,15 +1238,23 @@ var LW = (function () {
         inp.type = 'text';
         inp.className = 'lw-input';
         inp.value = old == null ? '' : String(old);
-        td.textContent = '';
+        /* 覆盖模式（同 dbgrid 的 $lwDbCell）：td 里原文本节点留着当
+           尺寸撑子，编辑器绝对定位铺满 td，行高/列宽进出编辑不变。
+           编辑器背景不透明，正好盖住下面的文本 */
+        td.classList.add('lw-cell-edit');
         td.appendChild(inp);
         inp.focus();
         inp.select();
+        function leave(v) {
+            td.classList.remove('lw-cell-edit');
+            if (inp.parentNode) inp.parentNode.removeChild(inp);
+            td.textContent = v;
+        }
         function commit() {
             if (!td.__lwEditing) return;
             td.__lwEditing = false;
             var v = inp.value;
-            td.textContent = v;
+            leave(v);
             if (v !== String(old == null ? '' : old)) {
                 fire(id, 'OnValidate', { row: row, key: (r.keys || [])[row], val: v });
             }
@@ -1254,7 +1262,7 @@ var LW = (function () {
         inp.addEventListener('blur', commit);
         inp.addEventListener('keydown', function (e) {
             if (e.key === 'Enter') { e.preventDefault(); inp.blur(); }
-            if (e.key === 'Escape') { td.__lwEditing = false; td.textContent = old == null ? '' : String(old); }
+            if (e.key === 'Escape') { td.__lwEditing = false; leave(old == null ? '' : String(old)); }
         });
     };
 
@@ -1295,6 +1303,7 @@ var LW = (function () {
         if (td.__lwEditing) return;
         var old = (r.rows || [])[row] ? (r.rows[row][col]) : '';
         td.__lwEditing = true;
+        var span = td.querySelector('span');
         var inp;
         if (et === 2) {
             /* 下拉：服务端 TColumn.PickList（plist 按列下标带选项） */
@@ -1322,14 +1331,34 @@ var LW = (function () {
                 inp.select();
             }
         }
-        td.textContent = '';
+        /* 覆盖模式：原文本隐藏但留在文档流里当尺寸撑子（行高/列宽进
+           出编辑前后一个像素都不变），编辑器绝对定位铺满 td。
+           不能像旧版那样 td.textContent='' 再塞 input —— 编辑器参与
+           行高计算，22px 固定高度与单元格实际高度不等，整行必然跳动 */
+        td.classList.add('lw-cell-edit');
+        if (span) {
+            span.style.visibility = 'hidden';
+        } else {
+            td.textContent = '';
+        }
         td.appendChild(inp);
         inp.focus();
+        /* 离开编辑态：恢复 span 显示与文本（或裸文本），摘掉编辑器 */
+        function leave(v) {
+            td.classList.remove('lw-cell-edit');
+            if (inp.parentNode) inp.parentNode.removeChild(inp);
+            if (span) {
+                span.style.visibility = '';
+                span.textContent = v;
+            } else {
+                td.textContent = v;
+            }
+        }
         function commit() {
             if (!td.__lwEditing) return;
             td.__lwEditing = false;
             var v = inp.value;
-            td.textContent = v;
+            leave(v);
             /* 本地行数据跟着改，服务端确认后的树补丁会覆盖成权威值 */
             if (r.rows && r.rows[row]) r.rows[row][col] = v;
             if (v !== String(old == null ? '' : old)) {
@@ -1345,7 +1374,7 @@ var LW = (function () {
                 if (e2.key === 'Enter') { e2.preventDefault(); inp.blur(); }
                 if (e2.key === 'Escape') {
                     td.__lwEditing = false;
-                    td.textContent = old == null ? '' : String(old);
+                    leave(old == null ? '' : String(old));
                 }
             });
         }
