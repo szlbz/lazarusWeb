@@ -1,0 +1,81 @@
+object LoginForm: TLoginForm
+  Left = 0
+  Height = 322
+  Top = 0
+  Width = 420
+  Caption = 'lazarusWeb · 登录'
+  ClientHeight = 322
+  ClientWidth = 420
+  OnCreate = FormCreate
+  object lblLogo: TLabel
+    Left = 28
+    Height = 30
+    Top = 24
+    Width = 360
+    Caption = 'lazarusWeb 综合演示'
+    Font.Color = clNavy
+    Font.Height = -21
+    Font.Style = [fsBold]
+    ParentFont = False
+  end
+  object lblSub: TLabel
+    Left = 30
+    Height = 18
+    Top = 56
+    Width = 360
+    Caption = 'dbaware · 登录后进入数据管理 / 报表中心'
+    Font.Color = clGray
+    ParentFont = False
+  end
+  object lblUser: TLabel
+    Left = 30
+    Height = 18
+    Top = 96
+    Width = 80
+    Caption = '用户名'
+  end
+  object edUser: TEdit
+    Left = 112
+    Height = 26
+    Top = 92
+    Width = 240
+  end
+  object lblPass: TLabel
+    Left = 30
+    Height = 18
+    Top = 136
+    Width = 80
+    Caption = '密码'
+  end
+  object edPass: TEdit
+    Left = 112
+    Height = 26
+    Top = 132
+    Width = 240
+    PasswordChar = '*'
+  end
+  object btnOk: TButton
+    Left = 112
+    Height = 32
+    Top = 176
+    Width = 116
+    Caption = '登录'
+    OnClick = DoLogin
+  end
+  object btnReset: TButton
+    Left = 236
+    Height = 32
+    Top = 176
+    Width = 116
+    Caption = '重置'
+    OnClick = DoReset
+  end
+  object lblHint: TLabel
+    Left = 30
+    Height = 60
+    Top = 226
+    Width = 360
+    Font.Color = clGray
+    ParentFont = False
+  end
+end

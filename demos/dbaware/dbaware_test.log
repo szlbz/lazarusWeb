@@ -1,0 +1,11 @@
+
+  lazarusWeb 0.9.0
+  --------------------------------------------------
+  Root      : C:\LazarusWeb
+  Ext       : C:\LazarusWeb\ext-7.5.1  /  C:\LazarusWeb\ext-7.0.0
+  Form      : AwareForm
+  Listen    : http://127.0.0.1:8110/
+  Ext switch: http://127.0.0.1:8110/?ext=7.0.0
+  --------------------------------------------------
+  Ctrl+CÍË³ö
+

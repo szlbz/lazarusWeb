@@ -1,0 +1,76 @@
+object ControlsForm: TControlsForm
+  Caption = 'lazarusWeb · 容器/列表控件'
+  ClientWidth = 700
+  ClientHeight = 560
+  OnCreate = FormCreate
+  LCLVersion = '4.2'
+  object rgColor: TRadioGroup
+    Caption = '颜色'
+    Left = 12
+    Height = 140
+    Top = 12
+    Width = 220
+    ItemIndex = 0
+    Items.Strings = (
+      '红色'
+      '绿色'
+      '蓝色'
+    )
+    OnClick = rgColorClick
+    TabOrder = 0
+  end
+  object cgLang: TCheckGroup
+    Caption = '语言'
+    Left = 240
+    Height = 140
+    Top = 12
+    Width = 220
+    Items.Strings = (
+      'Pascal'
+      'JavaScript'
+      'Python'
+    )
+    OnItemClick = cgLangItemClick
+    TabOrder = 1
+  end
+  object clbTodo: TCheckListBox
+    Left = 12
+    Height = 200
+    Top = 170
+    Width = 220
+    ItemHeight = 24
+    Items.Strings = (
+      '写设计文档'
+      '实现渲染器'
+      '补回归测试'
+      '更新 README'
+    )
+    OnClick = clbTodoClick
+    OnClickCheck = clbTodoClickCheck
+    TabOrder = 2
+  end
+  object vleInfo: TValueListEditor
+    Left = 240
+    Height = 200
+    Top = 170
+    Width = 260
+    Strings.Strings = (
+      '名称=机械键盘'
+      '数量=12'
+      '单价=299'
+    )
+    TitleCaptions.Strings = (
+      '属性'
+      '值'
+    )
+    OnValidate = vleInfoValidate
+    TabOrder = 3
+  end
+  object lblLog: TLabel
+    Left = 12
+    Height = 17
+    Top = 400
+    Width = 660
+    Caption = '（等待事件）'
+  end
+end

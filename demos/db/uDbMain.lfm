@@ -1,0 +1,557 @@
+object DbForm: TDbForm
+  Left = 0
+  Height = 1050
+  Top = 0
+  Width = 1620
+  Caption = '商品库存管理 · SQLite 演示'
+  ClientHeight = 1050
+  ClientWidth = 1620
+  Color = clBtnFace
+  DesignTimePPI = 144
+  Font.Color = clWindowText
+  Font.Height = -20
+  Font.Name = 'Microsoft YaHei UI'
+  LCLVersion = '4.8.0.0'
+  object pnlTop: TPanel
+    Left = 0
+    Height = 84
+    Top = 0
+    Width = 1620
+    BevelOuter = bvNone
+    ClientHeight = 84
+    ClientWidth = 1620
+    ParentBackground = False
+    TabOrder = 0
+    object lblFind: TLabel
+      Left = 21
+      Height = 27
+      Top = 28
+      Width = 75
+      AutoSize = False
+      Caption = '关键字'
+    end
+    object edFind: TEdit
+      Left = 99
+      Height = 35
+      Top = 22
+      Width = 240
+      TabOrder = 0
+    end
+    object lblCat: TLabel
+      Left = 366
+      Height = 27
+      Top = 28
+      Width = 54
+      AutoSize = False
+      Caption = '分类'
+    end
+    object cbFilterCat: TComboBox
+      Left = 423
+      Height = 35
+      Top = 22
+      Width = 195
+      ItemHeight = 27
+      Style = csDropDownList
+      TabOrder = 1
+    end
+    object chkLowStock: TCheckBox
+      Left = 645
+      Height = 31
+      Top = 27
+      Width = 156
+      Caption = '只看库存 < 10'
+      TabOrder = 2
+    end
+    object btnQuery: TButton
+      Left = 861
+      Height = 45
+      Top = 20
+      Width = 132
+      Caption = '查询'
+      TabOrder = 3
+      OnClick = btnQueryClick
+    end
+    object btnReset: TButton
+      Left = 1002
+      Height = 45
+      Top = 20
+      Width = 132
+      Caption = '重置'
+      TabOrder = 4
+      OnClick = btnResetClick
+    end
+    object lblTip: TLabel
+      Left = 1164
+      Height = 27
+      Top = 28
+      Width = 435
+      AutoSize = False
+      Caption = '提示：点列头排序 · 点行编辑'
+      Font.Color = clGray
+      Font.Height = -20
+      Font.Name = 'Microsoft YaHei UI'
+      ParentFont = False
+    end
+  end
+  object pcMain: TPageControl
+    Left = 0
+    Height = 930
+    Top = 84
+    Width = 1620
+    ActivePage = tsData
+    TabIndex = 0
+    TabOrder = 1
+    object tsData: TTabSheet
+      Caption = '数据维护'
+      ClientHeight = 890
+      ClientWidth = 1612
+      object grdMain: TDBGrid
+        Left = 12
+        Height = 705
+        Top = 12
+        Width = 990
+        Color = clWindow
+        Columns = <        
+          item
+            Title.Caption = 'ID'
+            Width = 66
+            FieldName = 'id'
+          end        
+          item
+            Title.Caption = '编码'
+            Width = 117
+            FieldName = 'code'
+          end        
+          item
+            Title.Caption = '名称'
+            Width = 255
+            FieldName = 'name'
+          end        
+          item
+            Title.Caption = '分类'
+            Width = 114
+            FieldName = 'category'
+          end        
+          item
+            Title.Caption = '单价'
+            Width = 93
+            FieldName = 'price'
+            DisplayFormat = '#,##0.00'
+          end        
+          item
+            Title.Caption = '库存'
+            Width = 78
+            FieldName = 'stock'
+          end        
+          item
+            Title.Caption = '更新时间'
+            Width = 189
+            FieldName = 'updated'
+          end        
+          item
+            Title.Caption = '备注'
+            Width = 0
+            Visible = False
+            FieldName = 'memo'
+          end>
+        Font.Color = clWindowText
+        Font.Height = -20
+        Font.Name = 'Microsoft YaHei UI'
+        Options = [dgTitles, dgIndicator, dgColumnResize, dgColLines, dgRowLines, dgTabs, dgConfirmDelete, dgCancelOnExit]
+        ParentFont = False
+        TabOrder = 0
+        TitleFont.Color = clWindowText
+        TitleFont.Height = -20
+        TitleFont.Name = 'Microsoft YaHei UI'
+        TitleFont.Style = [fsBold]
+        OnCellClick = grdCellClick
+        OnTitleClick = grdTitleClick
+      end
+      object pnlEdit: TPanel
+        Left = 984
+        Height = 705
+        Top = 12
+        Width = 600
+        ClientHeight = 705
+        ClientWidth = 600
+        ParentBackground = False
+        TabOrder = 1
+        object lblCode: TLabel
+          Left = 21
+          Height = 27
+          Top = 27
+          Width = 84
+          AutoSize = False
+          Caption = '编码'
+        end
+        object edCode: TDBEdit
+          Left = 117
+          Height = 35
+          Top = 21
+          Width = 450
+          DataField = 'code'
+          MaxLength = 0
+          TabOrder = 0
+          OnChange = FieldChanged
+        end
+        object lblName: TLabel
+          Left = 21
+          Height = 27
+          Top = 84
+          Width = 84
+          AutoSize = False
+          Caption = '名称'
+        end
+        object edName: TDBEdit
+          Left = 117
+          Height = 35
+          Top = 78
+          Width = 450
+          DataField = 'name'
+          MaxLength = 0
+          TabOrder = 1
+          OnChange = FieldChanged
+        end
+        object lblCatEdit: TLabel
+          Left = 21
+          Height = 27
+          Top = 141
+          Width = 84
+          AutoSize = False
+          Caption = '分类'
+        end
+        object cbCategory: TDBComboBox
+          Left = 117
+          Height = 35
+          Top = 135
+          Width = 240
+          DataField = 'category'
+          ItemHeight = 27
+          MaxLength = 0
+          TabOrder = 2
+          OnChange = FieldChanged
+        end
+        object lblPrice: TLabel
+          Left = 21
+          Height = 27
+          Top = 198
+          Width = 84
+          AutoSize = False
+          Caption = '单价'
+        end
+        object edPrice: TDBEdit
+          Left = 117
+          Height = 35
+          Top = 192
+          Width = 180
+          DataField = 'price'
+          MaxLength = 0
+          TabOrder = 3
+          OnChange = FieldChanged
+        end
+        object lblStock: TLabel
+          Left = 21
+          Height = 27
+          Top = 255
+          Width = 84
+          AutoSize = False
+          Caption = '库存'
+        end
+        object edStock: TDBEdit
+          Left = 117
+          Height = 35
+          Top = 249
+          Width = 180
+          DataField = 'stock'
+          MaxLength = 0
+          TabOrder = 4
+          OnChange = FieldChanged
+        end
+        object lblMemo: TLabel
+          Left = 21
+          Height = 27
+          Top = 312
+          Width = 84
+          AutoSize = False
+          Caption = '备注'
+        end
+        object mmMemo: TDBMemo
+          Left = 117
+          Height = 120
+          Top = 306
+          Width = 450
+          DataField = 'memo'
+          ScrollBars = ssVertical
+          TabOrder = 5
+        end
+        object lblAttachInfo: TLabel
+          Left = 21
+          Height = 27
+          Top = 438
+          Width = 555
+          AutoSize = False
+          Caption = '附件：—'
+          Font.Color = clGray
+          Font.Height = -20
+          Font.Name = 'Microsoft YaHei UI'
+          ParentFont = False
+        end
+        object lstAttach: TListBox
+          Left = 21
+          Height = 96
+          Top = 468
+          Width = 555
+          Font.Color = clWindowText
+          Font.Height = -18
+          Font.Name = 'Microsoft YaHei UI'
+          ItemHeight = 0
+          ParentFont = False
+          TabOrder = 6
+        end
+        object btnUpload: TLWFileUpload
+          Left = 21
+          Height = 45
+          Top = 573
+          Width = 150
+          Caption = '上传…'
+          TabOrder = 7
+          Filter = '图片|*.png;*.jpg;*.jpeg;*.gif;*.webp|文档|*.txt;*.csv;*.pdf;*.md|压缩包|*.zip;*.7z|所有文件|*.*'
+          MaxSizeKB = 4096
+          Multiple = True
+          OnUpload = btnUploadUpload
+        end
+        object btnAttachOpen: TButton
+          Left = 180
+          Height = 45
+          Top = 573
+          Width = 186
+          Caption = '下载选中'
+          Enabled = False
+          Font.Color = clWindowText
+          Font.Height = -18
+          Font.Name = 'Microsoft YaHei UI'
+          ParentFont = False
+          TabOrder = 8
+          OnClick = btnAttachOpenClick
+        end
+        object btnAttachDel: TButton
+          Left = 375
+          Height = 45
+          Top = 573
+          Width = 186
+          Caption = '删除选中'
+          Enabled = False
+          Font.Color = clWindowText
+          Font.Height = -18
+          Font.Name = 'Microsoft YaHei UI'
+          ParentFont = False
+          TabOrder = 9
+          OnClick = btnAttachDelClick
+        end
+        object lblState: TLabel
+          Left = 21
+          Height = 27
+          Top = 630
+          Width = 540
+          AutoSize = False
+          Caption = '状态：浏览'
+          Font.Color = clNavy
+          Font.Height = -20
+          Font.Name = 'Microsoft YaHei UI'
+          Font.Style = [fsBold]
+          ParentFont = False
+        end
+        object lblDetail: TLabel
+          Left = 21
+          Height = 27
+          Top = 663
+          Width = 555
+          AutoSize = False
+          Font.Color = clGray
+          Font.Height = -20
+          Font.Name = 'Microsoft YaHei UI'
+          ParentFont = False
+        end
+      end
+      object btnNew: TButton
+        Left = 12
+        Height = 45
+        Top = 729
+        Width = 132
+        Caption = '新增(N)'
+        TabOrder = 2
+        OnClick = btnNewClick
+      end
+      object btnSave: TButton
+        Left = 153
+        Height = 45
+        Top = 729
+        Width = 132
+        Caption = '保存(S)'
+        TabOrder = 3
+        OnClick = btnSaveClick
+      end
+      object btnCancel: TButton
+        Left = 294
+        Height = 45
+        Top = 729
+        Width = 132
+        Caption = '取消'
+        TabOrder = 4
+        OnClick = btnCancelClick
+      end
+      object btnDelete: TButton
+        Left = 435
+        Height = 45
+        Top = 729
+        Width = 132
+        Caption = '删除(D)'
+        TabOrder = 5
+        OnClick = btnDeleteClick
+      end
+      object btnFirst: TButton
+        Left = 588
+        Height = 45
+        Top = 729
+        Width = 60
+        Caption = '|<'
+        TabOrder = 6
+        OnClick = btnNavClick
+      end
+      object btnPrev: TButton
+        Left = 654
+        Height = 45
+        Top = 729
+        Width = 60
+        Caption = '<'
+        TabOrder = 7
+        OnClick = btnNavClick
+      end
+      object btnNext: TButton
+        Left = 720
+        Height = 45
+        Top = 729
+        Width = 60
+        Caption = '>'
+        TabOrder = 8
+        OnClick = btnNavClick
+      end
+      object btnLast: TButton
+        Left = 786
+        Height = 45
+        Top = 729
+        Width = 60
+        Caption = '>|'
+        TabOrder = 9
+        OnClick = btnNavClick
+      end
+      object lblInfo: TLabel
+        Left = 870
+        Height = 27
+        Top = 738
+        Width = 690
+        AutoSize = False
+        Font.Color = clWindowText
+        Font.Height = -20
+        Font.Name = 'Microsoft YaHei UI'
+        Font.Style = [fsBold]
+        ParentFont = False
+      end
+    end
+    object tsStat: TTabSheet
+      Caption = '分类统计'
+      ClientHeight = 890
+      ClientWidth = 1612
+      ImageIndex = 1
+      object grdStat: TDBGrid
+        Left = 12
+        Height = 720
+        Top = 12
+        Width = 1170
+        Color = clWindow
+        Columns = <        
+          item
+            Title.Caption = '分类'
+            Width = 240
+            FieldName = 'category'
+          end        
+          item
+            Title.Caption = '品项数'
+            Width = 150
+            FieldName = 'n'
+          end        
+          item
+            Title.Caption = '库存合计'
+            Width = 180
+            FieldName = 'qty'
+          end        
+          item
+            Title.Caption = '货值合计'
+            Width = 210
+            FieldName = 'amount'
+            DisplayFormat = '#,##0.00'
+          end>
+        Font.Color = clWindowText
+        Font.Height = -20
+        Font.Name = 'Microsoft YaHei UI'
+        Options = [dgTitles, dgIndicator, dgColumnResize, dgColLines, dgRowLines, dgTabs, dgConfirmDelete, dgCancelOnExit]
+        ParentFont = False
+        TabOrder = 0
+        TitleFont.Color = clWindowText
+        TitleFont.Height = -20
+        TitleFont.Name = 'Microsoft YaHei UI'
+        TitleFont.Style = [fsBold]
+      end
+      object lblStatSum: TLabel
+        Left = 12
+        Height = 27
+        Top = 738
+        Width = 1050
+        AutoSize = False
+        Font.Color = clWindowText
+        Font.Height = -20
+        Font.Name = 'Microsoft YaHei UI'
+        Font.Style = [fsBold]
+        ParentFont = False
+      end
+    end
+    object tsLog: TTabSheet
+      Caption = 'SQL 日志'
+      ClientHeight = 890
+      ClientWidth = 1612
+      ImageIndex = 2
+      object mmoLog: TMemo
+        Left = 12
+        Height = 825
+        Top = 12
+        Width = 1572
+        Font.Color = clWindowText
+        Font.Height = -20
+        Font.Name = 'Consolas'
+        ParentFont = False
+        ReadOnly = True
+        ScrollBars = ssBoth
+        TabOrder = 0
+        WordWrap = False
+      end
+    end
+  end
+  object sbMain: TStatusBar
+    Left = 0
+    Height = 34
+    Top = 1016
+    Width = 1620
+    Panels = <    
+      item
+        Text = '就绪'
+        Width = 480
+      end    
+      item
+        Width = 300
+      end    
+      item
+        Width = 570
+      end>
+    SimplePanel = False
+  end
+end

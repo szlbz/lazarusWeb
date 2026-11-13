@@ -1,0 +1,119 @@
+object DlgForm: TDlgForm
+  Left = 180
+  Top = 100
+  Width = 900
+  Height = 620
+  Caption = 'lazarusWeb · 对话框'
+  ClientHeight = 620
+  ClientWidth = 900
+  Color = clBtnFace
+  Font.Charset = GB2312_CHARSET
+  Font.Color = clWindowText
+  Font.Height = -13
+  Font.Name = 'Microsoft YaHei'
+  Font.Style = []
+  OnCreate = FormCreate
+  ExplicitWidth = 916
+  ExplicitHeight = 659
+  object lblTitle: TLabel
+    Left = 24
+    Top = 16
+    Width = 420
+    Height = 25
+    Caption = 'ShowMessage 之类的对话框，弹在浏览器里'
+    Font.Height = -19
+    Font.Style = [fsBold]
+    ParentFont = False
+  end
+  object lblHint: TLabel
+    Left = 24
+    Top = 48
+    Width = 800
+    Height = 20
+    Caption = '下面是普通的 LCL 调用；点按钮时服务端线程会挂起，直到你在浏览器里作答。'
+    Font.Color = clGray
+    ParentFont = False
+  end
+  object btnMsg: TButton
+    Left = 24
+    Top = 88
+    Width = 132
+    Height = 32
+    Caption = 'ShowMessage'
+    TabOrder = 0
+    OnClick = btnMsgClick
+  end
+  object btnConfirm: TButton
+    Left = 168
+    Top = 88
+    Width = 132
+    Height = 32
+    Caption = 'MessageDlg'
+    TabOrder = 1
+    OnClick = btnConfirmClick
+  end
+  object btnInput: TButton
+    Left = 312
+    Top = 88
+    Width = 132
+    Height = 32
+    Caption = 'InputQuery'
+    TabOrder = 2
+    OnClick = btnInputClick
+  end
+  object btnQuestion: TButton
+    Left = 456
+    Top = 88
+    Width = 132
+    Height = 32
+    Caption = 'QuestionDlg'
+    TabOrder = 3
+    OnClick = btnQuestionClick
+  end
+  object btnMsgBox: TButton
+    Left = 600
+    Top = 88
+    Width = 132
+    Height = 32
+    Caption = 'MessageBox'
+    TabOrder = 4
+    OnClick = btnMsgBoxClick
+  end
+  object btnOpen: TButton
+    Left = 24
+    Top = 136
+    Width = 132
+    Height = 32
+    Caption = 'OpenDialog'
+    TabOrder = 5
+    OnClick = btnOpenClick
+  end
+  object btnSave: TButton
+    Left = 168
+    Top = 136
+    Width = 132
+    Height = 32
+    Caption = 'SaveDialog'
+    TabOrder = 6
+    OnClick = btnSaveClick
+  end
+  object mmoLog: TMemo
+    Left = 24
+    Top = 188
+    Width = 852
+    Height = 404
+    Lines.Strings = (
+      '服务端日志：')
+    ScrollBars = ssVertical
+    TabOrder = 7
+  end
+  object OpenDialog1: TOpenDialog
+    Filter = '所有文件|*.*|文本文件|*.txt;*.csv;*.log|图片|*.png;*.jpg'
+    Title = '选择一个文件（会先上传到服务端）'
+  end
+  object SaveDialog1: TSaveDialog
+    DefaultExt = 'csv'
+    Filter = 'CSV 文件|*.csv|文本文件|*.txt|所有文件|*.*'
+    Title = '输入要保存的文件名'
+  end
+end

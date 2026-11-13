@@ -1,0 +1,869 @@
+object AwareForm: TAwareForm
+  Left = 0
+  Height = 1080
+  Top = 0
+  Width = 1650
+  Caption = 'lazarusWeb · 综合演示（DB + HTML + PDF + 图表 + 大表）'
+  ClientHeight = 1080
+  ClientWidth = 1650
+  DesignTimePPI = 144
+  Menu = mmMain
+  LCLVersion = '4.8.0.0'
+  OnCreate = FormCreate
+  object pcMain: TPageControl
+    Left = 0
+    Height = 1080
+    Top = 0
+    Width = 1650
+    ActivePage = tsDB
+    Align = alClient
+    TabIndex = 0
+    TabOrder = 0
+    object tsDB: TTabSheet
+      Caption = '数据感知'
+      ClientHeight = 1043
+      ClientWidth = 1642
+      object lblTitle: TLabel
+        Left = 18
+        Height = 31
+        Top = 18
+        Width = 565
+        Caption = 'DB 感知控件 —— 左边点一行，右边所有控件都跟着走'
+        Font.Height = -23
+        Font.Style = [fsBold]
+        ParentFont = False
+      end
+      object lblUser: TLabel
+        Left = 1050
+        Height = 1
+        Top = 21
+        Width = 1
+        Alignment = taRightJustify
+        Font.Color = clNavy
+        Font.Style = [fsBold]
+        ParentFont = False
+      end
+      object grdItems: TDBGrid
+        Left = 18
+        Height = 867
+        Top = 60
+        Width = 780
+        Color = clWindow
+        Columns = <        
+          item
+            Title.Caption = '编码'
+            Width = 120
+            FieldName = 'code'
+          end        
+          item
+            Title.Caption = '名称'
+            Width = 195
+            FieldName = 'name'
+          end        
+          item
+            Title.Caption = '单价'
+            Width = 120
+            FieldName = 'price'
+          end        
+          item
+            Title.Caption = '库存'
+            Width = 90
+            FieldName = 'stock'
+          end        
+          item
+            Title.Caption = '标签'
+            Width = 105
+            FieldName = 'tag'
+          end        
+          item
+            Title.Caption = '分类'
+            Width = 90
+            FieldName = 'cat_id'
+          end>
+        TabOrder = 0
+        OnTitleClick = grdTitleClick
+      end
+      object lblCodeCap: TLabel
+        Left = 822
+        Height = 24
+        Top = 69
+        Width = 143
+        Caption = 'TDBText（只读）'
+      end
+      object lblCode: TDBText
+        Left = 822
+        Height = 25
+        Top = 96
+        Width = 68
+        DataField = 'code'
+        Font.Style = [fsBold]
+        ParentFont = False
+      end
+      object lblNameCap: TLabel
+        Left = 822
+        Height = 24
+        Top = 138
+        Width = 141
+        Caption = 'TDBEdit（名称）'
+      end
+      object edName: TDBEdit
+        Left = 822
+        Height = 32
+        Top = 165
+        Width = 360
+        DataField = 'name'
+        MaxLength = 60
+        TabOrder = 1
+      end
+      object lblPriceCap: TLabel
+        Left = 822
+        Height = 24
+        Top = 213
+        Width = 141
+        Caption = 'TDBEdit（单价）'
+      end
+      object edPrice: TDBEdit
+        Left = 822
+        Height = 32
+        Top = 240
+        Width = 165
+        DataField = 'price'
+        Alignment = taRightJustify
+        MaxLength = 0
+        TabOrder = 2
+      end
+      object lblStockCap: TLabel
+        Left = 1017
+        Height = 24
+        Top = 213
+        Width = 141
+        Caption = 'TDBEdit（库存）'
+      end
+      object edStock: TDBEdit
+        Left = 1017
+        Height = 32
+        Top = 240
+        Width = 165
+        DataField = 'stock'
+        Alignment = taRightJustify
+        MaxLength = 0
+        TabOrder = 3
+      end
+      object lblMemoCap: TLabel
+        Left = 822
+        Height = 24
+        Top = 288
+        Width = 163
+        Caption = 'TDBMemo（备注）'
+      end
+      object mmMemo: TDBMemo
+        Left = 822
+        Height = 114
+        Top = 315
+        Width = 360
+        DataField = 'memo'
+        ScrollBars = ssVertical
+        TabOrder = 4
+      end
+      object chkActive: TDBCheckBox
+        Left = 822
+        Height = 33
+        Top = 441
+        Width = 360
+        Caption = 'TDBCheckBox（上架）'
+        DataField = 'active'
+        TabOrder = 5
+        ValueChecked = '1'
+        ValueUnchecked = '0'
+      end
+      object lblTagCap: TLabel
+        Left = 822
+        Height = 24
+        Top = 486
+        Width = 201
+        Caption = 'TDBComboBox（标签）'
+      end
+      object cbTag: TDBComboBox
+        Left = 822
+        Height = 32
+        Top = 513
+        Width = 360
+        DataField = 'tag'
+        ItemHeight = 24
+        Items.Strings = (
+          '新品'
+          '热销'
+          '清仓'
+        )
+        MaxLength = 0
+        TabOrder = 6
+      end
+      object lblTagListCap: TLabel
+        Left = 822
+        Height = 24
+        Top = 561
+        Width = 293
+        Caption = 'TDBListBox（标签，选中即改字段）'
+      end
+      object lbTag: TDBListBox
+        Left = 822
+        Height = 114
+        Top = 588
+        Width = 360
+        DataField = 'tag'
+        ItemHeight = 24
+        Items.Strings = (
+          '新品'
+          '热销'
+          '清仓'
+        )
+        TabOrder = 7
+      end
+      object rgState: TDBRadioGroup
+        Left = 1218
+        Height = 117
+        Top = 69
+        Width = 375
+        AutoFill = True
+        Caption = 'TDBRadioGroup（状态）'
+        ChildSizing.LeftRightSpacing = 6
+        ChildSizing.EnlargeHorizontal = crsHomogenousChildResize
+        ChildSizing.EnlargeVertical = crsHomogenousChildResize
+        ChildSizing.ShrinkHorizontal = crsScaleChilds
+        ChildSizing.ShrinkVertical = crsScaleChilds
+        ChildSizing.Layout = cclLeftToRightThenTopToBottom
+        ChildSizing.ControlsPerLine = 1
+        DataField = 'state'
+        Items.Strings = (
+          '停用'
+          '启用'
+        )
+        TabOrder = 8
+        Values.Strings = (
+          '0'
+          '1'
+        )
+      end
+      object lblCatCap: TLabel
+        Left = 1218
+        Height = 24
+        Top = 204
+        Width = 319
+        Caption = 'TDBLookupComboBox（外键：分类）'
+      end
+      object lkCat: TDBLookupComboBox
+        Left = 1218
+        Height = 32
+        Top = 231
+        Width = 375
+        DataField = 'cat_id'
+        KeyField = 'id'
+        ListField = 'name'
+        ListFieldIndex = 0
+        LookupCache = False
+        TabOrder = 9
+      end
+      object lblCatListCap: TLabel
+        Left = 1218
+        Height = 24
+        Top = 279
+        Width = 285
+        Caption = 'TDBLookupListBox（外键：分类）'
+      end
+      object lkCatList: TDBLookupListBox
+        Left = 1218
+        Height = 114
+        Top = 306
+        Width = 375
+        DataField = 'cat_id'
+        KeyField = 'id'
+        ListField = 'name'
+        ListFieldIndex = 0
+        LookupCache = False
+        TabOrder = 10
+      end
+      object imgPic: TDBImage
+        Left = 1218
+        Height = 180
+        Top = 438
+        Width = 180
+        DataField = 'img'
+        Stretch = True
+      end
+      object btnSave: TButton
+        Left = 1218
+        Height = 45
+        Top = 636
+        Width = 177
+        Caption = '保存'
+        TabOrder = 11
+        OnClick = btnSaveClick
+      end
+      object btnCancel: TButton
+        Left = 1416
+        Height = 45
+        Top = 636
+        Width = 177
+        Caption = '取消'
+        TabOrder = 12
+        OnClick = btnCancelClick
+      end
+      object btnPrev: TButton
+        Left = 1218
+        Height = 45
+        Top = 693
+        Width = 177
+        Caption = '上一条'
+        TabOrder = 13
+        OnClick = btnPrevClick
+      end
+      object btnNext: TButton
+        Left = 1416
+        Height = 45
+        Top = 693
+        Width = 177
+        Caption = '下一条'
+        TabOrder = 14
+        OnClick = btnNextClick
+      end
+      object navMain: TLWDBNavigator
+        Left = 18
+        Height = 39
+        Top = 942
+        Width = 600
+        BevelOuter = bvNone
+        ChildSizing.EnlargeHorizontal = crsScaleChilds
+        ChildSizing.EnlargeVertical = crsScaleChilds
+        ChildSizing.ShrinkHorizontal = crsScaleChilds
+        ChildSizing.ShrinkVertical = crsScaleChilds
+        ChildSizing.Layout = cclLeftToRightThenTopToBottom
+        ChildSizing.ControlsPerLine = 100
+        ClientHeight = 39
+        ClientWidth = 600
+        Options = []
+        ParentShowHint = False
+        ShowHint = True
+        TabOrder = 15
+        OnClick = navMainClick
+      end
+      object lblState: TLabel
+        Left = 822
+        Height = 25
+        Top = 729
+        Width = 256
+        Caption = '第 1 / 3 条 · 浏览 · 编码 P1001'
+        Font.Color = clNavy
+        Font.Style = [fsBold]
+        ParentFont = False
+      end
+      object lblHint: TLabel
+        Left = 822
+        Height = 24
+        Top = 768
+        Width = 552
+        Caption = '改任一控件 → 保存 → 字段真落库；点左侧行 → 全部控件自动跟随。'
+        Font.Color = clGray
+        ParentFont = False
+        WordWrap = True
+      end
+    end
+    object tsHTML: TTabSheet
+      Caption = 'HTML 展示'
+      ClientHeight = 1043
+      ClientWidth = 1642
+      object lblHtmlTitle: TLabel
+        Left = 18
+        Height = 31
+        Top = 15
+        Width = 892
+        Caption = 'TLWHTMLFrame —— 面板内渲染任意 HTML（对应 uniGUI 的 uniHTMLFrame）'
+        Font.Height = -23
+        Font.Style = [fsBold]
+        ParentFont = False
+      end
+      object mmHtml: TMemo
+        Left = 18
+        Height = 540
+        Top = 54
+        Width = 780
+        Lines.Strings = (
+          '<h2 style="color:#2255aa;margin:4px 0">TLWHTMLFrame · 富文本面板</h2>'
+          '<p>这段 HTML 由<b>服务端 Pascal 代码</b>提供，等价于 uniGUI 的 uniHTMLFrame。</p>'
+          '<ul>'
+          '<li>支持任意 HTML / 内联 CSS</li>'
+          '<li>运行时改 HTML 属性，浏览器端增量更新（不重建面板）</li>'
+          '<li>可与数据绑定、对话框、上传等框架能力自由组合</li>'
+          '</ul>'
+          '<table border="1" cellpadding="4" style="border-collapse:collapse">'
+          '<tr style="background:#dde"><th>lazarusWeb</th><th>uniGUI</th></tr>'
+          '<tr><td>TLWHTMLFrame</td><td>uniHTMLFrame</td></tr>'
+          '<tr><td>TLWPDFFrame</td><td>uniPDFFrame</td></tr>'
+          '<tr><td>TLWFileUpload</td><td>uniFileUpload</td></tr>'
+          '</table>'
+          '<p style="color:#888">在左边编辑 HTML 源码，点下面按钮立即刷新右下面板。</p>'
+        )
+        ScrollBars = ssVertical
+        TabOrder = 0
+      end
+      object btnHtmlApply: TButton
+        Left = 18
+        Height = 42
+        Top = 606
+        Width = 255
+        Caption = '应用到下方面板'
+        TabOrder = 1
+        OnClick = btnHtmlApplyClick
+      end
+      object htmlFrame: TLWHTMLFrame
+        Left = 18
+        Height = 315
+        Top = 660
+        Width = 1590
+        HTML.Strings = (
+          '<h2 style="color:#2255aa;margin:4px 0">TLWHTMLFrame · 富文本面板</h2>'
+          '<p>这段 HTML 由<b>服务端 Pascal 代码</b>提供，等价于 uniGUI 的 uniHTMLFrame。</p>'
+          '<ul>'
+          '<li>支持任意 HTML / 内联 CSS</li>'
+          '<li>运行时改 HTML 属性，浏览器端增量更新（不重建面板）</li>'
+          '<li>可与数据绑定、对话框、上传等框架能力自由组合</li>'
+          '</ul>'
+          '<table border="1" cellpadding="4" style="border-collapse:collapse">'
+          '<tr style="background:#dde"><th>lazarusWeb</th><th>uniGUI</th></tr>'
+          '<tr><td>TLWHTMLFrame</td><td>uniHTMLFrame</td></tr>'
+          '<tr><td>TLWPDFFrame</td><td>uniPDFFrame</td></tr>'
+          '<tr><td>TLWFileUpload</td><td>uniFileUpload</td></tr>'
+          '</table>'
+          '<p style="color:#888">在左边编辑 HTML 源码，点下面按钮立即刷新右下面板。</p>'
+        )
+        TabOrder = 2
+      end
+    end
+    object tsPDF: TTabSheet
+      Caption = 'PDF 展示'
+      ClientHeight = 1043
+      ClientWidth = 1642
+      object lblPdfTitle: TLabel
+        Left = 18
+        Height = 31
+        Top = 15
+        Width = 981
+        Caption = 'TLWPDFFrame —— 内嵌显示 PDF（对应 uniGUI 的 uniPDFFrame，用浏览器自带查看器）'
+        Font.Height = -23
+        Font.Style = [fsBold]
+        ParentFont = False
+      end
+      object btnPdfSample: TButton
+        Left = 18
+        Height = 42
+        Top = 54
+        Width = 270
+        Caption = '生成示例 PDF'
+        TabOrder = 0
+        OnClick = btnPdfSampleClick
+      end
+      object upPdf: TLWFileUpload
+        Left = 306
+        Height = 42
+        Top = 54
+        Width = 270
+        Caption = '上传本地 PDF…'
+        TabOrder = 1
+        Filter = 'PDF 文件|*.pdf'
+        OnUpload = upPdfUpload
+      end
+      object lblPdfName: TLabel
+        Left = 600
+        Height = 24
+        Top = 63
+        Width = 180
+        Caption = '当前文件：（未选择）'
+        Font.Color = clNavy
+        ParentFont = False
+      end
+      object pdfFrame: TLWPDFFrame
+        Left = 18
+        Height = 861
+        Top = 108
+        Width = 1590
+        TabOrder = 2
+      end
+    end
+    object tsChart: TTabSheet
+      Caption = '图表/其它'
+      ClientHeight = 1043
+      ClientWidth = 1642
+      object lblChartTitle: TLabel
+        Left = 18
+        Height = 31
+        Top = 15
+        Width = 923
+        Caption = 'TLWChart（对应 uniGUI 的 uniChart，Ext charts 包渲染）+ 日期选择 + Toast'
+        Font.Height = -23
+        Font.Style = [fsBold]
+        ParentFont = False
+      end
+      object chartMain: TLWChart
+        Left = 18
+        Height = 570
+        Top = 60
+        Width = 840
+        Title = '月度销量（示例数据）'
+        Categories.Strings = (
+          '一月'
+          '二月'
+          '三月'
+          '四月'
+          '五月'
+          '六月'
+        )
+        Series = <        
+          item
+            Name = '销量'
+            Values.Strings = (
+              '12'
+              '19'
+              '15'
+              '25'
+              '22'
+              '30'
+            )
+          end        
+          item
+            Name = '退货'
+            Values.Strings = (
+              '2'
+              '3'
+              '2'
+              '5'
+              '3'
+              '4'
+            )
+          end>
+        TabOrder = 0
+      end
+      object btnChartLine: TButton
+        Left = 18
+        Height = 42
+        Top = 654
+        Width = 195
+        Caption = '折线图'
+        TabOrder = 1
+        OnClick = btnChartLineClick
+      end
+      object btnChartBar: TButton
+        Left = 228
+        Height = 42
+        Top = 654
+        Width = 195
+        Caption = '柱状图'
+        TabOrder = 2
+        OnClick = btnChartBarClick
+      end
+      object btnChartPie: TButton
+        Left = 438
+        Height = 42
+        Top = 654
+        Width = 195
+        Caption = '饼图'
+        TabOrder = 3
+        OnClick = btnChartPieClick
+      end
+      object btnChartDB: TButton
+        Left = 648
+        Height = 42
+        Top = 654
+        Width = 210
+        Caption = '从数据库统计'
+        TabOrder = 4
+        OnClick = btnChartDBClick
+      end
+      object lblDateCap: TLabel
+        Left = 930
+        Height = 25
+        Top = 69
+        Width = 233
+        Caption = 'TDateEdit（Ext datefield）'
+        Font.Style = [fsBold]
+        ParentFont = False
+      end
+      object deDate: TDateEdit
+        Left = 930
+        Height = 32
+        Top = 102
+        Width = 270
+        CalendarDisplaySettings = [dsShowHeadings, dsShowDayNames]
+        DateOrder = doNone
+        ButtonWidth = 34
+        NumGlyphs = 1
+        MaxLength = 0
+        TabOrder = 5
+        Text = '2026-11-09'
+        OnChange = deDateChange
+      end
+      object lblDateVal: TLabel
+        Left = 1230
+        Height = 24
+        Top = 108
+        Width = 158
+        Caption = '选中：2026-11-09'
+        Font.Color = clNavy
+        ParentFont = False
+      end
+      object lblTimeCap: TLabel
+        Left = 930
+        Height = 25
+        Top = 165
+        Width = 237
+        Caption = 'TTimeEdit（Ext timefield）'
+        Font.Style = [fsBold]
+        ParentFont = False
+      end
+      object teTime: TTimeEdit
+        Left = 930
+        Height = 32
+        Top = 198
+        Width = 270
+        ButtonWidth = 34
+        NumGlyphs = 1
+        MaxLength = 0
+        TabOrder = 6
+        Text = '19:53'
+        OnChange = teTimeChange
+      end
+      object lblTimeVal: TLabel
+        Left = 1230
+        Height = 24
+        Top = 204
+        Width = 128
+        Caption = '选中：19:53:00'
+        Font.Color = clNavy
+        ParentFont = False
+      end
+      object lblToastCap: TLabel
+        Left = 930
+        Height = 25
+        Top = 264
+        Width = 423
+        Caption = 'ShowToast（轻提示，浏览器右上角弹出几秒消失）'
+        Font.Style = [fsBold]
+        ParentFont = False
+      end
+      object btnToastOk: TButton
+        Left = 930
+        Height = 42
+        Top = 297
+        Width = 270
+        Caption = '成功 Toast'
+        TabOrder = 7
+        OnClick = btnToastOkClick
+      end
+      object btnToastErr: TButton
+        Left = 1218
+        Height = 42
+        Top = 297
+        Width = 270
+        Caption = '错误 Toast'
+        TabOrder = 8
+        OnClick = btnToastErrClick
+      end
+      object gauge: TLWGauge
+        Left = 18
+        Height = 192
+        Top = 714
+        Width = 360
+        Value = 72
+        Max = 100
+        UnitText = '%'
+        WarnAt = 0.8
+        DangerAt = 0.95
+        Caption = '本月完成率'
+        Parent = tsChart
+      end
+      object btnGauge: TButton
+        Left = 393
+        Height = 42
+        Top = 714
+        Width = 195
+        Caption = '仪表盘 +10'
+        TabOrder = 10
+        OnClick = btnGaugeClick
+      end
+      object lblGaugeVal: TLabel
+        Left = 393
+        Height = 24
+        Top = 765
+        Width = 110
+        Caption = '当前值：72%'
+        Font.Color = clNavy
+        ParentFont = False
+      end
+      object btnMaskOn: TButton
+        Left = 393
+        Height = 42
+        Top = 813
+        Width = 195
+        Caption = '显示遮罩'
+        TabOrder = 11
+        OnClick = btnMaskOnClick
+      end
+      object btnMaskOff: TButton
+        Left = 603
+        Height = 42
+        Top = 813
+        Width = 195
+        Caption = '隐藏遮罩'
+        TabOrder = 12
+        OnClick = btnMaskOffClick
+      end
+      object lblColorCap: TLabel
+        Left = 930
+        Height = 25
+        Top = 666
+        Width = 288
+        Caption = 'TLWColorPicker（点色块选颜色）'
+        Font.Style = [fsBold]
+        ParentFont = False
+      end
+      object cpColor: TLWColorPicker
+        Left = 930
+        Height = 42
+        Top = 702
+        Width = 135
+        Color = clRed
+        OnColorChange = ColorChanged
+        Parent = tsChart
+      end
+      object lblColorVal: TLabel
+        Left = 1089
+        Height = 24
+        Top = 711
+        Width = 102
+        Caption = '颜色：clRed'
+        Font.Color = clNavy
+        ParentFont = False
+      end
+      object lblAjaxCap: TLabel
+        Left = 930
+        Height = 25
+        Top = 354
+        Width = 392
+        Caption = 'AJAX 端点（第三方 JS 直接 fetch /lw/ajax/*）'
+        Font.Style = [fsBold]
+        ParentFont = False
+      end
+      object frAjax: TLWHTMLFrame
+        Left = 930
+        Height = 264
+        Top = 387
+        Width = 570
+        HTML.Strings = (
+          '<div style="font:13px system-ui,Segoe UI,sans-serif;padding:6px"><button id="lwAjaxBtn" style="padding:5px 10px;cursor:pointer">GET /lw/ajax/items</button> <button id="lwAjaxWho" style="padding:5px 10px;cursor:pointer">GET /lw/ajax/whoami?sid=</button><pre id="lwAjaxOut" style="margin:8px 0 0 0;height:104px;overflow:auto;background:#f7f9fc;border:1px solid #dbe3ec;padding:6px;font-size:12px">点上面的按钮试试</pre></div><script>function lwAjaxShow(t){document.getElementById("lwAjaxOut").textContent=t;}document.getElementById("lwAjaxBtn").onclick=function(){ fetch("/lw/ajax/items?limit=3").then(function(r){return r.json();}) .then(function(j){lwAjaxShow(JSON.stringify(j,null,1));}) .catch(function(e){lwAjaxShow("请求失败: "+e);});};document.getElementById("lwAjaxWho").onclick=function(){ var sid=(window.LW&&LW.sid)?LW.sid():""; fetch("/lw/ajax/whoami?sid="+encodeURIComponent(sid)) .then(function(r){return r.json();}) .then(function(j){lwAjaxShow(JSON.stringify(j,null,1));}) .catch(function(e){lwAjaxShow("请求失败: "+e);});};</script>'
+        )
+        TabOrder = 14
+      end
+    end
+    object tsBig: TTabSheet
+      Caption = '大表分页'
+      ClientHeight = 1043
+      ClientWidth = 1642
+      object lblBigTitle: TLabel
+        Left = 18
+        Height = 31
+        Top = 15
+        Width = 1313
+        Caption = 'TLWDBGrid（对应 uniDBGrid 的 PagingBar/FilterBar/Summary）：240 行数据，每页 20 行 + 顶部过滤 + 底部价格合计'
+        Font.Height = -23
+        Font.Style = [fsBold]
+        ParentFont = False
+      end
+      object grdBig: TLWDBGrid
+        Left = 18
+        Height = 840
+        Top = 60
+        Width = 930
+        Color = clWindow
+        Columns = <        
+          item
+            Title.Caption = '编码'
+            Width = 150
+            FieldName = 'code'
+          end        
+          item
+            Title.Caption = '名称'
+            Width = 330
+            FieldName = 'name'
+          end        
+          item
+            Title.Caption = '数量'
+            Width = 120
+            FieldName = 'qty'
+          end        
+          item
+            Title.Caption = '价格'
+            Width = 150
+            FieldName = 'price'
+          end>
+        PopupMenu = pmGrid
+        TabOrder = 0
+        PageSize = 20
+        ShowFilter = True
+        SummaryType = gsSum
+        SummaryField = 'price'
+      end
+      object lblBigCodeCap: TLabel
+        Left = 990
+        Height = 24
+        Top = 69
+        Width = 422
+        Caption = '当前选中记录（点行定位，翻页/过滤后依然正确）：'
+      end
+      object lblBigCode: TDBText
+        Left = 990
+        Height = 25
+        Top = 102
+        Width = 97
+        DataField = 'name'
+        Font.Color = clNavy
+        Font.Style = [fsBold]
+        ParentFont = False
+      end
+    end
+  end
+  object mmMain: TMainMenu
+    object miFile: TMenuItem
+      Caption = '文件'
+      object miLogout: TMenuItem
+        Caption = '退出登录'
+        OnClick = miLogoutClick
+      end
+      object miExit: TMenuItem
+        Caption = '关闭窗口'
+        OnClick = miExitClick
+      end
+    end
+    object miWin: TMenuItem
+      Caption = '窗口'
+      object miOpenReport: TMenuItem
+        Caption = '报表中心（切换窗体）'
+        OnClick = miOpenReportClick
+      end
+    end
+    object miHelp: TMenuItem
+      Caption = '帮助'
+      object miAbout: TMenuItem
+        Caption = '关于'
+        OnClick = miAboutClick
+      end
+    end
+  end
+  object pmGrid: TPopupMenu
+    object miGridRefresh: TMenuItem
+      Caption = '刷新数据'
+      OnClick = miGridRefreshClick
+    end
+    object miGridCount: TMenuItem
+      Caption = '统计当前行数'
+      OnClick = miGridCountClick
+    end
+  end
+end

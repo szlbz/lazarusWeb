@@ -1,0 +1,95 @@
+object HelloForm: THelloForm
+  Left = 200
+  Top = 120
+  Width = 720
+  Height = 480
+  Caption = 'lazarusWeb · Hello'
+  ClientHeight = 480
+  ClientWidth = 720
+  Color = clBtnFace
+  Font.Charset = GB2312_CHARSET
+  Font.Color = clWindowText
+  Font.Height = -13
+  Font.Name = 'Microsoft YaHei'
+  Font.Style = []
+  OnCreate = FormCreate
+  ExplicitWidth = 736
+  ExplicitHeight = 519
+  object lblTitle: TLabel
+    Left = 24
+    Top = 16
+    Width = 400
+    Height = 25
+    Caption = 'Lazarus 窗体，直接跑在浏览器里'
+    Font.Height = -19
+    Font.Style = [fsBold]
+    ParentFont = False
+  end
+  object lblName: TLabel
+    Left = 24
+    Top = 64
+    Width = 60
+    Height = 17
+    Caption = '你的名字'
+  end
+  object edtName: TEdit
+    Left = 96
+    Top = 60
+    Width = 200
+    Height = 27
+    TabOrder = 0
+    Text = 'Lazarus'
+  end
+  object chkUpper: TCheckBox
+    Left = 312
+    Top = 64
+    Width = 120
+    Height = 19
+    Caption = '转成大写'
+    TabOrder = 1
+    OnChange = chkUpperChange
+  end
+  object cboCity: TComboBox
+    Left = 448
+    Top = 60
+    Width = 160
+    Height = 27
+    ItemHeight = 17
+    TabOrder = 2
+    Text = '北京'
+    Items.Strings = (
+      '北京'
+      '上海'
+      '深圳'
+      '成都')
+  end
+  object btnSay: TButton
+    Left = 624
+    Top = 60
+    Width = 72
+    Height = 27
+    Caption = '打招呼'
+    TabOrder = 3
+    OnClick = btnSayClick
+  end
+  object lblResult: TLabel
+    Left = 24
+    Top = 104
+    Width = 400
+    Height = 21
+    Caption = '（等待点击）'
+    Font.Height = -16
+    Font.Color = clNavy
+    ParentFont = False
+  end
+  object mmoLog: TMemo
+    Left = 24
+    Top = 144
+    Width = 672
+    Height = 305
+    Lines.Strings = (
+      '服务端日志：')
+    ScrollBars = ssVertical
+    TabOrder = 4
+  end
+end

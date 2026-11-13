@@ -1,0 +1,215 @@
+object AuditForm: TAuditForm
+  Left = 100
+  Height = 640
+  Top = 100
+  Width = 900
+  Caption = '架构审计 · 设计期属性核对'
+  LCLVersion = '4.0'
+  object lblA1: TLabel
+    Left = 8
+    Height = 15
+    Top = 20
+    Width = 60
+    Caption = 'Bevel:'
+  end
+  object bvlBox: TBevel
+    Left = 60
+    Height = 28
+    Top = 16
+    Width = 80
+    Shape = bsFrame
+  end
+  object bvlRaised: TBevel
+    Left = 150
+    Height = 28
+    Top = 16
+    Width = 80
+    Shape = bsBox
+    Style = bsRaised
+  end
+  object lblA2: TLabel
+    Left = 240
+    Height = 15
+    Top = 20
+    Width = 60
+    Caption = 'Image:'
+  end
+  object imgEmpty: TImage
+    Left = 290
+    Height = 40
+    Top = 8
+    Width = 80
+  end
+  object ledName: TLabeledEdit
+    Left = 130
+    Height = 23
+    Top = 60
+    Width = 180
+    EditLabel.Caption = '姓名'
+    LabelPosition = lpLeft
+    TabOrder = 0
+  end
+  object fneFile: TFileNameEdit
+    Left = 400
+    Height = 23
+    Top = 60
+    Width = 220
+    TabOrder = 1
+  end
+  object tbcTabs: TTabControl
+    Left = 100
+    Height = 70
+    Top = 100
+    Width = 260
+    TabIndex = 0
+    TabOrder = 2
+    Tabs.Strings = (
+      'Tab A'
+      'Tab B'
+    )
+  end
+  object trbV: TTrackBar
+    Left = 90
+    Height = 150
+    Top = 180
+    Width = 40
+    Frequency = 10
+    Orientation = trVertical
+    TickMarks = tmBoth
+    TabOrder = 3
+  end
+  object trbH: TTrackBar
+    Left = 370
+    Height = 33
+    Top = 190
+    Width = 150
+    Frequency = 10
+    TabOrder = 4
+  end
+  object prgV: TProgressBar
+    Left = 230
+    Height = 150
+    Top = 180
+    Width = 22
+    Orientation = pbVertical
+    Position = 40
+    TabOrder = 5
+  end
+  object medPhone: TMaskEdit
+    Left = 90
+    Height = 23
+    Top = 350
+    Width = 130
+    EditMask = '!9999-0000;1;_'
+    MaxLength = 9
+    TabOrder = 6
+    Text = '1234'
+  end
+  object chkGray: TCheckBox
+    Left = 250
+    Height = 19
+    Top = 352
+    Width = 90
+    AllowGrayed = True
+    Caption = '三态复选'
+    State = cbGrayed
+    TabOrder = 7
+  end
+  object tgbA: TToggleBox
+    Left = 360
+    Height = 25
+    Top = 350
+    Width = 100
+    Caption = 'ToggleBox'
+    TabOrder = 8
+  end
+  object lbMulti: TListBox
+    Left = 110
+    Height = 90
+    Top = 395
+    Width = 150
+    Items.Strings = (
+      '甲'
+      '乙'
+      '丙'
+    )
+    MultiSelect = True
+    TabOrder = 9
+  end
+  object spbA: TSpeedButton
+    Left = 300
+    Height = 25
+    Top = 400
+    Width = 80
+    Caption = 'Flat'
+    Flat = True
+  end
+  object spbB: TSpeedButton
+    Left = 390
+    Height = 25
+    Top = 400
+    Width = 80
+    Caption = '按下'
+    Down = True
+    GroupIndex = 1
+  end
+  object stx1: TStaticText
+    Left = 490
+    Height = 25
+    Top = 400
+    Width = 120
+    BorderStyle = sbsSingle
+    Caption = 'StaticText'
+    TabOrder = 10
+  end
+  object pgcBottom: TPageControl
+    Left = 8
+    Height = 130
+    Top = 500
+    Width = 420
+    ActivePage = tsOne
+    TabIndex = 0
+    TabOrder = 11
+    TabPosition = tpBottom
+    object tsOne: TTabSheet
+      Caption = '第一页'
+      object lblP1: TLabel
+        Left = 10
+        Height = 15
+        Top = 10
+        Width = 80
+        Caption = '底部页签一'
+      end
+    end
+    object tsTwo: TTabSheet
+      Caption = '第二页'
+      object lblP2: TLabel
+        Left = 10
+        Height = 15
+        Top = 10
+        Width = 80
+        Caption = '底部页签二'
+      end
+    end
+  end
+  object shpEllipse: TShape
+    Left = 450
+    Height = 60
+    Top = 510
+    Width = 100
+    Shape = stEllipse
+  end
+  object shpRoundRect: TShape
+    Left = 560
+    Height = 60
+    Top = 510
+    Width = 100
+    Shape = stRoundRect
+  end
+  object splMain: TSplitter
+    Left = 700
+    Height = 100
+    Top = 510
+    Width = 10
+  end
+end
