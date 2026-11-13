@@ -1591,8 +1591,13 @@ begin
   begin
     { 面板里渲染一段任意 HTML（uniHTMLFrame 对应物）。
       HTML 内容是业务代码给的，视作可信内容原样下发；
-      前端把换行统一成 \n，ext 的 html 配置按标记解析 }
+      前端把换行统一成 \n，ext 的 html 配置按标记解析。
+      bevel/border 与 panel 同语义：LCL 的 BevelOuter 默认 bvRaised，
+      浏览器端据此画 1px 边（BevelOuter=bvNone + BorderStyle=bsNone
+      才是真正无边框） }
     O.Add('html', TLWHTMLFrame(C).HTML.Text);
+    O.Add('bevel', Ord(TCustomPanel(C).BevelOuter));
+    O.Add('border', BorderStyleToStr(TCustomPanel(C).BorderStyle));
   end
   else if AKind = 'pdfframe' then
   begin
@@ -1600,6 +1605,8 @@ begin
       ViewURL 每次调用都 Touch 续期查看令牌 }
     O.Add('url', TLWPDFFrame(C).ViewURL);
     O.Add('file', ExtractFileName(TLWPDFFrame(C).PDFFile));
+    O.Add('bevel', Ord(TCustomPanel(C).BevelOuter));
+    O.Add('border', BorderStyleToStr(TCustomPanel(C).BorderStyle));
   end
   else if AKind = 'gauge' then
   begin
