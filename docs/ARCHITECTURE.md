@@ -3,7 +3,7 @@
 > 版本 0.9.0 · 更新日期 2026-11-09
 > 配套文档：`README.md`（快速上手）、`docs/COMPARISON_unigui.md`（与 uniGUI 对照）、
 > `docs/CONTROL_MATRIX.md` / `docs/DB_AWARE_MATRIX.md`（控件支持度实测矩阵）、
-> `docs/NOTES.md`（35 组踩坑实录）、`deploy/README.md`（HTTPS/反向代理/集群）。
+> `docs/NOTES.md`（108 个坑的踩坑实录，坑 23/66 等旧结论已被后续坑修订）、`deploy/README.md`（HTTPS/反向代理/集群）。
 
 ---
 
@@ -36,9 +36,9 @@ lazarusWeb 是 **Lazarus 桌面程序的 Web 化运行时**：把真实运行的
 ### 1.3 总体架构
 
 ```
-浏览器 (Ext JS 7.0.0 / 7.5.1)          服务端 (FPC 3.3.1 + Lazarus, nogui)
+浏览器 (Ext JS 7.5.1 或 Alpine.js 3.14.9)   服务端 (FPC 3.3.1 + Lazarus, nogui)
 ┌────────────────────────────┐  WS/长轮询 ┌──────────────────────────────┐
-│ lw.js (2350 行)             │  JSON     │ lwhttp   fphttpserver 多线程   │
+│ lw.js 或 lw-alpine.js       │  JSON     │ lwhttp   fphttpserver 多线程   │
 │  Ext.window/panel/grid/... │ ←────────→ │ lwsession 每标签页一棵 LCL 树  │
 │  reconcile 增量协调         │  HTTP      │ lwwriter  LCL树 → JSON        │
 │  WS 只传事件请求/响应       │            │ lwdispatch 事件 → RTTI 调业务  │
@@ -46,7 +46,8 @@ lazarusWeb 是 **Lazarus 桌面程序的 Web 化运行时**：把真实运行的
 └────────────────────────────┘            └──────────────────────────────┘
 ```
 
-服务端核心 24 个单元共约 1.4 万行，浏览器端 lw.js 2350 行。
+服务端核心单元与浏览器端 lw.js 的行数为早期快照（lw.js 现约 2800+ 行，
+另有第二渲染层 lw-alpine.js，见 2.11 节），精确行数不在此维护。
 
 ---
 
@@ -72,7 +73,7 @@ nogui widgetset 缺显示器、缺画布，直接 `TForm.Create` 就 AV（坑 1�
 - 特殊控件有专门序列化分支：`TRadioGroup/TCheckGroup/TValueListEditor` 的
   Items/Rows 结构（坑 25）、`TTreeView` 的节点树、`TStringGrid` 的行列等。
 
-### 2.3 lw.js —— 浏览器端渲染与协调（2350 行）
+### 2.3 lw.js —— 浏览器端渲染与协调（Ext 渲染层）
 
 - 把 `kind` 映射到 Ext JS 组件（39 个可视控件有真实渲染分支）；
 - **reconcile**：新树到达后按 id 对账，未变的 DOM/Ext 实例不动（保留输入焦点）；
@@ -176,7 +177,7 @@ CSS 三件套是否存在回落 crisp → classic → neptune，都不再写死�
   `ShowFilter` 过滤条、`SummaryType(gsSum/gsAvg/gsCount)` 汇总条；
 - `TDBNavigator` 在 nogui 下构造即崩（位图图元链，坑 23）→ `LWNewNavigator`
   工厂出安全子类，lfm 靠 `RegisterClassAlias` 自动落子类，用户代码写原生类型；
-- 11 种 data-aware 控件全部实测（`docs/DB_AWARE_MATRIX.md`），三条硬规则见
+- 12 种 data-aware 控件全部实测（`docs/DB_AWARE_MATRIX.md`），三条硬规则见
   README「数据库应用」节（SQLite 用 VARCHAR、必须显式 Commit、编辑态不下发网格行）。
 
 ### 2.11 周边能力
@@ -185,6 +186,10 @@ CSS 三件套是否存在回落 crisp → classic → neptune，都不再写死�
 |---|---|
 | `lwchart.pas` | `TLWChart` ctLine/ctBar/ctPie，ext-7.5.1 charts 包渲染，运行时切类型 |
 | `lwreport.pas` | 报表引擎：可打印 HTML（A4/@media print/thead 逐页重复）+ CSV（BOM+CRLF）+ **真 XLSX**（zipper 打包 OOXML，零第三方依赖） |
+| `lwdiff.pas` | 增量补丁（`--patch=1`）：两次 BuildPayload 的 forms 数组 diff 出 ops，客户端按 `tver` 自愈回全量（设计见 `docs/SCALE.md` §2） |
+| `lwui.pas` | `TLWGauge` / `TLWColorPicker` / 会话级遮罩 |
+| `lwweb.pas` | `TLWHTMLFrame` / `TLWPDFFrame` 富内容显示 |
+| `lw-alpine.js` | **第二渲染层**（Alpine.js 3.14.9）：`--client=alpine` 或 URL `?client=alpine` 启用，协议与 lw.js 完全一致，无需 ext-\<版本\> 目录（坑 89–97） |
 | `lwajax.pas` | `TLWApp.AddAjax(name, handler)` 自定义端点；上下文给 Param/Header/JSONBody/Session；未注册名回 404 并自省列出全部端点 |
 | `lwwebsocket.pas` | `/lw/ws` 升级（RFC6455）：**只传事件请求/响应**；推送一律由长轮询游标下发（`OnPushCommand` WS 直推保留但默认不启用） |
 | `lwhyper.pas` | 专用负载均衡器（对标 uniGUI Hyper Server）：单进程拉起 N 个 worker（同 exe 多开）、崩溃自动重启、HTTP 反向代理 + sid 会话粘性、WebSocket TCP 级透传、healthz 巡检；`tools/lwhyper.exe` 是入口，自身端点 `/lw/healthz`（汇总）与 `/lw/hyper/status`（worker 明细） |
@@ -243,22 +248,11 @@ Linux/macOS 用 `./build.sh`，`LAZBUILD` 环境变量可覆盖 lazbuild 路径�
 
 ### 3.2 命令行参数
 
-```
---config=path         指定配置文件（缺省自动找 <exe名>.ini / lazarusWeb.ini）
---port=8090           监听端口
---root=C:\lazarusWeb  项目根目录（含 ext-7.x.x）
---ext=7.5.1           默认 Ext 版本（URL ?ext= 可临时切换）
---extdir=目录         ext-js 目录（配置项 ExtDir 的等价物）
---theme=crisp         缺省主题（classic/crisp/gray/material/neptune/graphite）
---trust-proxy         反代后面取 X-Forwarded-For 真实 IP
---ajax-cors           /lw/ajax/* 允许跨域（第三方页面集成）
---verbose             打印每个请求与异常栈
---nogui               GUI 构建下也不弹面板（服务化部署）
---log=path            日志追加写文件
---help                帮助
-```
+完整参数表在 README「快速开始」节统一维护（单一出处，此处不再复制）；
+与旧版相比新增：`--form=` `--client=ext|alpine` `--title=` `--timeout=`
+`--patch=1`。权威口径以源码 `src/core/lwapp.pas` 的 `--help` 输出为准。
 
-### 3.2.1 配置文件（`lwconfig.pas`）
+### 3.2.1 配置文件（INI，解析在 `lwapp.pas`）
 
 `TLWApp.Run` 在解析命令行**之前**先读 INI，所以顺序是
 「内置默认值 → 配置文件 → 命令行」，命令行永远赢：
@@ -268,6 +262,8 @@ Linux/macOS 用 `./build.sh`，`LAZBUILD` 环境变量可覆盖 lazbuild 路径�
 Port=8090
 Theme=crisp
 ExtDir=ext-7.5.1
+;Patch=0
+;Client=ext
 ```
 
 - 文件定位：`--config=` 显式指定；否则 `<exe目录>\<exe名>.ini` →
@@ -332,6 +328,8 @@ TMainForm = class(TLWForm)   // 原来是 class(TForm)
   ② nginx/Caddy 反代 + 粘性会话（nginx `ip_hash` / Caddy
   `lb_policy ip_hash`）。两者会话都在进程内存里（外置 Redis 未做）；
   健康检查打 `/lw/healthz`；实例宕机切换后浏览器收 410 自动新建会话回登录页；
+  容量怎么估（单进程 ≈ 155 事件/秒，≈ N × 155 扩）、增量补丁协议与分阶段
+  方案见 `docs/SCALE.md`；
 - **服务化**：GUI 构建 + `--nogui`（无窗口）+ `--log=path`（日志落盘）。
 
 ### 3.6 回归测试
@@ -345,7 +343,8 @@ TMainForm = class(TLWForm)   // 原来是 class(TForm)
 | t_dialog(36) / t_files(28) / t_controls(26) | 对话框 / 上传下载 / 控件 |
 | t_ws(8) / t_login(15) / t_attach(42) | WebSocket / 登录 / 附件 |
 
-当前全量 **385 项全绿**。CDP 脚本驱动无头 Edge 做真实浏览器验证。
+当前全量回归 **数百项全绿**（各阶段快照为 385~472 项，精确计数以最近一次
+`tests/run_with_server.py` 全量跑的结果为准）。CDP 脚本驱动无头 Edge 做真实浏览器验证。
 
 ### 3.7 已知限制
 
@@ -359,6 +358,9 @@ TMainForm = class(TLWForm)   // 原来是 class(TForm)
 
 ### 3.8 踩坑实录
 
-35 组坑全部沉淀在 `docs/NOTES.md`（nogui 基础设施 → fpjson/编码 → SQLite/WAL →
-设计期包 → multipart 安全 → 对话框钩子 → WebSocket → 多页签游标 → GUI 面板），
-是这份框架最贵的资产——每个坑都带根因分析和验证手段。
+108 个坑（编号 1–108，缺 92 无对应记录）全部沉淀在 `docs/NOTES.md`
+（nogui 基础设施 → fpjson/编码 → SQLite/WAL → 设计期包 → multipart 安全 →
+对话框钩子 → WebSocket → 多页签游标 → GUI 面板 → lfm 化改造 → 性能剖析 →
+压测排障），是这份框架最贵的资产——每个坑都带根因分析和验证手段。
+注意坑是按时间累积的：坑 23（TDBNavigator 的 RegisterClassAlias）已被坑 29/41
+推翻、坑 66（TLabeledEdit 标签未修）已被坑 69 修复，以最新坑为准。
