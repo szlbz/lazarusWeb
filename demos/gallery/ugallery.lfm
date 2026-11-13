@@ -164,11 +164,11 @@ object GalleryForm: TGalleryForm
       end
       object gbGroup: TGroupBox
         Left = 855
-        Height = 195
+        Height = 206
         Top = 21
         Width = 360
         Caption = 'TGroupBox 组框'
-        ClientHeight = 166
+        ClientHeight = 177
         ClientWidth = 356
         TabOrder = 9
         object chkGbA: TCheckBox
@@ -665,18 +665,18 @@ object GalleryForm: TGalleryForm
         Caption = 'TStringGrid（可编辑，保存/调用 -> gridsave.json）：'
       end
       object btnSgSave: TButton
-        Left = 464
-        Height = 30
-        Top = 16
+        Left = 472
+        Height = 31
+        Top = 17
         Width = 110
         Caption = '保存'
         TabOrder = 5
         OnClick = SgSaveClick
       end
       object btnSgLoad: TButton
-        Left = 576
-        Height = 30
-        Top = 16
+        Left = 584
+        Height = 31
+        Top = 17
         Width = 110
         Caption = '调用'
         TabOrder = 6
@@ -1329,8 +1329,8 @@ object GalleryForm: TGalleryForm
           Left = 18
           Height = 24
           Top = 504
-          Width = 2241
-          Caption = '左边改格子 / 右边改控件，同一份数据实时联动；导航条是 TLWDBNavigator（nogui 友好）。两个网格都连 sqlite（gallery.db）：改一格即落库，重启进程数据不丢（删掉该文件即重建种子数据）。unit 列点击展开下拉选择（TColumn.PickList），made 列点击弹出日期选择。'
+          Width = 2687
+          Caption = '左边改格子 / 右边改控件，同一份数据实时联动；导航条是 TLWDBNavigator（nogui 友好）。两个网格都连 sqlite（gallery.db）：改一格即落库，重启进程数据不丢（删掉该文件即重建种子数据）。unit 列点击展开下拉选择（TColumn.PickList），made 列点击弹出日期选择，上架（active）列是一个勾选框，点一下即切换并落库。'
         end
       end
     end

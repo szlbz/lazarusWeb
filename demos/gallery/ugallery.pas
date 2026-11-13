@@ -301,6 +301,10 @@ type
     procedure SetupData;
     { 控件里的"内容"：网格单元格、列表行、树节点、图表序列、当天日期 }
     procedure FillContents;
+    { TDrawGrid 自绘单元格演示：@bar/@chip/@spark/@stars 标记，
+      服务端只存标记文本，浏览器端 $lwDrawCell 渲染成进度条/徽章/
+      迷你图/星级（nogui 是无头 widgetset，LCL OnDrawCell 画不出像素） }
+    procedure FillDrawGridDemo;
     { nogui 下 TBitBtn.Kind 会生成 glyph，可能抛 FPImageException → 降级 }
     procedure TryKind(ABtn: TBitBtn; AKind: TBitBtnKind);
   end;
@@ -460,6 +464,7 @@ begin
     ' Pos=' + IntToStr(Ord(Position)));
   SetupData;
   FillContents;
+  FillDrawGridDemo;
   TryKind(btnBitOk, bkOK);
   TryKind(btnBitCancel, bkCancel);
   { nogui widgetset 的 CreateTimer 返回 0，LCL TTimer 一启用就抛
@@ -675,6 +680,69 @@ begin
 end;
 
 { ============================ 控件内容 ============================ }
+
+procedure TGalleryForm.FillDrawGridDemo;
+const
+  GREEN = '#16a34a';
+  AMBER = '#d97706';
+  RED   = '#dc2626';
+  BLUE  = '#2563eb';
+
+  { 目标尺寸按设计期 PPI 反算：FormCreate 之后 AfterConstruction 会把
+    LFM 的 144 PPI 坐标缩到实际 PPI（96），直接写 Width := 420 会被
+    再乘 96/144 只剩 280，四列放不下就出横向滚动条 }
+  function ScaleUp(APx: Integer): Integer;
+  begin
+    Result := (APx * DesignTimePPI + 48) div 96;
+  end;
+
+begin
+  dgMain.ColCount := 4;
+  dgMain.RowCount := 6;
+  dgMain.FixedRows := 1;
+  dgMain.FixedCols := 0;
+  dgMain.DefaultRowHeight := 26;
+  { 列宽合计 410，网格给到 430 留出边线；高度 6 行 x 26 = 156，给 210 }
+  dgMain.Width := ScaleUp(430);
+  dgMain.Height := ScaleUp(210);
+  dgMain.ColWidths[0] := 90;
+  dgMain.ColWidths[1] := 150;
+  dgMain.ColWidths[2] := 90;
+  dgMain.ColWidths[3] := 80;
+
+  { 表头（固定行 0）走普通文本 }
+  LWSetDrawCellText(dgMain, 0, 0, '阶段');
+  LWSetDrawCellText(dgMain, 1, 0, '进度');
+  LWSetDrawCellText(dgMain, 2, 0, '状态');
+  LWSetDrawCellText(dgMain, 3, 0, '评分');
+
+  LWSetDrawCellText(dgMain, 0, 1, '构建');
+  LWSetDrawCellText(dgMain, 1, 1, '@bar(96,' + GREEN + ')');
+  LWSetDrawCellText(dgMain, 2, 1, '@chip(通过,' + GREEN + ')');
+  LWSetDrawCellText(dgMain, 3, 1, '@stars(5)');
+
+  LWSetDrawCellText(dgMain, 0, 2, '自动化测试');
+  LWSetDrawCellText(dgMain, 1, 2, '@bar(72,' + BLUE + ')');
+  LWSetDrawCellText(dgMain, 2, 2, '@chip(警告,' + AMBER + ')');
+  LWSetDrawCellText(dgMain, 3, 2, '@stars(4)');
+
+  LWSetDrawCellText(dgMain, 0, 3, '代码覆盖率');
+  LWSetDrawCellText(dgMain, 1, 3, '@bar(83,' + BLUE + ')');
+  LWSetDrawCellText(dgMain, 2, 3, '@chip(良好,' + GREEN + ')');
+  LWSetDrawCellText(dgMain, 3, 3, '@stars(4.5)');
+
+  LWSetDrawCellText(dgMain, 0, 4, '发布准备');
+  LWSetDrawCellText(dgMain, 1, 4, '@bar(31,' + RED + ')');
+  LWSetDrawCellText(dgMain, 2, 4, '@chip(阻塞,' + RED + ')');
+  LWSetDrawCellText(dgMain, 3, 4, '@stars(2.5)');
+
+  LWSetDrawCellText(dgMain, 0, 5, '每日吞吐');
+  LWSetDrawCellText(dgMain, 1, 5, '@spark(4,6,3,8,5,9,7,' + GREEN + ')');
+  LWSetDrawCellText(dgMain, 2, 5, '@chip(稳定,' + GREEN + ')');
+  LWSetDrawCellText(dgMain, 3, 5, '@stars(4)');
+
+  Log('TDrawGrid 自绘：@bar/@chip/@spark/@stars 标记由浏览器端渲染。');
+end;
 
 procedure TGalleryForm.FillContents;
 var
