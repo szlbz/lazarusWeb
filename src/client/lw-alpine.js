@@ -942,12 +942,17 @@ var LW = (function () {
                     if (gw[j] > 0) st += ';width:' + gw[j] + 'px;min-width:' + gw[j] + 'px';
                     ths += '<th style="' + st + '" x-text="' + r + '.cols[' + j + ']"></th>';
                 });
+                /* drawgrid 单元格支持自绘标记（@bar/@chip/@spark/@stars），
+                   由 $lwDrawCell 解析成 HTML；TStringGrid 保持纯文本 x-text */
+                var cellTd = (k === 'drawgrid')
+                    ? '<td style="height:' + grh + 'px" @click="$lwGridCellClick($el, \'' + id + '\', i, j)" x-html="$lwDrawCell(cell)"></td>'
+                    : '<td style="height:' + grh + 'px" @click="$lwGridCellClick($el, \'' + id + '\', i, j)" x-text="cell"></td>';
                 return '<div class="lw-grid lw-boxed"><table class="lw-table"><thead><tr>' + ths +
                     '</tr></thead><tbody>' +
                     '<template x-for="(row,i) in ' + r + '.rows" :key="i">' +
                     '<tr :class="i===' + r + '.idx ? \'lw-sel\' : \'\'">' +
                     '<template x-for="(cell,j) in row" :key="j">' +
-                    '<td style="height:' + grh + 'px" @click="$lwGridCellClick($el, \'' + id + '\', i, j)" x-text="cell"></td>' +
+                    cellTd +
                     '</template></tr></template></tbody></table></div>';
             }
 
@@ -1093,6 +1098,72 @@ var LW = (function () {
         if (!r) return;
         r.idx = i;
         if ($lwHas(id, 'OnClick')) fire(id, 'OnClick', { val: String(i) });
+    };
+
+    /* ---------------- drawgrid 单元格自绘标记 ----------------
+       nogui 是无头 widgetset（假 DC），LCL 级 OnDrawCell 画不出像素，
+       自绘只能在浏览器端做：服务端往 Cells 里放标记字符串，
+       这里解析成 HTML（进度条/徽章/迷你图/星级），纯文本原样转义。
+       标记语法（大小写敏感，必须整格以 @ 开头）：
+         @bar(72)          @bar(72,#dc2626)      进度条（0-100，缺省蓝色）
+         @chip(通过,#16a34a)                    彩色徽章（颜色可省）
+         @spark(4,6,3,8,5) @spark(4,6,3,#16a34a) 迷你折线图（末参为 #色 时是颜色）
+         @stars(4.5)                             星级评分（0-5） */
+    window.$lwDrawCell = function (cell) {
+        var s = String(cell == null ? '' : cell);
+        if (s.charAt(0) !== '@') return esc(s);
+        var i = s.indexOf('('), j = s.lastIndexOf(')');
+        if (i < 1 || j <= i) return esc(s);
+        var kind = s.slice(0, i);
+        var parts = s.slice(i + 1, j).split(',');
+        var colorOf = function (v, def) {
+            v = String(v || '').trim();
+            return (/^#[0-9a-fA-F]{3,8}$/.test(v)) ? v : def;
+        };
+        var k;
+        if (kind === '@bar') {
+            var pct = parseFloat(parts[0]);
+            if (isNaN(pct)) return esc(s);
+            pct = Math.max(0, Math.min(100, pct));
+            var bc = colorOf(parts[1], '#2563eb');
+            return '<div class="lw-cbar"><div class="lw-cbar-fill" style="width:' + pct +
+                '%;background:' + bc + '"></div><span class="lw-cbar-text">' + pct + '%</span></div>';
+        }
+        if (kind === '@chip') {
+            var cc = colorOf(parts[1], '#2563eb');
+            return '<span class="lw-chip" style="color:' + cc + ';background:' + cc +
+                '22;border-color:' + cc + '">' + esc(String(parts[0] || '').trim()) + '</span>';
+        }
+        if (kind === '@stars') {
+            var v = parseFloat(parts[0]);
+            if (isNaN(v)) return esc(s);
+            v = Math.max(0, Math.min(5, v));
+            var full = Math.floor(v), half = (v - full) >= 0.5;
+            var out = '<span class="lw-stars">';
+            for (k = 0; k < 5; k++) {
+                out += '<span class="' + (k < full || (k === full && half) ? 'lw-star-on' : 'lw-star-off') +
+                    '">' + (k < full ? '★' : (k === full && half ? '⯪' : '★')) + '</span>';
+            }
+            return out + '<span class="lw-star-text">' + v + '</span></span>';
+        }
+        if (kind === '@spark') {
+            var sc = colorOf(parts[parts.length - 1], null);
+            var vals = (sc ? parts.slice(0, -1) : parts).map(parseFloat).filter(function (x) { return !isNaN(x); });
+            if (vals.length < 2) return esc(s);
+            var W = 120, H = 22, P = 3;
+            var mn = Math.min.apply(null, vals), mx = Math.max.apply(null, vals);
+            var rng = (mx - mn) || 1;
+            var pts = vals.map(function (x, n) {
+                var px = P + n * (W - 2 * P) / (vals.length - 1);
+                var py = H - P - (x - mn) * (H - 2 * P) / rng;
+                return px.toFixed(1) + ',' + py.toFixed(1);
+            }).join(' ');
+            var lx = pts.split(' ')[vals.length - 1].split(',');
+            return '<svg class="lw-spark" width="' + W + '" height="' + H + '" viewBox="0 0 ' + W + ' ' + H + '">' +
+                '<polyline fill="none" stroke="' + (sc || '#2563eb') + '" stroke-width="1.5" points="' + pts + '"/>' +
+                '<circle cx="' + lx[0] + '" cy="' + lx[1] + '" r="2.2" fill="' + (sc || '#2563eb') + '"/></svg>';
+        }
+        return esc(s);
     };
 
     window.$lwGridCellClick = function (td, id, row, col) {

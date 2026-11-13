@@ -527,6 +527,52 @@ html, body {
 .lw-ve-key { width: 110px; background: #f6f8fa; }
 .lw-ve-edit { cursor: text; min-width: 120px; }
 
+/* ---------- drawgrid 自绘单元格（$lwDrawCell） ---------- */
+/* 进度条：细槽 + 填充条 + 百分比文本 */
+.lw-cbar {
+    position: relative;
+    display: inline-block;
+    vertical-align: middle;
+    min-width: 90px;
+    height: 14px;
+    background: #e8edf2;
+    border-radius: 7px;
+    overflow: hidden;
+}
+.lw-cbar-fill {
+    position: absolute;
+    left: 0; top: 0;
+    height: 100%;
+    border-radius: 7px;
+    transition: width .25s;
+}
+.lw-cbar-text {
+    position: relative;
+    z-index: 1;
+    font-size: 10px;
+    line-height: 14px;
+    padding-left: 5px;
+    color: #1b2b3a;
+    text-shadow: 0 0 2px #fff;
+}
+/* 彩色徽章 */
+.lw-chip {
+    display: inline-block;
+    font-size: 11px;
+    line-height: 1;
+    padding: 3px 8px;
+    border-radius: 9px;
+    border: 1px solid;
+    vertical-align: middle;
+}
+/* 星级评分 */
+.lw-stars { font-size: 13px; letter-spacing: 1px; vertical-align: middle; }
+.lw-star-on  { color: #f59e0b; }
+.lw-star-off { color: #c9d3dd; }
+.lw-star-text { margin-left: 4px; font-size: 11px; color: #64748b; letter-spacing: 0; }
+/* 迷你折线图 */
+.lw-spark { display: inline-block; vertical-align: middle; }
+
 /* DBGrid 布尔列（服务端 cedit=4）：单元格内常驻勾选框，点一下即写回 */
 .lw-table td > .lw-chk {
     display: block;
