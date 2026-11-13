@@ -377,6 +377,7 @@ html, body {
 }
 .lw-group-body {
     flex: 1;
+    box-sizing: border-box;   /* 无此规则时 flex 拉伸宽 + 左右 padding 会溢出边框 20px，伪造横向滚动条 */
     padding: 4px 10px;
     overflow: auto;
     display: flex;
@@ -384,7 +385,30 @@ html, body {
     gap: 4px;
 }
 .lw-group-abs .lw-group-body { position: relative; }
+/* abs 版（TGroupBox）子控件是 LCL 客户区坐标，1:1 映射：去掉流式版的 padding，
+   否则整体右移 10px/下移 4px，内容底边超出容器 -> 伪造纵向滚动条（LCL 里没有） */
+.lw-group-abs .lw-group-body { padding: 0; }
+/* LCL 的 TGroupBox 客户区原点在边框内侧几像素，标题文字悬浮在客户区顶部。
+   若标题占流式高度（~20px），子控件整体下移、底部内容被裁（编辑框底边 120 > body 106）。
+   改为绝对定位叠加：子区从边框内侧铺满，坐标与 LCL 一致，标题画在上面 */
+.lw-group-abs { position: relative; }
+.lw-group-abs .lw-group-title { position: absolute; top: 2px; left: 10px; z-index: 2; }
+.lw-group-abs .lw-group-body { position: absolute; inset: 0; }
 .lw-group-abs .lw-kids { position: absolute; }
+
+/* TPanel/TScrollBox 的 Caption（非缺省值时由模板渲染）：
+   绝对居中、不挡鼠标（面板还要接收点击），面板透明时它就是唯一可见内容 */
+.lw-panel-cap {
+    position: absolute;
+    left: 4px;
+    right: 4px;
+    top: 50%;
+    transform: translateY(-50%);
+    text-align: center;
+    color: #33475b;
+    font-size: 12px;
+    pointer-events: none;
+}
 
 /* ---------- 基础控件 ---------- */
 .lw-label { line-height: 1.4; }

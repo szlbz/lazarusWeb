@@ -1134,10 +1134,14 @@ var LW = (function () {
             case 'scrollbox':
             case 'frame':
                 cfg.layout = 'absolute';
-                cfg.border = (node.border === 'single');
+                /* bevel(bvRaised/bvLowered) 也给边框，caption 非缺省时居中显示，
+                   scrollbox 恒可滚（LCL ScrollBox 语义，见 lw-alpine.js 同分支） */
+                cfg.border = (node.border === 'single' || !!node.bevel);
                 cfg.header = false;
                 cfg.bodyStyle = node.bg ? 'background:' + node.bg : '';
-                if (node.autoscroll) cfg.autoScroll = true;
+                if (node.autoscroll || node.kind === 'scrollbox') cfg.autoScroll = true;
+                if (node.caption && node.caption !== node.name)
+                    cfg.html = '<div class="lw-panel-cap">' + esc(node.caption) + '</div>';
                 c = Ext.create('Ext.panel.Panel', cfg);
                 addTo(c, ct);
                 syncChildren(c, node);

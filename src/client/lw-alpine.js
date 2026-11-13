@@ -1030,14 +1030,27 @@ var LW = (function () {
             case 'panel':
             case 'scrollbox':
             case 'frame':
-                return '<div class="lw-body' + (node.border === 'single' ? ' lw-boxed' : '') +
-                    '" style="background:' + (node.bg || 'transparent') + (node.autoscroll ? ';overflow:auto' : '') +
-                    '"><div class="lw-kids"></div></div>';
+                { /* TPanel/TScrollBox/TFrame：bevel(bvRaised/bvLowered) 映射边框，
+                    caption 非缺省值时居中显示（设计器里 Caption=控件名的不渲染，
+                    服务端已过滤，这里双保险），scrollbox 内容超出视口必须可滚
+                    （LCL ScrollBox 的滚动语义，否则超出部分"看不见"） */
+                  var bevCls = (node.border === 'single' || node.bevel) ? ' lw-boxed' : '';
+                  var pOvf = (node.autoscroll || k === 'scrollbox') ? ';overflow:auto' : '';
+                  var pCap = (node.caption && node.caption !== node.name) ?
+                      '<div class="lw-panel-cap" x-text="' + r + '.cap"></div>' : '';
+                  return '<div class="lw-body' + bevCls +
+                      '" style="background:' + (node.bg || 'transparent') + pOvf +
+                      '">' + pCap + '<div class="lw-kids"></div></div>';
+                }
 
             case 'groupbox':
+                /* TGroupBox：AutoScroll=false 时 LCL 只裁剪不滚动。
+                   恒 overflow:auto 会因映射误差（标题条高度近似）伪造出
+                   比控件矮一大截的滚动条（AutoScroll 关着却出现滚动条） */
                 return '<div class="lw-group lw-group-abs' + (node.border !== 'none' ? ' lw-boxed' : '') + '">' +
                     '<div class="lw-group-title" x-text="' + r + '.cap"></div>' +
-                    '<div class="lw-body lw-group-body"><div class="lw-kids"></div></div></div>';
+                    '<div class="lw-body lw-group-body" style="overflow:' + (node.autoscroll ? 'auto' : 'hidden') +
+                    '"><div class="lw-kids"></div></div></div>';
 
             case 'tabs':
                 return '<div class="lw-tabs"><div class="lw-tabbar" id="lw-tabbar-' + id + '"></div>' +
