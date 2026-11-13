@@ -1,4 +1,5 @@
 {
+  SPDX-License-Identifier: MIT  (c) 2026 szlbz(秋风) QQ:315795176 -- 见仓库根目录 LICENSE
   lazarusWeb :: lwsession
   ------------------------------------------------------------------
   会话 = 一个浏览器标签页 + 一棵真实的 LCL 窗体实例树。

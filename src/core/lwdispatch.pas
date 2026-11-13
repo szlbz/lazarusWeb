@@ -1,4 +1,5 @@
 {
+  SPDX-License-Identifier: MIT  (c) 2026 szlbz(秋风) QQ:315795176 -- 见仓库根目录 LICENSE
   lazarusWeb :: lwdispatch
   ------------------------------------------------------------------
   浏览器事件 -> 真实 LCL 控件事件。

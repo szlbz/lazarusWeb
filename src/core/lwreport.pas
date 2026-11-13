@@ -1,4 +1,5 @@
 {
+  SPDX-License-Identifier: MIT  (c) 2026 szlbz(秋风) QQ:315795176 -- 见仓库根目录 LICENSE
   lazarusWeb :: lwreport
   ------------------------------------------------------------------
   服务端报表引擎（打印 / 导出）。承担 FastReport、LazReport 在桌面端

@@ -1,4 +1,5 @@
 {
+  SPDX-License-Identifier: MIT  (c) 2026 szlbz(秋风) QQ:315795176 -- 见仓库根目录 LICENSE
   lazarusWeb :: lwhttp
   ------------------------------------------------------------------
   内置 HTTP 服务（fcl-web / TFPHttpServer，tmThread 多线程）。

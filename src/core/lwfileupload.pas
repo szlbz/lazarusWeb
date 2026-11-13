@@ -1,4 +1,5 @@
 {
+  SPDX-License-Identifier: MIT  (c) 2026 szlbz(秋风) QQ:315795176 -- 见仓库根目录 LICENSE
   lazarusWeb :: lwfileupload
   ------------------------------------------------------------------
   TLWFileUpload —— 浏览器端"选择文件 → 上传 → 服务端事件"的按钮控件。

@@ -1,4 +1,5 @@
 {
+  SPDX-License-Identifier: MIT  (c) 2026 szlbz(秋风) QQ:315795176 -- 见仓库根目录 LICENSE
   lazarusWeb :: lwform
   ------------------------------------------------------------------
   TLWForm —— 业务窗体的基类，只做两件事：

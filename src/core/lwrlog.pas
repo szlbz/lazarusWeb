@@ -1,4 +1,5 @@
 {
+  SPDX-License-Identifier: MIT  (c) 2026 szlbz(秋风) QQ:315795176 -- 见仓库根目录 LICENSE
   lazarusWeb :: lwrlog
   ------------------------------------------------------------------
   统一日志出口。以前日志直接 WriteLn，只在控制台子系统里可见：

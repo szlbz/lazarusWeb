@@ -1,4 +1,5 @@
 {
+  SPDX-License-Identifier: MIT  (c) 2026 szlbz(秋风) QQ:315795176 -- 见仓库根目录 LICENSE
   lazarusWeb :: lwdiff
   ------------------------------------------------------------------
   增量补丁（阶段 2）：比较两次 BuildPayload 的 forms 数组，产出 ops。

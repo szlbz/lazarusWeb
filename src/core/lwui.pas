@@ -1,4 +1,5 @@
 {
+  SPDX-License-Identifier: MIT  (c) 2026 szlbz(秋风) QQ:315795176 -- 见仓库根目录 LICENSE
   lazarusWeb :: lwui
   ------------------------------------------------------------------
   几个"边缘但常用"的界面件（对应 uniGUI 的同类控件）：

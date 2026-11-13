@@ -1,4 +1,5 @@
 {
+  SPDX-License-Identifier: MIT  (c) 2026 szlbz(秋风) QQ:315795176 -- 见仓库根目录 LICENSE
   lazarusWeb :: lwupload
   ------------------------------------------------------------------
   POST /lw/api/upload 的服务端实现。
@@ -9,7 +10,8 @@
 
   文件落盘位置（按优先级）：
     1. TLWFileUpload.TargetFolder（业务代码指定，必须已存在或可创建）
-    2. <临时目录>/lw_uploads/<会话号>/<控件名>/
+    2. <exe目录>/uploads/<会话号>/<控件名>/（LWUploadRootDir；
+       exe 旁不可写时自动退回 <临时目录>/uploads/）
   文件名只保留基名并做安全化处理 —— 浏览器给的名字里可能带 ..\ 或盘符，
   直接拼进路径就是目录穿越漏洞。
 }
@@ -65,8 +67,9 @@ function LWUploadDirFor(const ASid: string; const ASub: string): string;
 var
   d: string;
 begin
-  d := IncludeTrailingPathDelimiter(GetTempDir(False)) + 'lw_uploads' +
-    PathDelim + ASid;
+  { 根目录来自 lwbase.LWUploadRootDir（默认 exe 旁 uploads，见其注释），
+    会话隔离结构保持 <root>/<sid>/<控件名>/ }
+  d := LWUploadRootDir + ASid;
   if ASub <> '' then
     d := IncludeTrailingPathDelimiter(d) + LWSafeFileName(ASub);
   if not ForceDirectories(d) then

@@ -1,4 +1,5 @@
 { 自动生成 lwproxyws.pas —— GUI 构建专用：按线程路由的代理 widgetset
+  SPDX-License-Identifier: MIT  (c) 2026 szlbz(秋风) QQ:315795176 -- 见仓库根目录 LICENSE
   生成器 gen_proxyws.py；改动请改生成器，不要手改方法转发部分
   LAYER 1  TLWProxyWidgetSet：WidgetSet 实例级代理
            主线程 -> 安装时捕获的真实 widgetset（gtk2/win32/qt5）

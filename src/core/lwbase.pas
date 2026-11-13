@@ -1,5 +1,6 @@
 {
   lazarusWeb :: lwbase
+  SPDX-License-Identifier: MIT  (c) 2026 szlbz(秋风) QQ:315795176 -- 见仓库根目录 LICENSE
   ------------------------------------------------------------------
   基础类型、颜色/字体转换、JSON 小工具、会话抽象基类。
 
@@ -100,6 +101,12 @@ function AlignToStr(A: TAlign): string;
 function BorderStyleToStr(A: TBorderStyle): string;
 function Base64FromStream(AStream: TStream): string;
 function BoolToInt(B: Boolean): Integer;
+{ 上传/浏览器选文件等服务端落地文件的根目录：默认 <exe目录>/uploads/，
+  与"配置文件保存到 exe 目录"的部署约定一致；exe 旁不可写时自动退回
+  <临时目录>/uploads/。部署/业务可在启动早期赋 LWUploadRoot 覆盖。 }
+function LWUploadRootDir: string;
+var
+  LWUploadRoot: string = '';   { 非空 = 强制指定上传根目录 }
 { 去掉 LCL 流式加载自动加的 "_N" 数字后缀：FooForm_3 -> FooForm。
   一个进程同时服务多个会话时，同名窗体会被实例化多次；LCL 的 TReader
   发现「全局已有同名窗体」就把名字改成 FooForm_1。但窗体名是框架识别
@@ -285,6 +292,23 @@ end;
 function BorderStyleToStr(A: TBorderStyle): string;
 begin
   if A = bsSingle then Result := 'single' else Result := 'none';
+end;
+
+function LWUploadRootDir: string;
+var
+  d: string;
+begin
+  if LWUploadRoot <> '' then
+    d := IncludeTrailingPathDelimiter(LWUploadRoot)
+  else
+    d := IncludeTrailingPathDelimiter(ExtractFilePath(ParamStr(0))) +
+      'uploads' + PathDelim;
+  if not ForceDirectories(d) then
+    { exe 旁不可写（例如部署到 Program Files 且无权限）→ 退回系统临时目录，
+      保证上传永远有地方落盘 }
+    d := IncludeTrailingPathDelimiter(GetTempDir(False)) + 'uploads' + PathDelim;
+  ForceDirectories(d);
+  Result := d;
 end;
 
 function Base64FromStream(AStream: TStream): string;
