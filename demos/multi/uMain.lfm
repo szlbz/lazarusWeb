@@ -1,0 +1,174 @@
+object MainForm: TMainForm
+  Left = 60
+  Top = 60
+  Width = 820
+  Height = 560
+  Caption = 'lazarusWeb · 综合示例'
+  ClientHeight = 560
+  ClientWidth = 820
+  Color = clBtnFace
+  Font.Height = -13
+  Font.Name = 'Microsoft YaHei'
+  Menu = mmMain
+  OnCreate = FormCreate
+  ExplicitWidth = 836
+  ExplicitHeight = 599
+  object pcMain: TPageControl
+    Left = 0
+    Top = 57
+    Width = 820
+    Height = 455
+    ActivePage = tsData
+    TabOrder = 0
+    object tsData: TTabSheet
+      Caption = '订单数据'
+      object sgData: TStringGrid
+        Left = 0
+        Top = 0
+        Width = 812
+        Height = 415
+        Align = alClient
+        ColCount = 3
+        RowCount = 13
+        FixedRows = 1
+        Options = [goFixedVertLine, goFixedHorzLine, goVertLine, goHorzLine, goRangeSelect, goEditing]
+        TabOrder = 0
+        ColWidths = (
+          100
+          200
+          150)
+      end
+      object btnLoad: TButton
+        Left = 8
+        Top = 420
+        Width = 100
+        Height = 28
+        Caption = '重新加载'
+        TabOrder = 1
+        OnClick = btnLoadClick
+      end
+    end
+    object tsOpts: TTabSheet
+      Caption = '参数设置'
+      ImageIndex = 1
+      object chkAuto: TCheckBox
+        Left = 24
+        Top = 24
+        Width = 160
+        Height = 19
+        Caption = '自动刷新'
+        TabOrder = 0
+      end
+      object lblLevel: TLabel
+        Left = 24
+        Top = 64
+        Width = 40
+        Height = 17
+        Caption = '级别'
+      end
+      object cboLevel: TComboBox
+        Left = 80
+        Top = 60
+        Width = 160
+        Height = 27
+        ItemHeight = 17
+        TabOrder = 1
+        Text = '标准'
+        Items.Strings = (
+          '标准'
+          '快速'
+          '精确')
+      end
+      object lblThreads: TLabel
+        Left = 24
+        Top = 108
+        Width = 40
+        Height = 17
+        Caption = '线程'
+      end
+      object seThreads: TSpinEdit
+        Left = 80
+        Top = 104
+        Width = 90
+        Height = 27
+        MaxValue = 64
+        MinValue = 1
+        TabOrder = 2
+        Value = 4
+      end
+      object btnApply: TButton
+        Left = 24
+        Top = 160
+        Width = 100
+        Height = 28
+        Caption = '应用参数'
+        TabOrder = 3
+        OnClick = btnApplyClick
+      end
+    end
+  end
+  object lblState: TLabel
+    Left = 16
+    Top = 520
+    Width = 500
+    Height = 17
+    Caption = '就绪'
+  end
+  object stbMain: TStatusBar
+    Left = 0
+    Top = 538
+    Width = 820
+    Height = 22
+    Panels = <
+      item
+        Width = 400
+      end
+      item
+        Width = 300
+      end>
+    SimplePanel = False
+  end
+  object mmMain: TMainMenu
+    Left = 8
+    Top = 8
+    object miFile: TMenuItem
+      Caption = '文件(&F)'
+      object miExit: TMenuItem
+        Caption = '退出(&X)'
+        ShortCut = 16465
+        OnClick = miExitClick
+      end
+    end
+    object miHelp: TMenuItem
+      Caption = '帮助(&H)'
+      object miAbout: TMenuItem
+        Caption = '关于(&A)'
+        ShortCut = 112
+        OnClick = miAboutClick
+      end
+    end
+  end
+  object tbMain: TToolBar
+    Left = 0
+    Top = 0
+    Width = 820
+    Height = 57
+    ButtonHeight = 30
+    ButtonWidth = 84
+    Caption = 'tbMain'
+    ShowCaptions = True
+    TabOrder = 2
+    object tbRefresh: TToolButton
+      Left = 0
+      Top = 0
+      Caption = '刷新'
+      OnClick = tbRefreshClick
+    end
+    object tbAbout: TToolButton
+      Left = 84
+      Top = 0
+      Caption = '关于'
+      OnClick = miAboutClick
+    end
+  end
+end

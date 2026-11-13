@@ -1,0 +1,75 @@
+object MenuTreeForm: TMenuTreeForm
+  Left = 200
+  Top = 100
+  Width = 980
+  Height = 640
+  Caption = 'lazarusWeb · 左侧折叠菜单（TTreeView + Alpine.js）'
+  ClientHeight = 640
+  ClientWidth = 980
+  Color = clBtnFace
+  Font.Charset = GB2312_CHARSET
+  Font.Color = clWindowText
+  Font.Height = -13
+  Font.Name = 'Microsoft YaHei'
+  Font.Style = []
+  OnCreate = FormCreate
+  ExplicitWidth = 996
+  ExplicitHeight = 679
+  object tvMenu: TTreeView
+    Left = 0
+    Top = 0
+    Width = 280
+    Height = 640
+    Align = alLeft
+    Indent = 22
+    TabOrder = 0
+    OnClick = tvMenuClick
+  end
+  object pnlRight: TPanel
+    Left = 280
+    Top = 0
+    Width = 700
+    Height = 640
+    Align = alClient
+    BevelOuter = bvNone
+    ParentColor = True
+    TabOrder = 1
+    object lblTitle: TLabel
+      Left = 28
+      Top = 24
+      Width = 300
+      Height = 25
+      Caption = '请选择左侧菜单'
+      Font.Height = -19
+      Font.Style = [fsBold]
+      ParentFont = False
+    end
+    object lblPath: TLabel
+      Left = 28
+      Top = 60
+      Width = 300
+      Height = 17
+      Caption = '（节点路径）'
+      Font.Color = clGray
+      ParentFont = False
+    end
+    object mmoBody: TMemo
+      Left = 28
+      Top = 96
+      Width = 632
+      Height = 400
+      ReadOnly = True
+      ScrollBars = ssVertical
+      TabOrder = 0
+    end
+    object lblTip: TLabel
+      Left = 28
+      Top = 512
+      Width = 400
+      Height = 17
+      Caption = '（等待点击）'
+      Font.Color = clGray
+      ParentFont = False
+    end
+  end
+end
