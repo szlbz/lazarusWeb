@@ -16,5 +16,4 @@ lazarusWeb默认使用Alpine.js，也可以使用Ext js
 <img width="1809" height="1177" alt="QQ_2026-11-12_17-13-01" src="https://github.com/user-attachments/assets/7fbe0270-3a95-424a-8c35-24fc87f50a05" />
 <img width="1815" height="1179" alt="QQ_2026-11-12_17-17-44" src="https://github.com/user-attachments/assets/92e18df9-9ca7-4565-9b78-1e73260f254c" />
 <img width="1817" height="1179" alt="QQ_2026-11-12_17-18-11" src="https://github.com/user-attachments/assets/8b8df772-352e-43ad-97e9-f559cfc02b66" />
-<img width="1813" height="1183" alt="QQ_2026-11-12_17-18-30" src="https://github.com/user-attachments/assets/2ab85842-8c4c-4ff4-8e67-926a38b408f2" />
-![Uploading QQ_2026-11-12_17-18-53.png…]()
+<img width="1824" height="1173" alt="QQ_2026-11-13_09-15-53" src="https://github.com/user-attachments/assets/90ca9690-cba7-48da-bb30-1cefebaad4d1" />
