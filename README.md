@@ -6,7 +6,7 @@
 这个在内网使用还是可以的，方便只会写lazarus普通桌面应用的人，如果不使用第三方可视控件，可以很简单就可以转为Web应用。  
 lazarusWeb默认使用Alpine.js，也可以使用Ext js  
 # 特别说明：这个框架肯定有很多问题，只能用来验证lazarus桌面程序快速转为Web应用的可能和效果。  
-<img width="1814" height="1174" alt="QQ_2026-11-13_10-58-25" src="https://github.com/user-attachments/assets/9149d956-7c38-4d0d-9b6b-e09226637aeb" />
+<img width="1817" height="1176" alt="QQ_2026-11-13_11-10-07" src="https://github.com/user-attachments/assets/87dd6d96-f620-44f7-87b4-59058432f7a4" />
 <img width="1845" height="1269" alt="QQ_2026-11-12_17-11-14" src="https://github.com/user-attachments/assets/2f6bb2ff-cae0-4177-b82e-1032c1663d2c" />
 <img width="1821" height="1179" alt="QQ_2026-11-12_17-11-33" src="https://github.com/user-attachments/assets/6cf0fb0d-6586-470a-94ca-04641d33620e" />
 <img width="1815" height="1170" alt="QQ_2026-11-12_17-11-48" src="https://github.com/user-attachments/assets/305a37e0-0fae-4fb5-b123-fa741f96c0b5" />
