@@ -1,0 +1,801 @@
+/* SPDX-License-Identifier: MIT  (c) 2026 szlbz(秋风) QQ:315795176 -- 见仓库根目录 LICENSE */
+/* lazarusWeb :: lw-alpine.css —— Alpine 客户端样式
+   与 lw.css（Ext 版）互不干扰：Ext 版的选择器都在 .x-* 命名空间，
+   这里全部用 lw-* 前缀的自绘控件样式。 */
+
+html, body {
+    height: 100%;
+    margin: 0;
+    padding: 0;
+    background: #dfe3e6;
+    font-family: "Microsoft YaHei", "PingFang SC", "Segoe UI", Arial, sans-serif;
+    font-size: 13px;
+    color: #1b1b1b;
+    overflow: hidden;
+}
+
+/* ---------- 外壳（busy / splash / mask / toast / dialog） ---------- */
+
+#lw-busy {
+    position: fixed;
+    left: 0; top: 0; right: 0;
+    height: 2px;
+    background: linear-gradient(90deg, #2a7de1 0%, #6ab0ff 50%, #2a7de1 100%);
+    background-size: 200% 100%;
+    animation: lw-busy-run 1s linear infinite;
+    z-index: 95000;
+    display: none;
+}
+#lw-busy[lw-on] { display: block; }
+[x-show] { /* Alpine 隐藏由其自身管理 */ }
+
+@keyframes lw-busy-run {
+    from { background-position: 0 0; }
+    to { background-position: -200% 0; }
+}
+
+#lw-splash {
+    position: fixed;
+    left: 0; top: 0; right: 0; bottom: 0;
+    background: #f2f5f8;
+    z-index: 90000;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+.lw-splash-box {
+    padding: 18px 28px;
+    background: #fff;
+    border: 1px solid #d6dde3;
+    border-radius: 4px;
+    color: #33475b;
+    font-size: 13px;
+    box-shadow: 0 6px 24px rgba(0, 0, 0, .08);
+}
+
+.lw-mask {
+    position: fixed;
+    left: 0; top: 0; right: 0; bottom: 0;
+    z-index: 99999;
+    background: rgba(255, 255, 255, 0.55);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;   /* 点击任意处可关闭（LWShowScreenMask 的遮罩不再卡死） */
+}
+.lw-mask-box {
+    background: #fff;
+    padding: 18px 26px;
+    border-radius: 6px;
+    box-shadow: 0 6px 24px rgba(0, 0, 0, 0.18);
+    text-align: center;
+    min-width: 160px;
+}
+.lw-mask-spin {
+    width: 26px;
+    height: 26px;
+    margin: 0 auto 10px auto;
+    border: 3px solid #dbe3ec;
+    border-top-color: #1a73e8;
+    border-radius: 50%;
+    animation: lw-spin 0.8s linear infinite;
+}
+@keyframes lw-spin { to { transform: rotate(360deg); } }
+.lw-mask-text { font-size: 13px; color: #44525f; }
+
+.lw-toast-wrap {
+    position: fixed;
+    right: 14px; top: 14px;
+    z-index: 98000;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+.lw-toast {
+    width: 270px;
+    background: #fff;
+    border: 1px solid #ccd6de;
+    border-left: 3px solid #2a7de1;
+    border-radius: 4px;
+    box-shadow: 0 4px 14px rgba(0, 0, 0, .12);
+    padding: 8px 12px;
+}
+.lw-toast-title { font-weight: bold; font-size: 12px; color: #2b3a49; }
+.lw-toast-text { font-size: 12px; color: #44525f; margin-top: 2px; word-break: break-word; }
+
+/* ---------- 服务端对话框 ---------- */
+.lw-dlg-overlay {
+    position: fixed;
+    left: 0; top: 0; right: 0; bottom: 0;
+    background: rgba(0, 0, 0, .28);
+    z-index: 99000;
+    display: flex;
+    align-items: flex-start;
+    justify-content: center;
+}
+.lw-dlg-win {
+    margin-top: 12vh;
+    width: 430px;
+    background: #fff;
+    border-radius: 6px;
+    box-shadow: 0 10px 40px rgba(0, 0, 0, .3);
+    overflow: hidden;
+}
+.lw-dlg-title {
+    padding: 10px 14px;
+    background: #f2f5f8;
+    border-bottom: 1px solid #dde4ea;
+    font-size: 13px;
+    font-weight: bold;
+    color: #2b3a49;
+    display: flex;
+    align-items: center;
+    cursor: move;
+    user-select: none;
+}
+.lw-dlg-x {
+    margin-left: auto;
+    cursor: pointer;
+    color: #8a97a5;
+    font-size: 16px;
+    line-height: 1;
+    padding: 0 4px;
+}
+.lw-dlg-x:hover { color: #d9534f; }
+.lw-dlg-body { padding: 16px 18px; }
+.lw-dlg-msg {
+    font-size: 13px;
+    line-height: 1.6;
+    color: #2b3a49;
+    word-break: break-word;
+    margin-bottom: 10px;
+    white-space: pre-wrap;
+}
+.lw-dlg-input {
+    width: 100%;
+    box-sizing: border-box;
+}
+.lw-dlg-file {
+    margin-top: 12px;
+    padding: 8px 10px;
+    background: #f5f8fb;
+    border: 1px dashed #c3ced9;
+    border-radius: 3px;
+    font-size: 12px;
+    color: #5b6b7b;
+}
+.lw-dlg-btns {
+    padding: 10px 18px 14px;
+    display: flex;
+    justify-content: flex-end;
+    gap: 8px;
+}
+.lw-dlg-title-icon {
+    display: inline-block;
+    width: 16px;
+    height: 16px;
+    line-height: 16px;
+    border-radius: 50%;
+    color: #fff;
+    font-size: 11px;
+    font-weight: bold;
+    text-align: center;
+    margin-right: 6px;
+    font-family: Arial, sans-serif;
+}
+.lw-dlg-i-info { background: #2a7de1; }
+.lw-dlg-i-warn { background: #e8a33d; }
+.lw-dlg-i-err  { background: #d9534f; }
+.lw-dlg-i-ques { background: #3f9ae0; }
+
+/* ---------- 窗体 ---------- */
+
+#lw-root { position: fixed; left: 0; top: 0; right: 0; bottom: 0; }
+
+/* 模态窗体背后的遮罩（对齐 Ext 版 modal:true 的表现：ShowModal 期间背景不可点） */
+.lw-win-mask {
+    position: absolute;
+    left: 0; top: 0; right: 0; bottom: 0;
+    background: rgba(15, 25, 35, .32);
+}
+
+.lw-win {
+    position: absolute;
+    background: #f0f0f0;
+    border: 1px solid #a8b4bd;
+    border-radius: 5px;
+    box-shadow: 0 8px 30px rgba(0, 0, 0, .25);
+    box-sizing: border-box;
+    display: flex;
+    flex-direction: column;
+}
+.lw-win-title {
+    height: 28px;
+    min-height: 28px;
+    background: linear-gradient(#f7f9fb, #e8edf2);
+    border-bottom: 1px solid #ccd6de;
+    border-radius: 5px 5px 0 0;
+    display: flex;
+    align-items: center;
+    padding: 0 10px;
+    cursor: move;
+    user-select: none;
+    font-weight: bold;
+    color: #2b3a49;
+    font-size: 13px;
+}
+/* 标题占满剩余宽度：右侧图标（最大化/×）才能贴到标题栏最右。
+   不能用 margin-left:auto 推图标 —— flex 会把剩余空间平分给
+   多个 auto 边距，最大化图标会被顶到标题栏中间（坑：关于对话框）。
+   min-width:0 让 ellipsis 在 flex 里继续生效 */
+.lw-win-cap { flex: 1; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.lw-win-x {
+    cursor: pointer;
+    color: #6c7a87;
+    font-size: 18px;
+    line-height: 1;
+    padding: 0 6px;
+}
+.lw-win-x:hover { color: #d9534f; }
+
+/* 右上角最大化/还原图标（对齐 Ext maximizable；排在 × 左边，
+   靠 .lw-win-cap 的 flex:1 推到最右） */
+.lw-win-max {
+    cursor: pointer;
+    color: #6c7a87;
+    font-size: 13px;
+    line-height: 1;
+    padding: 0 7px;
+}
+.lw-win-max:hover { color: #2b6cb0; }
+
+/* 可调大小（LFM bsSizeable/bsSizeToolWin）：CSS resize 的唯一入口是
+   拖右下角；overflow 必须非 visible，句柄才出现 */
+.lw-win.lw-resizable {
+    resize: both;
+    overflow: hidden;
+    min-width: 240px;
+    min-height: 140px;
+}
+
+/* 最大化：!important 覆盖内联 left/top/width/height */
+.lw-win.lw-max {
+    left: 0 !important;
+    top: 0 !important;
+    width: 100% !important;
+    height: 100% !important;
+    border-radius: 0;
+}
+.lw-win.lw-max.lw-resizable { resize: none; }
+.lw-win-body {
+    position: relative;
+    overflow: auto;
+    flex: 1;
+}
+.lw-statusbar {
+    position: absolute;
+    left: 0;
+    height: 24px;
+    line-height: 24px;
+    background: #eef1f5;
+    border-top: 1px solid #ccd6de;
+    border-radius: 0 0 5px 5px;
+    display: flex;
+    overflow: hidden;
+    z-index: 5;
+}
+.lw-status-item {
+    padding: 0 10px;
+    font-size: 12px;
+    color: #44525f;
+    white-space: nowrap;
+    border-right: 1px solid #dde4ea;
+}
+.lw-menubar {
+    display: flex;
+    background: #f2f5f8;
+    border-bottom: 1px solid #dde4ea;
+    z-index: 6;
+}
+.lw-menu-top { padding: 4px 12px; cursor: default; font-size: 13px; }
+.lw-menu-top:hover { background: #dbe7f5; }
+
+/* ---------- 菜单弹层 ---------- */
+.lw-menu-pop {
+    position: fixed;
+    min-width: 160px;
+    background: #fff;
+    border: 1px solid #b9c3cd;
+    border-radius: 4px;
+    box-shadow: 0 4px 16px rgba(0, 0, 0, .18);
+    padding: 4px 0;
+    z-index: 97000;
+    font-size: 13px;
+}
+.lw-menu-item {
+    padding: 5px 24px 5px 16px;
+    cursor: default;
+    position: relative;
+    white-space: nowrap;
+}
+.lw-menu-item:hover { background: #dbe7f5; }
+.lw-menu-item.lw-disabled { color: #b0bcc7; }
+.lw-menu-item.lw-disabled:hover { background: transparent; }
+.lw-menu-sep { height: 1px; background: #dde4ea; margin: 4px 0; }
+.lw-menu-check { position: absolute; left: 4px; color: #2a7de1; font-size: 11px; }
+.lw-mn {
+    float: right;
+    margin-left: 28px;
+    color: #98a6b3;
+    font-size: 11px;
+}
+
+/* ---------- 节点包装 ---------- */
+.lw-n { position: absolute; }
+.lw-n.lw-flow { position: static; }
+
+/* 容器 */
+.lw-body {
+    position: relative;
+    width: 100%;
+    height: 100%;
+}
+.lw-kids { position: relative; width: 100%; height: 100%; }
+.lw-kids.lw-kids-flow {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    width: auto;
+    height: auto;
+}
+.lw-tbar {
+    width: 100%;
+    height: 100%;
+    box-sizing: border-box;
+    display: flex;
+    align-items: center;
+    padding: 2px 4px;
+    background: #f2f5f8;
+    border-bottom: 1px solid #dde4ea;
+}
+.lw-tbsep { width: 1px; height: 18px; background: #ccd6de; margin: 0 4px; }
+.lw-tool { white-space: nowrap; }
+
+/* 组（RadioGroup / CheckGroup / GroupBox） */
+.lw-group {
+    box-sizing: border-box;
+    width: 100%;
+    height: 100%;
+    display: flex;
+    flex-direction: column;
+}
+.lw-group.lw-boxed { border: 1px solid #b9c3cd; border-radius: 4px; background: #fff; }
+.lw-group-title {
+    padding: 3px 8px;
+    font-weight: bold;
+    color: #33475b;
+    font-size: 12px;
+}
+.lw-group-body {
+    flex: 1;
+    box-sizing: border-box;   /* 无此规则时 flex 拉伸宽 + 左右 padding 会溢出边框 20px，伪造横向滚动条 */
+    padding: 4px 10px;
+    overflow: auto;
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+}
+.lw-group-abs .lw-group-body { position: relative; }
+/* abs 版（TGroupBox）子控件是 LCL 客户区坐标，1:1 映射：去掉流式版的 padding，
+   否则整体右移 10px/下移 4px，内容底边超出容器 -> 伪造纵向滚动条（LCL 里没有） */
+.lw-group-abs .lw-group-body { padding: 0; }
+/* LCL 的 TGroupBox 客户区原点在边框内侧几像素，标题文字悬浮在客户区顶部。
+   若标题占流式高度（~20px），子控件整体下移、底部内容被裁（编辑框底边 120 > body 106）。
+   改为绝对定位叠加：子区从边框内侧铺满，坐标与 LCL 一致，标题画在上面 */
+.lw-group-abs { position: relative; }
+.lw-group-abs .lw-group-title { position: absolute; top: 2px; left: 10px; z-index: 2; }
+.lw-group-abs .lw-group-body { position: absolute; inset: 0; }
+.lw-group-abs .lw-kids { position: absolute; }
+
+/* TPanel/TScrollBox 的 Caption（非缺省值时由模板渲染）：
+   绝对居中、不挡鼠标（面板还要接收点击），面板透明时它就是唯一可见内容 */
+.lw-panel-cap {
+    position: absolute;
+    left: 4px;
+    right: 4px;
+    top: 50%;
+    transform: translateY(-50%);
+    text-align: center;
+    color: #33475b;
+    font-size: 12px;
+    pointer-events: none;
+}
+
+/* ---------- 基础控件 ---------- */
+.lw-label { line-height: 1.4; }
+.lw-input, .lw-select, .lw-memo {
+    box-sizing: border-box;
+    width: 100%;
+    height: 100%;
+    border: 1px solid #b9c3cd;
+    border-radius: 3px;
+    padding: 3px 6px;
+    font: inherit;
+    color: inherit;
+    background: #fff;
+}
+.lw-memo { resize: none; overflow: auto; }
+.lw-input:focus, .lw-select:focus, .lw-memo:focus { outline: none; border-color: #2a7de1; }
+.lw-input:disabled, .lw-select:disabled, .lw-memo:disabled,
+.lw-btn:disabled { background: #eef1f5; color: #98a6b3; cursor: not-allowed; }
+.lw-input[readonly] { background: #f6f8fa; }
+
+.lw-editbtn { display: flex; width: 100%; height: 100%; }
+.lw-editbtn .lw-input { flex: 1; border-radius: 3px 0 0 3px; }
+.lw-eb-btn {
+    width: 26px;
+    min-width: 26px;
+    border-radius: 0 3px 3px 0 !important;
+    border-left: 0 !important;
+}
+
+.lw-btn {
+    box-sizing: border-box;
+    border: 1px solid #b9c3cd;
+    border-radius: 3px;
+    background: linear-gradient(#fdfefe, #eef2f6);
+    color: #2b3a49;
+    font: inherit;
+    padding: 3px 12px;
+    cursor: pointer;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    max-width: 100%;
+    max-height: 100%;
+}
+.lw-btn:hover { background: #e8f0fa; border-color: #8fb3dd; }
+.lw-btn:active { background: #dbe7f5; }
+.lw-btn-pressed { background: #cfe0f3 !important; border-color: #5c92cf !important; }
+.lw-nav, .lw-pg { min-width: 30px; padding: 2px 8px; }
+
+/* 独立按钮（wrapper 带 LCL 设计尺寸）：填满设计矩形并垂直居中。
+   writer 按 DPI 缩放下发尺寸（如 144dpi 设计 37px -> 21px），高度
+   小于按钮自然高度时原生 button 内容从顶部排布、底部溢出被裁，
+   文字视觉上贴底 —— flex 居中让溢出均匀分到上下两侧 */
+.lw-n > .lw-btn {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 100%;
+    height: 100%;
+}
+/* 工具条流式布局里的按钮保持自然尺寸 */
+.lw-n.lw-flow > .lw-btn { display: inline-block; width: auto; height: auto; }
+
+/* TBitBtn.Kind 图标字符 */
+.lw-btn.lw-bic-ok::before, .lw-btn.lw-bic-yes::before, .lw-btn.lw-bic-all::before,
+.lw-btn.lw-bic-yestoall::before { content: "\2713\00A0"; font-weight: bold; }
+.lw-btn.lw-bic-cancel::before, .lw-btn.lw-bic-no::before, .lw-btn.lw-bic-close::before,
+.lw-btn.lw-bic-abort::before, .lw-btn.lw-bic-notoall::before { content: "\2715\00A0"; font-weight: bold; }
+.lw-btn.lw-bic-help::before { content: "?\00A0"; font-weight: bold; }
+.lw-btn.lw-bic-retry::before { content: "\21BB\00A0"; font-weight: bold; }
+.lw-btn.lw-bic-ignore::before { content: "\2715\00A0"; font-weight: bold; opacity: .6; }
+
+.lw-cb { display: flex; align-items: center; gap: 6px; cursor: default; white-space: nowrap; }
+.lw-cb input { margin: 0; }
+.lw-cb input:disabled + span { color: #98a6b3; }
+
+.lw-list {
+    width: 100%;
+    height: 100%;
+    overflow: auto;
+    background: #fff;
+    box-sizing: border-box;
+}
+.lw-list.lw-boxed { border: 1px solid #b9c3cd; border-radius: 3px; }
+.lw-list-item { padding: 2px 8px; cursor: default; white-space: nowrap; }
+.lw-list-item:hover { background: #eef4fb; }
+.lw-sel { background: #cfe0f3 !important; }
+.lw-clb { padding: 4px; display: flex; flex-direction: column; gap: 2px; }
+.lw-clb-item { padding: 1px 6px; }
+
+/* ---------- 表格 ---------- */
+.lw-grid {
+    width: 100%;
+    height: 100%;
+    overflow: auto;
+    background: #fff;
+    box-sizing: border-box;
+}
+.lw-grid.lw-boxed { border: 1px solid #b9c3cd; border-radius: 3px; }
+.lw-table { border-collapse: collapse; width: max-content; min-width: 100%; font-size: 12px; }
+.lw-table th, .lw-table td {
+    border: 1px solid #dde4ea;
+    padding: 3px 8px;
+    text-align: left;
+    white-space: nowrap;
+}
+.lw-table th {
+    background: #f2f5f8;
+    font-weight: bold;
+    color: #33475b;
+    position: sticky;
+    top: 0;
+    cursor: default;
+    z-index: 1;
+}
+.lw-ve-key { width: 110px; background: #f6f8fa; }
+.lw-ve-edit { cursor: text; min-width: 120px; }
+
+/* ---------- drawgrid 自绘单元格（$lwDrawCell） ---------- */
+/* 进度条：细槽 + 填充条 + 百分比文本 */
+.lw-cbar {
+    position: relative;
+    display: inline-block;
+    vertical-align: middle;
+    min-width: 90px;
+    height: 14px;
+    background: #e8edf2;
+    border-radius: 7px;
+    overflow: hidden;
+}
+.lw-cbar-fill {
+    position: absolute;
+    left: 0; top: 0;
+    height: 100%;
+    border-radius: 7px;
+    transition: width .25s;
+}
+.lw-cbar-text {
+    position: relative;
+    z-index: 1;
+    font-size: 10px;
+    line-height: 14px;
+    padding-left: 5px;
+    color: #1b2b3a;
+    text-shadow: 0 0 2px #fff;
+}
+/* 彩色徽章 */
+.lw-chip {
+    display: inline-block;
+    font-size: 11px;
+    line-height: 1;
+    padding: 3px 8px;
+    border-radius: 9px;
+    border: 1px solid;
+    vertical-align: middle;
+}
+/* 星级评分 */
+.lw-stars { font-size: 13px; letter-spacing: 1px; vertical-align: middle; }
+.lw-star-on  { color: #f59e0b; }
+.lw-star-off { color: #c9d3dd; }
+.lw-star-text { margin-left: 4px; font-size: 11px; color: #64748b; letter-spacing: 0; }
+/* 迷你折线图 */
+.lw-spark { display: inline-block; vertical-align: middle; }
+
+/* DBGrid 布尔列（服务端 cedit=4）：单元格内常驻勾选框，点一下即写回 */
+.lw-table td > .lw-chk {
+    display: block;
+    margin: 2px auto;
+    width: 14px;
+    height: 14px;
+    cursor: pointer;
+    accent-color: #4a86c8;
+}
+
+.lw-dbgrid {
+    width: 100%;
+    height: 100%;
+    display: flex;
+    flex-direction: column;
+    box-sizing: border-box;
+}
+.lw-dbgrid-body { flex: 1; min-height: 0; }
+.lw-dbgrid tbody tr { cursor: default; }
+.lw-dbgrid tbody tr:hover { background: #eef4fb; }
+.lw-grid-filter {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 4px;
+    background: #f2f5f8;
+    border-bottom: 1px solid #dde4ea;
+}
+.lw-grid-filter .lw-input { height: 24px; flex: 1; }
+.lw-grid-pager {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 3px 6px;
+    background: #f2f5f8;
+    border-top: 1px solid #dde4ea;
+    font-size: 12px;
+    color: #44525f;
+}
+.lw-nav { display: flex; align-items: center; gap: 4px; }
+
+/* ---------- 进度 / 滑条 / 编辑微调 ---------- */
+.lw-prog {
+    width: 100%;
+    height: 100%;
+    position: relative;
+    background: #e3e8ee;
+    border: 1px solid #b9c3cd;
+    border-radius: 3px;
+    overflow: hidden;
+    box-sizing: border-box;
+}
+.lw-prog-bar {
+    height: 100%;
+    background: linear-gradient(#6ab0ff, #2a7de1);
+    transition: width .25s;
+}
+.lw-prog-text {
+    position: absolute;
+    left: 0; right: 0; top: 0;
+    text-align: center;
+    line-height: 100%;
+    font-size: 11px;
+    color: #2b3a49;
+    top: 50%;
+    transform: translateY(-50%);
+}
+.lw-range { width: 100%; }
+.lw-vrange {
+    writing-mode: vertical-lr;
+    direction: rtl;
+    width: auto;
+    height: 100%;
+}
+.lw-updown { text-align: center; }
+
+/* ---------- 图形 / 帧 ---------- */
+.lw-img { max-width: 100%; max-height: 100%; }
+.lw-htmlframe, .lw-pdfframe {
+    width: 100%;
+    height: 100%;
+    background: #fff;
+    overflow: auto;
+    box-sizing: border-box;
+}
+.lw-chart {
+    width: 100%;
+    height: 100%;
+    background: #fff;
+    /* SVG 自适应容器：内容永不超界。不能用 auto —— <svg> 是行内元素，
+       底部有 line-height 空隙，100% 高 + 空隙溢出几像素就会伪造出
+       纵向滚动条（坑 115） */
+    overflow: hidden;
+    box-sizing: border-box;
+}
+.lw-chart > svg { display: block; }
+/* 宿主是 TCustomPanel：BevelOuter/BorderStyle 非 none 时画 1px 边，
+   与 grid/list/tree 的描边同一套颜色。缺这条规则时 htmlframe/pdfframe
+   加了 lw-boxed 也没有任何视觉边框（内容自身 #fff 背景，看起来像空白） */
+.lw-htmlframe.lw-boxed, .lw-pdfframe.lw-boxed, .lw-chart.lw-boxed {
+    border: 1px solid #b9c3cd;
+    border-radius: 3px;
+}
+.lw-gauge { width: 100%; height: 100%; }
+.lw-swatch { width: 100%; height: 100%; min-height: 20px; box-sizing: border-box; border-radius: 3px; }
+
+/* ---------- 页签 ---------- */
+.lw-tabs {
+    width: 100%;
+    height: 100%;
+    display: flex;
+    flex-direction: column;
+    box-sizing: border-box;
+}
+.lw-tabbar {
+    display: flex;
+    background: #f2f5f8;
+    border-bottom: 1px solid #ccd6de;
+    z-index: 4;
+}
+.lw-tab {
+    padding: 5px 14px;
+    font-size: 13px;
+    color: #44525f;
+    cursor: default;
+    border: 1px solid transparent;
+    border-bottom: none;
+    white-space: nowrap;
+    user-select: none;
+}
+.lw-tab:hover { background: #e8f0fa; }
+.lw-tab.lw-active {
+    background: #fff;
+    border-color: #ccd6de;
+    border-radius: 4px 4px 0 0;
+    font-weight: bold;
+    color: #2b3a49;
+    margin-bottom: -1px;
+}
+.lw-tabs-body {
+    flex: 1;
+    min-height: 0;
+    position: relative;
+    background: #fff;
+    overflow: hidden;
+}
+.lw-tabcard {
+    position: absolute;
+    left: 0; top: 0; right: 0; bottom: 0;
+    overflow: hidden;
+}
+
+/* ---------- 装饰 ---------- */
+.lw-bevel { width: 100%; height: 100%; border: 1px solid #c9d0d7; box-shadow: inset 1px 1px 0 #ffffff; box-sizing: border-box; }
+.lw-splitter {
+    width: 100%; height: 100%;
+    background: #eef1f5;
+    border-left: 1px solid #ccd3da;
+    border-right: 1px solid #ffffff;
+    cursor: col-resize;
+    box-sizing: border-box;
+}
+.lw-unknown {
+    display: inline-block;
+    border: 1px dashed #e06a6a;
+    background: #fff4f4;
+    color: #c0392b;
+    font-size: 11px;
+    line-height: 16px;
+    padding: 1px 4px;
+    white-space: nowrap;
+    overflow: hidden;
+}
+
+/* ---------- 树 ---------- */
+.lw-tree {
+    width: 100%;
+    height: 100%;
+    overflow: auto;
+    background: #fff;
+    box-sizing: border-box;
+    padding: 2px 0;
+}
+.lw-tree.lw-boxed { border: 1px solid #b9c3cd; border-radius: 3px; }
+.lw-tree-node { display: flex; align-items: center; white-space: nowrap; padding-top: 1px; padding-bottom: 1px; }
+.lw-tree-tw {
+    width: 12px;
+    min-width: 12px;
+    height: 12px;
+    margin-right: 4px;
+    display: inline-block;
+    position: relative;
+    cursor: default;
+}
+.lw-tree-tw.lw-leaf::before { content: ''; }
+.lw-tree-tw:not(.lw-leaf)::before {
+    content: '';
+    position: absolute;
+    left: 2px; top: 3px;
+    width: 6px; height: 6px;
+    border-right: 2px solid #6c7a87;
+    border-bottom: 2px solid #6c7a87;
+    transform: rotate(-45deg);
+}
+.lw-tree-tw.lw-open::before { transform: rotate(45deg); top: 1px; }
+.lw-tree-text { padding: 0 4px; }
+.lw-tree-node.lw-sel .lw-tree-text { background: #cfe0f3; }
+
+/* ---------- tooltip ---------- */
+.lw-tip {
+    position: fixed;
+    background: #fdfefe;
+    border: 1px solid #b9c3cd;
+    border-radius: 3px;
+    padding: 4px 8px;
+    font-size: 12px;
+    color: #33475b;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, .15);
+    z-index: 99990;
+    pointer-events: none;
+    max-width: 380px;
+}
+
+/* 单元格编辑器（dbgrid/valeditor 就地输入框） */
+.lw-table td .lw-input { height: 22px; padding: 1px 4px; }
