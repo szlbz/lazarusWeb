@@ -16,6 +16,7 @@ Lazarus 桌面程序的 Web 化运行时 —— 参考 uniGUI 的思路，但用
 ## 环境要求
 
 - FPC 3.3.1 + Lazarus
+- Alpine.js（内置依赖）
 - Ext JS 7.0.0（GPLv3 版，**可选**：发布包不包含，需自行从 Sencha 官方渠道获取后放入 `ext-7.0.0\`；不放置时默认使用内置的 Alpine.js 渲染层）  
 - **Ext 支持为可选功能，ext-js 文件由用户自行获取，其授权合规由使用者自行负责。**  
 
