@@ -4,7 +4,7 @@
 2、lazarus 4.8  
 2026-11-08周日闲来无事，让AI写了个Lazarus 桌面程序的 Web 化运行， 参考 uniGUI 的思路，但用真实的 LCL 控件树直接序列化成Alpine.js界面。业务程序只需要把窗体基类从 TForm 改成 TLWForm，其余代码（事件、属性、.lfm）原样保留，就能以服务程序的形式跑在浏览器里。  
 这个在内网使用还是可以的，方便只会写lazarus普通桌面应用的人，如果不使用第三方可视控件，可以很简单就可以转为Web应用。  
-lazarusWeb默认使用Alpine.js(已自带在src/client/alpine.min.js)，也可以选择Ext js  
+lazarusWeb默认使用Alpine.js(已自带在src/client/alpine.min.js)，也可以选择Ext-js  
 # 特别说明：这个框架肯定有很多问题，只能用来验证lazarus桌面程序快速转为Web应用的可能和效果。  
 <img width="1817" height="1176" alt="QQ_2026-11-13_11-10-07" src="https://github.com/user-attachments/assets/87dd6d96-f620-44f7-87b4-59058432f7a4" />
 <img width="1845" height="1269" alt="QQ_2026-11-12_17-11-14" src="https://github.com/user-attachments/assets/2f6bb2ff-cae0-4177-b82e-1032c1663d2c" />
