@@ -207,7 +207,7 @@ type
     btnDlFile: TButton;
     lblMiscHint: TLabel;
     { tsDB 数据感知 }
-    grdDb: TDBGrid;
+    grdDb: TLWDBGrid;
     pnlDbRight: TPanel;
     lbl31: TLabel;
     dbeName: TDBEdit;
@@ -665,6 +665,17 @@ begin
       grdDb.Columns[i].Title.Caption := '上架';
   end;
 
+  { 两级表头（TLWDBGrid.HeaderGroups）：每行 '标题|起-止'，起/止是可见列
+    下标（0 起、含止），没写进任何分组的列自己贯通两行 —— 最后一列
+    "上架"（可见列 6）就是混排样例。列是按字段自动生成的：
+    code name unit made price stock active }
+  with grdDb.HeaderGroups do
+  begin
+    Add('商品信息|0-1');
+    Add('规格与日期|2-3');
+    Add('价格与库存|4-5');
+  end;
+
   { tsBig：1000 行物料，TLWDBGrid 显示层分页。同样走 sqlite（bigitems 表），
     独立连接/事务：只读展示，和 tsDB 的业务事务互不干扰（WAL 下两连接可并存） }
   EnsureBigDb;
@@ -677,6 +688,13 @@ begin
 
   dsBig.DataSet := qryBig;
   grdBig.DataSource := dsBig;
+
+  { 大表页也演示两级表头：id name qty price -> 物料 0-1 / 数量与金额 2-3 }
+  with grdBig.HeaderGroups do
+  begin
+    Add('物料|0-1');
+    Add('数量与金额|2-3');
+  end;
 end;
 
 { ============================ 控件内容 ============================ }

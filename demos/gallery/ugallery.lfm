@@ -14,9 +14,9 @@ object GalleryForm: TGalleryForm
     Height = 900
     Top = 0
     Width = 1800
-    ActivePage = tsStd
+    ActivePage = tsDB
     Align = alClient
-    TabIndex = 0
+    TabIndex = 10
     TabOrder = 0
     OnChange = pcMainChange
     object tsStd: TTabSheet
@@ -729,7 +729,7 @@ object GalleryForm: TGalleryForm
         )
         ColWidths = (
           96
-          560
+          534
         )
       end
       object lbl19: TLabel
@@ -1222,7 +1222,7 @@ object GalleryForm: TGalleryForm
       Caption = '数据感知'
       ClientHeight = 863
       ClientWidth = 1792
-      object grdDb: TDBGrid
+      object grdDb: TLWDBGrid
         Left = 0
         Height = 863
         Top = 0
@@ -1231,6 +1231,8 @@ object GalleryForm: TGalleryForm
         Color = clWindow
         Columns = <>
         TabOrder = 0
+        PageSize = 0
+        ShowFilter = False
       end
       object pnlDbRight: TPanel
         Left = 1050
@@ -1355,8 +1357,8 @@ object GalleryForm: TGalleryForm
         Left = 12
         Height = 24
         Top = 600
-        Width = 932
-        Caption = 'TLWDBGrid：1000 行 / 每页 50 / 顶部过滤 / qty 列汇总 —— 显示层分页，对应 uniDBGrid 的分页过滤汇总能力。'
+        Width = 1022
+        Caption = 'TLWDBGrid：1000 行 / 每页 50 / 顶部过滤 / qty 列汇总 / 两级表头 —— 显示层分页，对应 uniDBGrid 的分页过滤汇总能力。'
       end
     end
   end
