@@ -1,106 +1,104 @@
 object MainForm: TMainForm
   Left = 60
+  Height = 840
   Top = 60
-  Width = 820
-  Height = 560
+  Width = 1230
   Caption = 'lazarusWeb · 综合示例'
-  ClientHeight = 560
-  ClientWidth = 820
+  ClientHeight = 840
+  ClientWidth = 1230
   Color = clBtnFace
-  Font.Height = -13
+  DesignTimePPI = 144
+  Font.Height = -20
   Font.Name = 'Microsoft YaHei'
   Menu = mmMain
+  LCLVersion = '4.8.0.0'
   OnCreate = FormCreate
-  ExplicitWidth = 836
-  ExplicitHeight = 599
   object pcMain: TPageControl
     Left = 0
-    Top = 57
-    Width = 820
-    Height = 455
+    Height = 682
+    Top = 86
+    Width = 1230
     ActivePage = tsData
+    TabIndex = 0
     TabOrder = 0
     object tsData: TTabSheet
       Caption = '订单数据'
+      ClientHeight = 642
+      ClientWidth = 1222
       object sgData: TStringGrid
         Left = 0
+        Height = 642
         Top = 0
-        Width = 812
-        Height = 415
+        Width = 1222
         Align = alClient
         ColCount = 3
-        RowCount = 13
-        FixedRows = 1
         Options = [goFixedVertLine, goFixedHorzLine, goVertLine, goHorzLine, goRangeSelect, goEditing]
+        RowCount = 13
         TabOrder = 0
         ColWidths = (
-          100
-          200
-          150)
-      end
-      object btnLoad: TButton
-        Left = 8
-        Top = 420
-        Width = 100
-        Height = 28
-        Caption = '重新加载'
-        TabOrder = 1
-        OnClick = btnLoadClick
+          150
+          300
+          225
+        )
       end
     end
     object tsOpts: TTabSheet
       Caption = '参数设置'
+      ClientHeight = 642
+      ClientWidth = 1222
       ImageIndex = 1
       object chkAuto: TCheckBox
-        Left = 24
-        Top = 24
-        Width = 160
-        Height = 19
+        Left = 36
+        Height = 31
+        Top = 36
+        Width = 105
         Caption = '自动刷新'
         TabOrder = 0
       end
       object lblLevel: TLabel
-        Left = 24
-        Top = 64
+        Left = 36
+        Height = 27
+        Top = 96
         Width = 40
-        Height = 17
         Caption = '级别'
       end
       object cboLevel: TComboBox
-        Left = 80
-        Top = 60
-        Width = 160
-        Height = 27
-        ItemHeight = 17
-        TabOrder = 1
-        Text = '标准'
+        Left = 120
+        Height = 35
+        Top = 90
+        Width = 240
+        ItemHeight = 27
+        ItemIndex = 0
         Items.Strings = (
           '标准'
           '快速'
-          '精确')
+          '精确'
+        )
+        TabOrder = 1
+        Text = '标准'
       end
       object lblThreads: TLabel
-        Left = 24
-        Top = 108
+        Left = 36
+        Height = 27
+        Top = 162
         Width = 40
-        Height = 17
         Caption = '线程'
       end
       object seThreads: TSpinEdit
-        Left = 80
-        Top = 104
-        Width = 90
-        Height = 27
+        Left = 120
+        Height = 35
+        Top = 156
+        Width = 135
         MaxValue = 64
         MinValue = 1
         TabOrder = 2
         Value = 4
       end
       object btnApply: TButton
-        Left = 24
-        Top = 160
-        Width = 100
-        Height = 28
+        Left = 36
+        Height = 42
+        Top = 240
+        Width = 150
         Caption = '应用参数'
         TabOrder = 3
         OnClick = btnApplyClick
@@ -108,29 +106,61 @@ object MainForm: TMainForm
     end
   end
   object lblState: TLabel
-    Left = 16
-    Top = 520
-    Width = 500
-    Height = 17
+    Left = 168
+    Height = 27
+    Top = 774
+    Width = 40
     Caption = '就绪'
   end
   object stbMain: TStatusBar
     Left = 0
-    Top = 538
-    Width = 820
-    Height = 22
-    Panels = <
+    Height = 34
+    Top = 806
+    Width = 1230
+    Panels = <    
       item
-        Width = 400
-      end
+        Width = 600
+      end    
       item
-        Width = 300
+        Width = 450
       end>
     SimplePanel = False
   end
-  object mmMain: TMainMenu
+  object tbMain: TToolBar
+    Left = 0
+    Height = 86
+    Top = 0
+    Width = 1230
+    ButtonHeight = 45
+    ButtonWidth = 126
+    Caption = 'tbMain'
+    ShowCaptions = True
+    TabOrder = 2
+    object tbRefresh: TToolButton
+      Left = 1
+      Top = 2
+      Caption = '刷新'
+      OnClick = tbRefreshClick
+    end
+    object tbAbout: TToolButton
+      Left = 127
+      Top = 2
+      Caption = '关于'
+      OnClick = miAboutClick
+    end
+  end
+  object btnLoad: TButton
     Left = 8
-    Top = 8
+    Height = 36
+    Top = 768
+    Width = 150
+    Caption = '重新加载'
+    TabOrder = 3
+    OnClick = btnLoadClick
+  end
+  object mmMain: TMainMenu
+    Left = 12
+    Top = 12
     object miFile: TMenuItem
       Caption = '文件(&F)'
       object miExit: TMenuItem
@@ -146,29 +176,6 @@ object MainForm: TMainForm
         ShortCut = 112
         OnClick = miAboutClick
       end
-    end
-  end
-  object tbMain: TToolBar
-    Left = 0
-    Top = 0
-    Width = 820
-    Height = 57
-    ButtonHeight = 30
-    ButtonWidth = 84
-    Caption = 'tbMain'
-    ShowCaptions = True
-    TabOrder = 2
-    object tbRefresh: TToolButton
-      Left = 0
-      Top = 0
-      Caption = '刷新'
-      OnClick = tbRefreshClick
-    end
-    object tbAbout: TToolButton
-      Left = 84
-      Top = 0
-      Caption = '关于'
-      OnClick = miAboutClick
     end
   end
 end

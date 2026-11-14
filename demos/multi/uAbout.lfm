@@ -1,57 +1,58 @@
 object AboutForm: TAboutForm
   Left = 400
+  Height = 300
   Top = 250
+  Width = 630
   BorderStyle = bsDialog
   Caption = '关于 lazarusWeb'
-  ClientHeight = 200
-  ClientWidth = 420
+  ClientHeight = 300
+  ClientWidth = 630
   Color = clBtnFace
-  Font.Height = -13
+  DesignTimePPI = 144
+  Font.Height = -20
   Font.Name = 'Microsoft YaHei'
   Position = poScreenCenter
-  ExplicitWidth = 436
-  ExplicitHeight = 239
+  LCLVersion = '4.8.0.0'
   object lblTitle: TLabel
-    Left = 24
-    Top = 24
-    Width = 200
-    Height = 25
+    Left = 36
+    Height = 39
+    Top = 36
+    Width = 223
     Caption = 'lazarusWeb 0.9'
-    Font.Height = -19
+    Font.Height = -29
     Font.Style = [fsBold]
     ParentFont = False
   end
   object lblText: TLabel
-    Left = 24
-    Top = 68
-    Width = 372
-    Height = 68
-    Caption =
-      'Lazarus 桌面程序的 Web 化运行时。'#13#10'服务端用真实 LCL 控件，'#13#10'浏览器端用 Ext JS 渲染。'
+    Left = 36
+    Height = 81
+    Top = 102
+    Width = 333
+    Caption = 'Lazarus 桌面程序的 Web 化运行时。'#13#10'服务端用真实 LCL 控件，'#13#10'浏览器端用 Alpine.js / Ext JS 渲染。'
     WordWrap = True
   end
   object lblVer: TLabel
-    Left = 24
-    Top = 140
-    Width = 240
-    Height = 17
+    Left = 36
+    Height = 27
+    Top = 210
+    Width = 288
     Caption = 'Ext JS 7.0.0  ·  nogui widgetset'
   end
   object btnOk: TButton
-    Left = 216
-    Top = 164
-    Width = 88
-    Height = 28
+    Left = 324
+    Height = 42
+    Top = 246
+    Width = 132
     Caption = '确定'
     Default = True
     ModalResult = 1
     TabOrder = 0
   end
   object btnCancel: TButton
-    Left = 312
-    Top = 164
-    Width = 88
-    Height = 28
+    Left = 468
+    Height = 42
+    Top = 246
+    Width = 132
     Cancel = True
     Caption = '取消'
     ModalResult = 2

@@ -9,7 +9,11 @@ uses
   ComCtrls, ExtCtrls, Menus, Buttons, Spin, lwform, uAbout;
 
 type
+
+  { TMainForm }
+
   TMainForm = class(TLWForm)
+    btnLoad: TButton;
     mmMain: TMainMenu;
     miFile: TMenuItem;
     miExit: TMenuItem;
@@ -22,7 +26,6 @@ type
     tsData: TTabSheet;
     tsOpts: TTabSheet;
     sgData: TStringGrid;
-    btnLoad: TButton;
     stbMain: TStatusBar;
     chkAuto: TCheckBox;
     lblLevel: TLabel;
@@ -56,6 +59,9 @@ begin
   sgData.Cells[2, 0] := '金额';
   FillGrid;
   lblState.Caption := '就绪';
+  { 状态栏初始文本（与桌面端一样：Panels[i].Text 由业务代码决定，
+    框架负责把格子按 LFM 里的宽度/对齐/边框画出来） }
+  stbMain.Panels[0].Text := '就绪';
 end;
 
 procedure TMainForm.FillGrid;
@@ -70,6 +76,8 @@ begin
     sgData.Cells[1, i] := '客户' + IntToStr(i);
     sgData.Cells[2, i] := FormatFloat('0.00', i * 137.5);
   end;
+  { 第二格跟着行数变：验证服务端改 Panels[i].Text 后补丁能落到前端 }
+  stbMain.Panels[1].Text := Format('行数 %d', [sgData.RowCount - 1]);
 end;
 
 procedure TMainForm.miExitClick(Sender: TObject);
