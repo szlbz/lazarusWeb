@@ -16,6 +16,117 @@
 var LW = (function () {
     'use strict';
 
+    /* ---------------- 主题（亮色 / 深色 / 跟随系统） ----------------
+       三档偏好：light / dark / auto（auto = 跟随系统配色）。
+        · 偏好存 localStorage['lw-theme']：刷新、多标签页、多窗体一致；
+        · auto 时监听 matchMedia，系统深色开关（含 Windows 的定时切换）
+          一变就跟着切，页面不刷新；
+        · 实际生效的主题写在 <html data-lw-theme="light|dark"> 上，
+          CSS 只认这一个属性（两套调色板见 lw-alpine.css 顶部）；
+        · 服务端窗体属性 LWTheme / LWThemeButton 只在"本地还没有用户
+          选择"时作为首次默认值 —— 用户手动选过就以本地为准。 */
+    var THEME_KEY = 'lw-theme';
+    var THEME_MODES = ['light', 'dark', 'auto'];
+    var themePref = 'auto';
+    var themeSaved = false;     /* 本地是否已有用户选择 */
+    var themeBtns = [];         /* 已创建的标题栏按钮（换主题要一起换图标） */
+    var themeBtnHidden = false; /* 服务端 LWThemeButton = False */
+    var mqDark = (window.matchMedia ?
+        window.matchMedia('(prefers-color-scheme: dark)') : null);
+
+    function themeResolve(p) {
+        if (p === 'light' || p === 'dark') return p;
+        return (mqDark && mqDark.matches) ? 'dark' : 'light';
+    }
+    function themeLabel(p) {
+        return p === 'light' ? '亮色' : (p === 'dark' ? '深色' : '跟随系统');
+    }
+    /* 图标用手绘 SVG：Unicode 的 ☀/☾ 在不同机器上字重、大小差很多，
+       自己画的三枚（太阳 / 月牙 / 半黑半白）在标题栏里尺寸一致 */
+    function themeIcon(p) {
+        var s = '<svg width="14" height="14" viewBox="0 0 16 16" fill="none" ' +
+            'stroke="currentColor" stroke-width="1.3" stroke-linecap="round">';
+        if (p === 'light') {
+            s += '<circle cx="8" cy="8" r="3.1" fill="currentColor" stroke="none"/>';
+            [[13.4, 8, 15.2, 8], [11.82, 11.82, 13.09, 13.09], [8, 13.4, 8, 15.2],
+             [4.18, 11.82, 2.91, 13.09], [2.6, 8, 0.8, 8], [4.18, 4.18, 2.91, 2.91],
+             [8, 2.6, 8, 0.8], [11.82, 4.18, 13.09, 2.91]].forEach(function (l) {
+                s += '<line x1="' + l[0] + '" y1="' + l[1] + '" x2="' + l[2] + '" y2="' + l[3] + '"/>';
+            });
+        } else if (p === 'dark') {
+            s += '<path d="M10.6 2.4a6 6 0 1 0 2.9 10.4A6.9 6.9 0 0 1 10.6 2.4z" ' +
+                'fill="currentColor" stroke="none"/>';
+        } else {
+            s += '<circle cx="8" cy="8" r="5.3"/>' +
+                '<path d="M8 2.7a5.3 5.3 0 0 1 0 10.6z" fill="currentColor" stroke="none"/>';
+        }
+        return s + '</svg>';
+    }
+    function themeBtnSync(b) {
+        b.innerHTML = themeIcon(themePref);
+        b.title = '配色：' + themeLabel(themePref) + '（点击切换）';
+        b.classList.toggle('lw-on', themePref !== 'auto');
+    }
+    function themeApply(p, save) {
+        if (THEME_MODES.indexOf(p) < 0) p = 'auto';
+        themePref = p;
+        var real = themeResolve(p);
+        var de = document.documentElement;
+        de.setAttribute('data-lw-theme', real);
+        de.setAttribute('data-lw-theme-pref', p);
+        if (save) {
+            themeSaved = true;
+            try { localStorage.setItem(THEME_KEY, p); } catch (e) { }
+        }
+        for (var i = 0; i < themeBtns.length; i++) themeBtnSync(themeBtns[i]);
+        /* 图表是静态 SVG 字符串，颜色用类名承载 CSS 变量，换主题自动变色；
+           业务侧若自己画了 canvas/图片，可监听这个事件重绘 */
+        try {
+            document.dispatchEvent(new CustomEvent('lw:themechange',
+                { detail: { theme: real, pref: p } }));
+        } catch (e) { }
+        return real;
+    }
+    function themeInit() {
+        var saved = '';
+        try { saved = localStorage.getItem(THEME_KEY) || ''; } catch (e) { }
+        if (THEME_MODES.indexOf(saved) >= 0) themeSaved = true;
+        themeApply(themeSaved ? saved : 'auto', false);
+        if (mqDark) {
+            var onSys = function () { if (themePref === 'auto') themeApply('auto', false); };
+            if (mqDark.addEventListener) mqDark.addEventListener('change', onSys);
+            else if (mqDark.addListener) mqDark.addListener(onSys);
+        }
+        /* 别的标签页切了主题：storage 事件只在其它文档里派发，跟着改 */
+        window.addEventListener('storage', function (e) {
+            if (e.key !== THEME_KEY) return;
+            themeSaved = true;
+            themeApply(THEME_MODES.indexOf(e.newValue) >= 0 ? e.newValue : 'auto', false);
+        });
+    }
+
+    /* 显式设成 clBlack 的文字：深色主题下必须反色，否则黑底黑字。
+       其它显式色（clRed 之类）原样保留 —— 设计期选了颜色就该照做。 */
+    function themeFg(c) {
+        if (!c) return c;
+        var v = String(c).toLowerCase();
+        return (v === '#000000' || v === '#000') ? 'var(--lw-fg)' : c;
+    }
+
+    /* 立即落主题属性。lw-alpine.js 在 <head> 里同步加载（不带 defer），
+       执行时 body 还是空的 —— 所以不会出现"先白底再闪成深色"。 */
+    themeInit();
+
+    /* 给 HTMLFrame 里的自定义脚本 / 控制台用的简写入口 */
+    window.$lwTheme = {
+        set: function (p) { return themeApply(p, true); },
+        get: function () { return themePref; },
+        cycle: function () {
+            var i = THEME_MODES.indexOf(themePref);
+            return themeApply(THEME_MODES[(i + 1) % THEME_MODES.length], true);
+        }
+    };
+
     var S = {
         sid: null,
         R: {},        /* nodeId -> Alpine.reactive 节点状态（模板绑定的唯一来源） */
@@ -88,6 +199,33 @@ var LW = (function () {
     window.$lwHas = function (id, ev) {
         var evs = S.EV[id];
         return !!(evs && evs.indexOf(ev) >= 0);
+    };
+
+    /* TComboBox 自绘下拉：展开时按输入框矩形算 fixed 坐标。
+       页签卡片 / 滚动区都会裁绝对定位，只有 fixed 能盖出去；
+       下方放不下就翻到上方，再不行贴边（下拉项多时最多显示 10 行再滚）。 */
+    window.$lwComboOpen = function (id, el) {
+        var r = S.R[id];
+        if (!r || r.dis || r.open) return;
+        var rc = el.getBoundingClientRect();
+        var n = (r.items || []).length;
+        var h = Math.min(n, 10) * 26 + 8;
+        var top = rc.bottom + 1;
+        if (top + h > window.innerHeight - 4) top = Math.max(4, rc.top - h - 1);
+        r.px = Math.round(rc.left);
+        r.py = Math.round(top);
+        r.pw = Math.round(rc.width);
+        r.open = true;
+    };
+
+    /* 选中一项：写回文本（服务端确认的树补丁随后会覆盖成权威值），
+       关弹层，并按 LCL 语义发 OnChange */
+    window.$lwComboPick = function (id, t) {
+        var r = S.R[id];
+        if (!r) return;
+        r.txt = (t == null ? '' : String(t));
+        r.open = false;
+        if ($lwHas(id, 'OnChange')) fire(id, 'OnChange', { val: r.txt });
     };
     /* 按控件名触发事件（TLWHTMLFrame 里的自定义 HTML 用）
        帧内容里的脚本拿不到控件 id（id 是服务端序列化时分配的），
@@ -378,7 +516,7 @@ var LW = (function () {
             if (f.style.indexOf('i') >= 0) st += 'font-style:italic;';
             if (f.style.indexOf('u') >= 0) st += 'text-decoration:underline;';
         }
-        if (node.fg) st += 'color:' + node.fg + ';';
+        if (node.fg) st += 'color:' + themeFg(node.fg) + ';';
         return st;
     }
 
@@ -422,7 +560,9 @@ var LW = (function () {
             /* valeditor 表头 */
             t0: '', t1: '',
             /* dblookup 当前键 */
-            key: node.key != null ? String(node.key) : ''
+            key: node.key != null ? String(node.key) : '',
+            /* combo 自绘弹层（open=是否展开，px/py/pw=展开时的 fixed 坐标） */
+            open: false, px: 0, py: 0, pw: 0
         });
         if (k === 'combo') {
             r.txt = node.text || (node.items && node.index >= 0 ? node.items[node.index] : '');
@@ -476,14 +616,14 @@ var LW = (function () {
 
         var parts = [];
         parts.push('<svg width="' + w + '" height="' + h + '" viewBox="0 0 ' + w + ' ' + h + '" xmlns="http://www.w3.org/2000/svg">');
-        parts.push('<path d="' + arc(0, 1, r) + '" fill="none" stroke="#e3e8ee" stroke-width="10" stroke-linecap="round"/>');
+        parts.push('<path d="' + arc(0, 1, r) + '" fill="none" class="lw-ch-track" stroke-width="10" stroke-linecap="round"/>');
         if (f > 0.001)
             parts.push('<path d="' + arc(0, f, r) + '" fill="none" stroke="' + col + '" stroke-width="10" stroke-linecap="round"/>');
         for (var i = 0; i <= 10; i++) {
             var a1 = pt(i / 10, r - 21), a2 = pt(i / 10, r - 15);
             parts.push('<line x1="' + a1[0].toFixed(1) + '" y1="' + a1[1].toFixed(1) +
                 '" x2="' + a2[0].toFixed(1) + '" y2="' + a2[1].toFixed(1) +
-                '" stroke="#c3ced9" stroke-width="1"/>');
+                '" class="lw-ch-grid" stroke-width="1"/>');
         }
         var tip = pt(f, r * 0.72);
         parts.push('<line x1="' + cx + '" y1="' + cy + '" x2="' + tip[0].toFixed(1) +
@@ -494,7 +634,7 @@ var LW = (function () {
         parts.push('<text x="' + cx + '" y="' + (cy - 12) + '" text-anchor="middle" font-size="' +
             fs.toFixed(0) + '" font-weight="bold" fill="' + col + '">' + esc(txt) + '</text>');
         if (n.caption)
-            parts.push('<text x="' + cx + '" y="14" text-anchor="middle" font-size="12" fill="#5b6b7b">' + esc(n.caption) + '</text>');
+            parts.push('<text x="' + cx + '" y="14" text-anchor="middle" font-size="12" class="lw-ch-text">' + esc(n.caption) + '</text>');
         parts.push('</svg>');
         return parts.join('');
     }
@@ -517,12 +657,13 @@ var LW = (function () {
         var parts = ['<svg width="100%" height="100%" viewBox="0 0 ' + w + ' ' + h +
             '" preserveAspectRatio="none" xmlns="http://www.w3.org/2000/svg">'];
 
-        function textEl(x, y, s, size, anchor, fill, extra) {
+        /* 颜色用 class 承载（SVG 的 fill 属性不认 var()，换主题要能自动变色） */
+        function textEl(x, y, s, size, anchor, cls, extra) {
             return '<text x="' + x.toFixed(1) + '" y="' + y.toFixed(1) + '" text-anchor="' + (anchor || 'middle') +
-                '" font-size="' + (size || 11) + '" fill="' + (fill || '#44525f') + '"' + (extra || '') + '>' + esc(s) + '</text>';
+                '" font-size="' + (size || 11) + '" class="' + (cls || 'lw-ch-text') + '"' + (extra || '') + '>' + esc(s) + '</text>';
         }
 
-        if (n.title) parts.push(textEl(w / 2, 16, n.title, 13, 'middle', '#2b3a49', ' font-weight="bold"'));
+        if (n.title) parts.push(textEl(w / 2, 16, n.title, 13, 'middle', 'lw-ch-title'));
 
         if (n.charttype === 'pie') {
             var s0 = series[0] || { values: [] };
@@ -540,7 +681,7 @@ var LW = (function () {
                 var x1 = cx + r * Math.cos(a1), y1 = cy + r * Math.sin(a1);
                 parts.push('<path d="M ' + cx + ' ' + cy + ' L ' + x0.toFixed(1) + ' ' + y0.toFixed(1) +
                     ' A ' + r.toFixed(1) + ' ' + r.toFixed(1) + ' 0 ' + large + ' 1 ' + x1.toFixed(1) + ' ' + y1.toFixed(1) +
-                    ' Z" fill="' + CHART_COLORS[i % CHART_COLORS.length] + '" stroke="#fff" stroke-width="1"/>');
+                    ' Z" fill="' + CHART_COLORS[i % CHART_COLORS.length] + '" class="lw-ch-sep" stroke-width="1"/>');
                 var am = (a0 + a1) / 2, lx = cx + (r + 12) * Math.cos(am), ly = cy + (r + 12) * Math.sin(am);
                 parts.push(textEl(lx, ly + 4, cats[i] || '', 11, am > Math.PI / 2 || am < -Math.PI / 2 ? 'end' : 'start'));
                 a0 = a1;
@@ -567,8 +708,8 @@ var LW = (function () {
         for (var g = 0; g <= 4; g++) {
             var gy = pad.t + ih - ih * g / 4;
             parts.push('<line x1="' + pad.l + '" y1="' + gy.toFixed(1) + '" x2="' + (w - pad.r) + '" y2="' + gy.toFixed(1) +
-                '" stroke="#e3e8ee" stroke-width="1"/>');
-            parts.push(textEl(pad.l - 6, gy + 4, String(Math.round(maxv * g / 4 * 100) / 100), 10, 'end', '#8a97a5'));
+                '" class="lw-ch-grid" stroke-width="1"/>');
+            parts.push(textEl(pad.l - 6, gy + 4, String(Math.round(maxv * g / 4 * 100) / 100), 10, 'end', 'lw-ch-axis'));
         }
         var ncat = Math.max(cats.length, 1);
         var step = iw / ncat;
@@ -846,15 +987,27 @@ var LW = (function () {
 
             case 'combo':
             case 'dbcombo': {
-                var dl = 'lw-dl-' + id;
-                if (node.editable === false) {
-                    return '<select class="lw-select" style="' + fs + '" x-model="' + r + '.txt" ' + dis +
-                        ' @change="' + evAttr(id, 'OnChange', '{val:' + r + '.txt}') + '">' +
-                        '<template x-for="(t,i) in ' + r + '.items" :key="i"><option :value="t" x-text="t" :selected="t===' + r + '.txt"></option></template></select>';
-                }
-                return '<input type="text" class="lw-input" style="' + fs + '" list="' + dl + '" x-model="' + r + '.txt" ' + dis +
+                /* 自绘下拉，不再用原生控件：
+                   - datalist 弹层会按输入框当前文本过滤，只剩"当前值"一项（坑 126）
+                   - 原生 select 弹层跟随系统主题，深色下是个大黑块，样式不可控
+                   可编辑（csDropDown）= 能打字；csDropDownList = readonly 只能选。
+                   弹层用 position:fixed：页签卡片 .lw-tabcard 是 overflow:hidden，
+                   绝对定位会被裁掉；坐标由 $lwComboOpen 按输入框矩形算。 */
+                var cRo = (node.editable === false || node.readonly) ? ' readonly' : '';
+                return '<div class="lw-combo" style="' + fs + '">' +
+                    '<input type="text" class="lw-input lw-combo-in" style="' + fs + '" x-model="' + r + '.txt"' +
+                    cRo + ' ' + dis +
+                    ' @click="$lwComboOpen(\'' + id + '\',$el)"' +
+                    ' @keydown.escape="' + r + '.open = false"' +
                     ' @change="' + evAttr(id, 'OnChange', '{val:' + r + '.txt}') + '"/>' +
-                    '<datalist id="' + dl + '"><template x-for="(t,i) in ' + r + '.items" :key="i"><option :value="t"></option></template></datalist>';
+                    '<span class="lw-combo-arw"></span>' +
+                    '<div class="lw-combo-pop" x-show="' + r + '.open" x-cloak' +
+                    ' :style="\'left:\' + ' + r + '.px + \'px;top:\' + ' + r + '.py + \'px;min-width:\' + ' + r + '.pw + \'px\'"' +
+                    ' @click.outside="' + r + '.open = false">' +
+                    '<template x-for="(t,i) in ' + r + '.items" :key="i">' +
+                    '<div class="lw-combo-it" :class="(t === ' + r + '.txt) ? \'on\' : \'\'"' +
+                    ' @click="$lwComboPick(\'' + id + '\',t)" x-text="t"></div>' +
+                    '</template></div></div>';
             }
 
             case 'dblookup':
@@ -1457,9 +1610,33 @@ var LW = (function () {
 
     /* ---------------- 主菜单 / 右键菜单 ---------------- */
 
+    /* 主题弹层的"当前实例"：外部点击关闭用它做判断（见 closeThemeMenu） */
+    var themePopEl = null, themePopAnchor = null;
+
+    function closeThemeMenu() {
+        if (themePopEl) themePopEl.remove();
+        themePopEl = null;
+        themePopAnchor = null;
+    }
+
     function closeAllMenus() {
         document.querySelectorAll('.lw-menu-pop').forEach(function (m) { m.remove(); });
+        themePopEl = null;
+        themePopAnchor = null;
     }
+
+    /* 主题弹层的"点外面关掉"：常驻一个监听，判断的是当前弹层实例。
+       不能改成"开一次弹层注册一个，关掉时自摘" —— 那种写法只在
+       点在弹层外时才会摘，点在按钮上（开第二次弹层）那次不摘，
+       旧监听就留下了；下一次 mousedown 它先把新弹层删掉，
+       click 于是落在已被移除的元素上、永远到不了菜单项，
+       表现为"切过一次主题后再也切不动，刷新才好"。 */
+    document.addEventListener('mousedown', function (ev) {
+        if (!themePopEl) return;
+        if (themePopEl.contains(ev.target)) return;
+        if (themePopAnchor && themePopAnchor.contains(ev.target)) return;
+        closeThemeMenu();
+    }, true);
 
     function menuPopHtml(items) {
         var h = '<div class="lw-menu-pop">';
@@ -1504,6 +1681,46 @@ var LW = (function () {
         document.querySelectorAll('.lw-menu-pop').forEach(function (m) {
             if (m !== p && !p.contains(m) && !m.contains(p)) m.remove();
         });
+    }
+
+    /* ---------------- 主题切换按钮（标题栏右侧 ☀/☾/◐） ----------------
+       弹层复用 .lw-menu-pop 的三项菜单；标题栏本来就有放大/关闭图标，
+       放这里不会压住状态栏文字，也不用额外的浮层定位。 */
+    function themeMenu(anchor) {
+        closeAllMenus();
+        var host = document.createElement('div');
+        host.innerHTML = menuPopHtml(THEME_MODES.map(function (p) {
+            return { caption: themeLabel(p), checked: p === themePref };
+        }));
+        var pop = host.firstChild;
+        document.body.appendChild(pop);
+        var r = anchor.getBoundingClientRect();
+        pop.style.left = Math.max(4, Math.round(r.right - pop.offsetWidth)) + 'px';
+        pop.style.top = Math.round(r.bottom + 2) + 'px';
+        /* 登记当前实例：外部点击由上面那个常驻监听负责关闭 */
+        themePopEl = pop;
+        themePopAnchor = anchor;
+        pop.querySelectorAll('.lw-menu-item').forEach(function (el, i) {
+            el.addEventListener('click', function (e) {
+                e.stopPropagation();
+                themeApply(THEME_MODES[i], true);
+                closeAllMenus();
+            });
+        });
+    }
+
+    function themeButton(title) {
+        var b = document.createElement('span');
+        b.className = 'lw-win-theme';
+        b.addEventListener('click', function (e) {
+            e.stopPropagation();
+            themeMenu(b);
+        });
+        themeBtnSync(b);
+        themeBtns.push(b);
+        var before = title.querySelector('.lw-win-max') || title.querySelector('.lw-win-x');
+        if (before) title.insertBefore(b, before); else title.appendChild(b);
+        return b;
     }
 
     /* ---------------- 节点创建 / 子节点同步 ---------------- */
@@ -1851,6 +2068,15 @@ var LW = (function () {
     function buildForm(f) {
         if (S.forms[f.id]) return S.forms[f.id];
 
+        /* 主题：服务端的窗体属性只当"首次默认值"。本地已经有用户选择时
+           不动（用户的显式选择优先于设计期默认值） */
+        if (!S.themeSeen) {
+            S.themeSeen = true;
+            if (!themeSaved && (f.theme === 'light' || f.theme === 'dark')) {
+                themeApply(f.theme, false);
+            }
+        }
+
         var fx = f.x, fy = f.y;
         /* 模态/非模态一律在视口里居中（坑 93）：LFM 的 Left/Top 常是 0 或
            设计时随手摆的位置，模态窗体沿用会怼在左上角 */
@@ -1891,11 +2117,14 @@ var LW = (function () {
             '<span class="lw-win-max" title="最大化/还原">▢</span>' +
             (f.modal ? '<span class="lw-win-x" title="关闭">×</span>' : '');
         win.appendChild(title);
+        /* 配色切换按钮：只放在非模态窗口（模态对话框标题栏已经够挤，
+           而且它往往只显示几秒，不给它加控件） */
+        if (!themeBtnHidden && !f.modal) themeButton(title);
 
         var body = document.createElement('div');
         body.className = 'lw-win-body';
         body.style.height = clientH + 'px';
-        body.style.background = f.bg || '#f0f0f0';
+        body.style.background = f.bg || 'var(--lw-win-bg)';
         body.style.overflow = 'auto';
         var kids = document.createElement('div');
         kids.className = 'lw-kids';
@@ -1984,7 +2213,8 @@ var LW = (function () {
         /* 标题栏拖动 */
         title.addEventListener('mousedown', function (e) {
             if (e.target.classList.contains('lw-win-x') ||
-                e.target.classList.contains('lw-win-max')) return;
+                e.target.classList.contains('lw-win-max') ||
+                e.target.classList.contains('lw-win-theme')) return;
             if (win.__lwMax) return;   /* 最大化时不可拖 */
             var sx = e.clientX - win.offsetLeft, sy = e.clientY - win.offsetTop;
             function mv(ev2) {
@@ -3006,6 +3236,18 @@ var LW = (function () {
         start: start,
         reload: function () { boot(); },
         sid: function () { return S.sid; },
+        /* 主题：业务代码可以用 LW.theme.set('dark') 之类直接切 */
+        theme: {
+            set: function (p) { return themeApply(p, true); },
+            get: function () { return themePref; },        /* 偏好：light/dark/auto */
+            current: function () { return themeResolve(themePref); },  /* 实际生效 */
+            modes: function () { return THEME_MODES.slice(); },
+            /* 有窗体时给标题栏按钮开关；无窗体时只影响之后创建的窗体 */
+            button: function (on) {
+                themeBtnHidden = !on;
+                themeBtns.forEach(function (b) { b.style.display = on ? '' : 'none'; });
+            }
+        },
         /* 诊断：补丁/全量各来了多少次，当前树版本 */
         stats: function () {
             return { patch: S.nPatch, full: S.nFull, tver: S.tver };
