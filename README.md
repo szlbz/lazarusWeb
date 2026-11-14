@@ -2,10 +2,10 @@
 
 Lazarus 桌面程序的 Web 化运行时 —— 参考 uniGUI 的思路，但用**真实的 LCL 控件树**直接序列化成 Ext JS 界面。业务程序只需要把窗体基类从 `TForm` 改成 `TLWForm`，其余代码（事件、属性、`.lfm`）原样保留，就能以服务程序的形式跑在浏览器里。
 
-浏览器 (Ext JS 7.0.0 或 Alpine.js) 服务端 (Lazarus, nogui widgetset)
+浏览器 (Alpine.js 或 Ext JS 7.0.0) 服务端 (Lazarus, nogui widgetset)
 | 浏览器端 (Ext JS 7.0.0 或 Alpine.js) | 通信 | 服务端 (Lazarus, nogui widgetset) |
 | :--- | :---: | :--- |
-| `lw.js` 渲染/协调器<br><br>`Ext.window/panel/grid/...`<br><br>`WS传事件/长轮询游标收推送` | **HTTP**<br><br>**←→**<br><br>**JSON** | `lwhttp` fcl-web 多线程服务器<br>`lwsession` 每标签页一棵 LCL 控件树<br>`lwwriter` LCL 树→JSON<br>`lwdispatch` 事件→RTTI 调业务代码<br>`lwws` nogui 补丁(虚拟显示器/画布) |
+| `lw.js` 渲染/协调器<br><br>`Ext.window/panel/grid/...`<br><br>`WS传事件/长轮询游标收推送` | <br><br>**HTTP←→JSON**<br><br> | `lwhttp` fcl-web 多线程服务器<br>`lwsession` 每标签页一棵 LCL 控件树<br>`lwwriter` LCL 树→JSON<br>`lwdispatch` 事件→RTTI 调业务代码<br>`lwws` nogui 补丁(虚拟显示器/画布) |
 
 ## 环境要求
 
