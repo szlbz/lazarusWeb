@@ -18,17 +18,23 @@
        登录/重置按钮、OnLogin 认证回调，新建即能跑，认证逻辑改 DoLoginEx。
 
     3. 组件面板 -> "lazarusWeb" 页
-       TLWForm / TLWLoginForm / TLWFileUpload / TLWDBGrid / TLWDBNavigator /
-       TLWChart / TLWGauge / TLWColorPicker / TLWHTMLFrame / TLWPDFFrame /
-       TLWSideMenu（左侧折叠菜单，非可视，拖到窗体上后双击即开 IDE 原生
-       菜单编辑器，与 TMainMenu 完全一致）。
+       TLWFileUpload / TLWDBGrid / TLWDBNavigator / TLWChart / TLWGauge /
+       TLWColorPicker / TLWHTMLFrame / TLWPDFFrame / TLWSideMenu
+       （左侧折叠菜单，非可视，拖到窗体上后双击即开 IDE 原生菜单编辑器，
+       与 TMainMenu 完全一致）。
+
+       面板上只放"能往窗体上拖的控件"。TLWForm / TLWLoginForm 是窗体基类，
+       不进面板 —— 它们由向导生成（新建工程 / 新建文件），没有任何拖放语义。
 
        这些类注册进 IDE 是"带自定义控件的窗体能在设计期打开"的前提 ——
        读 lfm 时按类名 GetClass，IDE 进程里没注册就直接报未知类。
 
-    4. TLWForm 注册为设计期基类
-       FormEditingHook.RegisterDesignerBaseClass —— 这样 TLWForm 的后代
-       才能在设计器里正常打开（与 uniGUI 的 TUniForm 一个道理）。
+    4. TLWForm / TLWLoginForm 注册为设计期基类
+       FormEditingHook.RegisterDesignerBaseClass —— 这样它们的后代才能在
+       设计器里正常打开（与 uniGUI 的 TUniForm 一个道理）。设计期基类
+       注册表正好也是 IDE 解析 lfm 祖先类名时的查找目标
+       （SearchComponentClass -> FindDesignerBaseClassByName），
+       所以拿掉面板注册不会丢祖先解析能力。
 
   注意：TLWForm 是真正的 TForm 后代，不是 uniGUI 那种"影子类"，
   所以不需要设计期代理类（DesignProxy）—— 拖上去的 TButton/TEdit 就是
@@ -537,9 +543,16 @@ end;
 
 procedure Register;
 begin
-  { 1. TLWForm 作为设计期基类：IDE 才会用窗体设计器打开它的后代 }
-  FormEditingHook.RegisterDesignerBaseClass(TLWForm);
+  { 1. 窗体基类：TLWForm / TLWLoginForm 不是"能拖到窗体上"的组件，
+    不进组件面板；只做两件事：
+      - RegisterClass：IDE 读 .lfm 时按类名 GetClass 能找到它们；
+      - RegisterDesignerBaseClass：IDE 才用窗体设计器打开它们的后代，
+        同时这也是解析 lfm 祖先类名（TLWLoginForm 只出现在祖先位置）
+        的查找目标 —— 正是坑 64 里唯一命中过的两条路。 }
   RegisterClass(TLWForm);
+  RegisterClass(TLWLoginForm);
+  FormEditingHook.RegisterDesignerBaseClass(TLWForm);
+  FormEditingHook.RegisterDesignerBaseClass(TLWLoginForm);
 
   { 2. 新建工程向导：两个模板，差别只有 .lpi 的 widgetset 档位。
     注册顺序 = 新建工程对话框里的显示顺序；GUI 档调试最顺手，放前面。 }
@@ -556,20 +569,17 @@ begin
   LWLoginFormDescriptor := TLWLoginFormFileDesc.Create;
   RegisterProjectFileDescriptor(LWLoginFormDescriptor);
 
-  { 4. 组件面板：自己的控件。
+  { 5. 组件面板：只放能拖到窗体上的控件。
     RegisterComponents 内部会 RegisterClass，IDE 读 lfm 因此能找到这些类 ——
     这是"带自定义控件的窗体能在设计期打开"的前提，缺了就报未知类。
     TLWReport 是非可视 TComponent，注册类名但不进面板。
 
-    TLWForm / TLWLoginForm 也必须进面板注册表（SearchComponentClass 只认
-    面板注册的类 / 设计器基类 / 带 lfm 的单元）。登录窗体模板的 lfm 根类
-    是工程单元里的 TLoginForm（IDE 进程里没有这个类），IDE 解析它的祖先
-    TLWLoginForm 时：lwlogin 没有 .lfm、TryFindDeclaration 又只在新单元里
-    找"同名类型定义"（TLWLoginForm 只出现在祖先位置，找不到）——唯一能
-    命中的就是面板注册表。不注册的后果：祖先被错配成 TLWForm，lfm 里
-    的控件全部丢失、设计器不显示（坑 64）。 }
+    窗体基类（TLWForm / TLWLoginForm）不进面板：它们不是"往窗体上拖"的
+    组件，而是向导生成的窗体基类，见上面第 1 段。曾经靠面板注册来顺带
+    解决祖先类名解析（坑 64），现在改为 RegisterDesignerBaseClass ——
+    SearchComponentClass 的查找顺序里，"设计期基类"排在面板注册表之后
+    同样能命中，且不会在面板上多出两个拖不下来的条目。 }
   RegisterComponents(sLWPaletteTab, [
-    TLWForm, TLWLoginForm,
     TLWFileUpload,
     TLWDBGrid, TLWDBNavigator,
     TLWChart, TLWGauge, TLWColorPicker,
@@ -591,12 +601,13 @@ end;
 initialization
   { 组件面板图标：24x24 PNG（icons/*.png），资源名 = 组件类名
     （RegisterComponents 注册的类，IDE 按类名在 LazarusResources 里找
-    'TLWxxx' PNG，找不到才落默认方块）。改图标后用 lazres 重新生成：
+    'TLWxxx' PNG，找不到才落默认方块）。只有进面板的控件才需要图标；
+    TLWForm / TLWLoginForm 已不在面板上，图标也一并去掉了。
+    改图标后用 lazres 重新生成：
       cd icons && python gen_icons.py
-      ../ 下执行：lazres lwdesign_icons.lrs TLWForm.png TLWLoginForm.png
-        TLWFileUpload.png TLWDBGrid.png TLWDBNavigator.png TLWChart.png
-        TLWGauge.png TLWColorPicker.png TLWHTMLFrame.png TLWPDFFrame.png
-        TLWSideMenu.png }
+      ../ 下执行：lazres lwdesign_icons.lrs TLWFileUpload.png TLWDBGrid.png
+        TLWDBNavigator.png TLWChart.png TLWGauge.png TLWColorPicker.png
+        TLWHTMLFrame.png TLWPDFFrame.png TLWSideMenu.png }
   {$I lwdesign_icons.lrs}
 
 end.
