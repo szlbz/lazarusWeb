@@ -25,10 +25,15 @@ uses
   Classes, SysUtils, Forms, Controls, fpjson, lwbase, lwdownload;
 
 type
+  { 浏览器端配色模式（Alpine 渲染层）：跟随系统 / 亮色 / 深色。
+    序列化给前端的名字见 LWThemeToStr（'auto' / 'light' / 'dark'）。 }
+  TLWThemeMode = (twAuto, twLight, twDark);
+
   TLWForm = class(TForm)
   private
     FWebClosing: Boolean;
     FWebVisible: Boolean;
+    FLWTheme: TLWThemeMode;
   protected
     procedure DoClose(var CloseAction: TCloseAction); override;
     { .lfm 加载完后把窗体名还原成设计期名字。
@@ -61,9 +66,28 @@ type
       对应 uniGUI 的 UniSession.AddJS / uniToast；比 ShowMessage 轻：
       不挂起线程、不需要用户点确定。 }
     procedure ShowToast(const AMsg: string; const ATitle: string = '');
+  published
+    { 浏览器端默认配色（Alpine 渲染层）。
+      twAuto（缺省）= 跟随系统；twLight / twDark = 强制亮色 / 深色。
+      用户在前端标题栏点过配色按钮后，以其本机保存的选择为准 ——
+      这里只是"没选过时的默认值"。Ext 渲染层不看这个属性。 }
+    property LWTheme: TLWThemeMode read FLWTheme write FLWTheme default twAuto;
   end;
 
+{ 主题模式 -> 前端认的字符串 }
+function LWThemeToStr(AMode: TLWThemeMode): string;
+
 implementation
+
+function LWThemeToStr(AMode: TLWThemeMode): string;
+begin
+  case AMode of
+    twLight: Result := 'light';
+    twDark: Result := 'dark';
+  else
+    Result := 'auto';
+  end;
+end;
 
 destructor TLWForm.Destroy;
 var

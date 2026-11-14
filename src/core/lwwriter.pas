@@ -1904,6 +1904,10 @@ begin
   o.Add('modalresult', AForm.ModalResult);
   o.Add('fg', ColorToCSS(AForm.Font.Color));
   o.Add('bg', ColorToCSS(AForm.Color));
+  { 浏览器端配色：auto / light / dark（Alpine 渲染层认这个键；
+    Ext 渲染层忽略）。前端只把它当"没选过时的默认值" }
+  if AForm is TLWForm then
+    o.Add('theme', LWThemeToStr(TLWForm(AForm).LWTheme));
   o.Add('font', FontToJSON(AForm.Font));
 
   case AForm.BorderStyle of
