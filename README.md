@@ -723,3 +723,5 @@ Copyright (c) 2026 szlbz(秋风) QQ:315795176
 <img width="1817" height="1179" alt="QQ_2026-11-12_17-18-11" src="https://github.com/user-attachments/assets/8b8df772-352e-43ad-97e9-f559cfc02b66" />
 <img width="1824" height="1173" alt="QQ_2026-11-13_09-15-53" src="https://github.com/user-attachments/assets/90ca9690-cba7-48da-bb30-1cefebaad4d1" />
 <img width="1770" height="1118" alt="QQ_2026-11-14_05-46-50" src="https://github.com/user-attachments/assets/c9a81e47-b5a5-45a1-93a2-fd6443108711" />
+<img width="1638" height="1120" alt="QQ_2026-11-14_10-22-53" src="https://github.com/user-attachments/assets/6569bbb4-c090-455e-80c8-aac0485f5b10" />
+<img width="1646" height="1118" alt="QQ_2026-11-14_10-24-05" src="https://github.com/user-attachments/assets/c172ee7f-9e72-4355-b20e-41c0f11ee99d" />
