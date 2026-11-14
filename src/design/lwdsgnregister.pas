@@ -53,7 +53,7 @@ implementation
 uses
   Classes, SysUtils, TypInfo, Forms, Controls, Dialogs, StdCtrls, LCLType,
   LResources, ProjectIntf, LazIDEIntf, FormEditingIntf, IDEIntf, CompOptsIntf,
-  lwbase, lwform, lwfileupload, lwnewproject, lwlogin,
+  lwbase, lwform, lwfileupload, lwnewproject, lwlogin, lwcaptcha,
   { 下面这些来自 lwserver 包：注册进 IDE 后，带自定义控件的窗体才能
     在设计器里打开（不然读 lfm 报 "unknown class TLWDBGrid"），
     同时也进组件面板，Object Inspector 能直接编辑它们的新属性 }
@@ -355,7 +355,7 @@ end;
 function TLWLoginFormFileDesc.GetInterfaceUsesSection: string;
 begin
   Result := inherited GetInterfaceUsesSection +
-    ', Forms, Controls, StdCtrls, lwform, lwlogin';
+    ', Forms, Controls, StdCtrls, lwform, lwlogin, lwcaptcha';
 end;
 
 { 生成的类：控件字段声明在前（默认 published，lfm 可回填），
@@ -369,17 +369,22 @@ begin
   Result :=
      'type' + LE
     + '  { 登录窗体（TLWLoginForm 子类），新建即用：' + LE
-    + '    - 控件已在模板 lfm 里放好：约定名 edUser / edPass ' + LE
-    + '      基类自动识别；登录/重置按钮直接挂基类的 DoLogin / DoReset；' + LE
+    + '    - 控件已在模板 lfm 里放好：约定名 edUser / edPass / edCode ' + LE
+    + '      基类自动识别；TLWCaptcha 就是图形验证码（点图换一张），' + LE
+    + '      基类会在提交前自动校验；按钮挂基类的 DoLogin / DoReset；' + LE
     + '    - 认证逻辑写在 DoLoginEx（默认演示账号 admin / admin，' + LE
     + '      真实项目改成查数据库 / LDAP / 权限表）。' + LE
-    + '    AfterConstruction 是兜底：字段为空（控件被删）时按同一套坐标补建。 }' + LE
+    + '    界面可以整个删掉重画：一个控件都不剩时，基类 TLWLoginForm' + LE
+    + '    会在 AfterConstruction 里自动补建账号/密码/验证码/按钮。 }' + LE
     + '  T' + ResourceName + ' = class(TLWLoginForm)' + LE
     + '    lblTitle: TLabel;' + LE
     + '    lblUser: TLabel;' + LE
     + '    lblPass: TLabel;' + LE
+    + '    lblCode: TLabel;' + LE
     + '    edUser: TEdit;' + LE
     + '    edPass: TEdit;' + LE
+    + '    edCode: TEdit;' + LE
+    + '    captcha1: TLWCaptcha;' + LE
     + '    btnOk: TButton;' + LE
     + '    btnReset: TButton;' + LE
     + '  public' + LE
@@ -404,7 +409,7 @@ begin
   Result :=
      'object ' + ResourceName + ': T' + ResourceName + LE
     + '  Left = 300' + LE
-    + '  Height = 220' + LE
+    + '  Height = 270' + LE
     + '  Top = 200' + LE
     + '  Width = 390' + LE
     + '  Caption = ''登录''' + LE
@@ -444,10 +449,31 @@ begin
     + '    PasswordChar = ''*''' + LE
     + '    Text = ''''' + LE
     + '  end' + LE
+    + '  object lblCode: TLabel' + LE
+    + '    Left = 24' + LE
+    + '    Height = 18' + LE
+    + '    Top = 142' + LE
+    + '    Width = 60' + LE
+    + '    Caption = ''验证码''' + LE
+    + '  end' + LE
+    + '  object captcha1: TLWCaptcha' + LE
+    + '    Left = 110' + LE
+    + '    Height = 34' + LE
+    + '    Top = 136' + LE
+    + '    Width = 110' + LE
+    + '    CaptchaLength = 4' + LE
+    + '  end' + LE
+    + '  object edCode: TEdit' + LE
+    + '    Left = 230' + LE
+    + '    Height = 26' + LE
+    + '    Top = 140' + LE
+    + '    Width = 130' + LE
+    + '    Text = ''''' + LE
+    + '  end' + LE
     + '  object btnOk: TButton' + LE
     + '    Left = 110' + LE
     + '    Height = 30' + LE
-    + '    Top = 150' + LE
+    + '    Top = 196' + LE
     + '    Width = 110' + LE
     + '    Caption = ''登 录''' + LE
     + '    OnClick = DoLogin' + LE
@@ -455,7 +481,7 @@ begin
     + '  object btnReset: TButton' + LE
     + '    Left = 250' + LE
     + '    Height = 30' + LE
-    + '    Top = 150' + LE
+    + '    Top = 196' + LE
     + '    Width = 110' + LE
     + '    Caption = ''重 置''' + LE
     + '    OnClick = DoReset' + LE
@@ -474,56 +500,12 @@ begin
   Result :=
      '{$R *.lfm}' + LE
     + LE
-    + '{ 按 TLWLoginForm 的约定名补建控件；lfm 里已有同名控件时跳过。 }' + LE
+    + '{ 界面（含图形验证码）已在模板 lfm 里放好，这里只挂认证回调。' + LE
+    + '  万一用户把控件全删了：基类 TLWLoginForm 会在 AfterConstruction' + LE
+    + '  里按同一套坐标自动补建一套（AutoBuildUI=True），仍然可用。 }' + LE
     + 'procedure T' + ResourceName + '.AfterConstruction;' + LE
     + 'begin' + LE
     + '  inherited AfterConstruction;' + LE
-    + '  if edUser <> nil then Exit;  { lfm 已设计过，不再自动补建 }' + LE
-    + LE
-    + '  Caption := ''登录'';' + LE
-    + '  Width := 390;' + LE
-    + '  Height := 220;' + LE
-    + LE
-    + '  lblTitle := TLabel.Create(Self);' + LE
-    + '  lblTitle.Parent := Self;' + LE
-    + '  lblTitle.SetBounds(24, 18, 340, 18);' + LE
-    + '  lblTitle.Caption := ''登录（演示账号 admin / admin）'';' + LE
-    + LE
-    + '  lblUser := TLabel.Create(Self);' + LE
-    + '  lblUser.Parent := Self;' + LE
-    + '  lblUser.SetBounds(24, 62, 60, 18);' + LE
-    + '  lblUser.Caption := ''用户名'';' + LE
-    + LE
-    + '  edUser := TEdit.Create(Self);' + LE
-    + '  edUser.Parent := Self;' + LE
-    + '  edUser.Name := ''edUser'';' + LE
-    + '  edUser.SetBounds(110, 58, 250, 26);' + LE
-    + '  edUser.Text := '''';  { LCL SetName 会把空 Text 填成组件名，必须清掉 }' + LE
-    + LE
-    + '  lblPass := TLabel.Create(Self);' + LE
-    + '  lblPass.Parent := Self;' + LE
-    + '  lblPass.SetBounds(24, 102, 60, 18);' + LE
-    + '  lblPass.Caption := ''密 码'';' + LE
-    + LE
-    + '  edPass := TEdit.Create(Self);' + LE
-    + '  edPass.Parent := Self;' + LE
-    + '  edPass.Name := ''edPass'';' + LE
-    + '  edPass.SetBounds(110, 98, 250, 26);' + LE
-    + '  edPass.PasswordChar := ''*'';' + LE
-    + '  edPass.Text := '''';  { 同上：清掉 SetName 填进来的组件名 }' + LE
-    + LE
-    + '  btnOk := TButton.Create(Self);' + LE
-    + '  btnOk.Parent := Self;' + LE
-    + '  btnOk.SetBounds(110, 150, 110, 30);' + LE
-    + '  btnOk.Caption := ''登 录'';' + LE
-    + '  btnOk.OnClick := @DoLogin;    { 基类 published：读编辑框 -> OnLogin }' + LE
-    + LE
-    + '  btnReset := TButton.Create(Self);' + LE
-    + '  btnReset.Parent := Self;' + LE
-    + '  btnReset.SetBounds(250, 150, 110, 30);' + LE
-    + '  btnReset.Caption := ''重 置'';' + LE
-    + '  btnReset.OnClick := @DoReset; { 基类 published：清空两个编辑框 }' + LE
-    + LE
     + '  OnLogin := @DoLoginEx;' + LE
     + 'end;' + LE
     + LE
@@ -580,6 +562,9 @@ begin
     SearchComponentClass 的查找顺序里，"设计期基类"排在面板注册表之后
     同样能命中，且不会在面板上多出两个拖不下来的条目。 }
   RegisterComponents(sLWPaletteTab, [
+    { 图形验证码：拖到 TLWLoginForm 上即生效（基类自动找到它并校验输入；
+      约定名 edCode 的编辑框当输入框，也可以自己指定 LoginCodeEdit）}
+    TLWCaptcha,
     TLWFileUpload,
     TLWDBGrid, TLWDBNavigator,
     TLWChart, TLWGauge, TLWColorPicker,
