@@ -33,7 +33,7 @@ interface
 uses
   Classes, SysUtils, Math, Forms, Controls, Graphics, StdCtrls, ExtCtrls,
   ComCtrls, DB, DBCtrls, DBGrids, sqldb, sqlite3conn,
-  lwform, lwfileupload, lwupload;
+  lwform, lwfileupload, lwupload, lwdbgrid;
 
 type
 
@@ -109,7 +109,7 @@ type
     tsStat: TTabSheet;
     tsLog: TTabSheet;
     { 数据维护页 }
-    grdMain: TDBGrid;
+    grdMain: TLWDBGrid;
     pnlEdit: TPanel;
     edCode: TDBEdit;
     edName: TDBEdit;
@@ -135,7 +135,7 @@ type
     btnAttachOpen: TButton;
     btnAttachDel: TButton;
     { 统计页 / 日志页 }
-    grdStat: TDBGrid;
+    grdStat: TLWDBGrid;
     lblStatSum: TLabel;
     mmoLog: TMemo;
     sbMain: TStatusBar;
@@ -187,6 +187,20 @@ begin
   inherited Create(TheOwner);
   FSortField := 'id';
   FSortDir := 'ASC';
+  { 两级表头（TLWDBGrid.HeaderGroups）：'标题|起-止'，起/止是按可见列
+    从左数起的下标（0 起、含止）；没写进任何分组的列自己贯通两行。
+    grdMain 的"备注"列 Visible=False，不占列号 —— 所以这里只分到 5，
+    最后的"更新时间"（可见列 6）留作不分组的样例。
+    lfm 里这两个网格写的是 TLWDBGrid —— FPC 的 GetClass 只认精确类名，
+    RegisterClassAlias 在 lfm 加载路径上不生效（同 TLWDBNavigator）。 }
+  with grdMain.HeaderGroups do
+  begin
+    Add('基本信息|0-2');
+    Add('价格与库存|3-5');
+  end;
+  { 统计页：只有"统计指标"三列成组，分类列单独贯通 —— 顺带演示
+    部分列分组、部分列不分组的混排 }
+  grdStat.HeaderGroups.Add('统计指标|1-3');
   { 控件由 uDbMain.lfm 在 inherited Create 里就建好了（设计期布局）。
     这里只做两件事：开库、把控件和数据集接上。
     DataSource 不能写进 lfm —— 它要到 SetupData 里才创建。 }
