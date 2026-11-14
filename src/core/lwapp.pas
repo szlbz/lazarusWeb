@@ -138,6 +138,11 @@ begin
   try
     AForm := cls.Create(nil);
     AForm.Name := LWStripUniqSuffix(AForm.Name);
+    { 没有 lfm 的窗体（纯代码建窗 / TLWLoginForm 基类直接当登录窗体用）
+      建出来 Name 是空串 —— 而 TLWForm.SetVisible 靠 Name<>'' 来区分
+      "网页窗体"和"LCL 装载期"，空名字会让 Hide/Show 落到 nogui 的
+      inherited 路径（不生效）。名字就是注册名，正好。 }
+    if AForm.Name = '' then AForm.Name := AName;
   finally
     LWLCLLeave;
   end;

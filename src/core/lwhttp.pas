@@ -43,7 +43,7 @@ interface
 uses
   Classes, SysUtils, DateUtils, fphttpserver, httpdefs, httpprotocol, fpjson, jsonparser,
   ssockets, Sockets, Forms, Controls, lwbase, lwsession, lwdispatch, lwform, lwupload, lwdownload,
-  lwajax, lwwebsocket, lwrlog;
+  lwajax, lwwebsocket, lwrlog, lwcaptcha;
 
 type
   TLWServerConfig = record
@@ -173,6 +173,9 @@ type
     procedure ApiAjax(var ARequest: TFPHTTPConnectionRequest; var AResponse: TFPHTTPConnectionResponse);
     { 负载均衡健康检查：/lw/healthz }
     procedure ApiHealth(var AResponse: TFPHTTPConnectionResponse);
+    { 图形验证码图片：/lw/api/captcha?k=<令牌>&v=<版本>&n&w&h[&r=<时间戳>]
+      带 r 表示"换一张"（浏览器端点图刷新），会强制重新生成答案 }
+    procedure ApiCaptcha(var ARequest: TFPHTTPConnectionRequest; var AResponse: TFPHTTPConnectionResponse);
     { 跨页签会话共享：新页签挂到已有 sid 上（不新建会话）}
     procedure ApiAttach(var ARequest: TFPHTTPConnectionRequest; var AResponse: TFPHTTPConnectionResponse);
     { 会话标识（?sid= 或 X-LW-Sid 头）；找不到返回 '' }
@@ -1758,6 +1761,53 @@ begin
   end;
 end;
 
+{ 图形验证码图片。
+
+  URL 由 lwwriter 按控件状态生成：k=令牌 v=版本 n=字符数 w/h=像素尺寸。
+  浏览器端"点图刷新"只是在 URL 后追加 &r=<时间戳>，服务端看到 r 就
+  强制换一个新答案 —— 刷新不占会话执行锁，也不需要一次事件往返。
+
+  缓存策略必须 no-store：同一 URL 在"页签重绘 / 补丁重建 img"时会被
+  再次请求，若命中缓存倒也无妨（同一令牌本来就复用同一答案），但
+  换图后浏览器若拿旧缓存就会"点了没反应"，所以干脆一律不缓存。 }
+procedure TLWServer.ApiCaptcha(var ARequest: TFPHTTPConnectionRequest;
+  var AResponse: TFPHTTPConnectionResponse);
+var
+  token, force: string;
+  n, w, h: Integer;
+  png: TMemoryStream;
+begin
+  token := QueryP(ARequest, 'k', '');
+  force := QueryP(ARequest, 'r', '');
+  n := StrToIntDef(QueryP(ARequest, 'n', '4'), 4);
+  w := StrToIntDef(QueryP(ARequest, 'w', '110'), 110);
+  h := StrToIntDef(QueryP(ARequest, 'h', '34'), 34);
+  if token = '' then
+  begin
+    Reply('missing token', 'text/plain; charset=utf-8', 400, AResponse);
+    Exit;
+  end;
+  png := TMemoryStream.Create;
+  try
+    LWCaptchaPng(token, n, w, h, force <> '', png);
+    png.Position := 0;
+    AResponse.Code := 200;
+    {$IF FPC_FULLVERSION >= 30301}
+    AResponse.CodeText := GetHTTPStatusText(200);
+    {$ELSE}
+    AResponse.CodeText := LWHTTPStatusText(200);
+    {$ENDIF}
+    AResponse.ContentType := 'image/png';
+    AResponse.SetCustomHeader('Cache-Control', 'no-store, no-cache, must-revalidate');
+    AResponse.SetCustomHeader('Pragma', 'no-cache');
+    AResponse.ContentStream := png;
+    AResponse.FreeContentStream := True;
+    png := nil;   { 所有权交给响应对象，finally 里不能再释放 }
+  finally
+    png.Free;
+  end;
+end;
+
 { 自定义 AJAX 端点。
   约定：/lw/ajax/<名字>，名字里允许 '/'；GET/POST/PUT/DELETE 都收；
   响应格式由处理器决定（默认 JSON）。第三方 JS 只需要知道 URL。 }
@@ -1919,6 +1969,14 @@ begin
   if (p = '/lw/healthz') or (p = '/lw/health') then
   begin
     ApiHealth(AResponse);
+    Exit;
+  end;
+
+  { 图形验证码图片。不走会话：令牌本身就是"哪一张图"的凭证，
+    放在静态资源判断之前，免得被当成未知路径 }
+  if p = '/lw/api/captcha' then
+  begin
+    ApiCaptcha(ARequest, AResponse);
     Exit;
   end;
 

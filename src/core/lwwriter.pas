@@ -32,7 +32,7 @@ uses
   Classes, SysUtils, Variants, Graphics, Controls, Forms, StdCtrls, ExtCtrls, ComCtrls,
   Grids, Menus, Buttons, MaskEdit, Spin, CheckLst, ValEdit, TypInfo, LCLProc, fpjson,
   EditBtn, GroupedEdit, DB, DBCtrls, DBGrids, lwbase, lwform, lwfileupload, lwdbnav, lwweb,
-  lwchart, lwdbgrid, lwui, lwrlog, lwsidemenu;
+  lwchart, lwdbgrid, lwui, lwrlog, lwsidemenu, lwcaptcha;
 
 type
   TLWWriter = class
@@ -49,6 +49,7 @@ type
     function BitmapDataURI(B: TBitmap): string;
     function FindSideMenu(AForm: TCustomForm): TLWSideMenu;
     function StatusPanels(SB: TStatusBar): TJSONArray;
+    function StatusInfo(SB: TStatusBar; AForm: TCustomForm): TJSONObject;
     procedure WriteKindProps(C: TControl; const AKind: string; O: TJSONObject);
     procedure WriteKindPropsBody(C: TControl; const AKind: string; O: TJSONObject);
     function MakeBase(C: TControl; const AKind: string): TJSONObject;
@@ -202,6 +203,9 @@ begin
     落进 listbox、TValueListEditor 会落进 grid —— 必须先判。
     TLWHTMLFrame/TLWPDFFrame/TLWChart 是 TCustomPanel 后代，也必须先判；
     TDateEdit 族是 TCustomEditButton（TCustomEdit）后代，也要先判 }
+  { TLWCaptcha 是 TGraphicControl 后代：必须排在所有标准控件判断之前，
+    否则会落到 unknown 占位框 }
+  else if C is TLWCaptcha then Result := 'captcha'
   else if C is TLWHTMLFrame then Result := 'htmlframe'
   else if C is TLWPDFFrame then Result := 'pdfframe'
   else if C is TLWChart then Result := 'chart'
@@ -1089,6 +1093,54 @@ begin
     JArrAddStr(Result, SB.Panels[i].Text);
 end;
 
+{ 状态栏的"长相"（分格宽度/对齐/边框、高度、SimpleText）。
+
+  以前只发 Panels[i].Text（status 数组），浏览器端只能猜样式：高度写死
+  24px、每格宽度按内容自适应 —— 于是 LFM 里 `Height=34 / Panels 各 600、
+  450` 的状态栏到了网页上变成一条 24px 的空条，里面只有两个贴着左边的
+  小方块（空文本 + 1px 分隔线 = 21px），和桌面端差得远。这里把布局参数
+  一起发过去，前端按 LCL 的规则画。
+
+  文本仍走 status 数组（保持兼容 + 补丁只比这两个键），这里只发结构。 }
+function TLWWriter.StatusInfo(SB: TStatusBar; AForm: TCustomForm): TJSONObject;
+var
+  i: Integer;
+  arr: TJSONArray;
+  p: TStatusPanel;
+  po: TJSONObject;
+  h: Integer;
+begin
+  Result := TJSONObject.Create;
+  { 高度要按窗体自己的 DPI 比例折一下。
+
+    LCL 加载 LFM 时会按 DesignTimePPI / 当前 PPI 缩放窗体和子控件（multi
+    的设计尺寸 1230x840 @144PPI 在 96PPI 下变成 820x560，Panels 600/450
+    也变成 400/300）。但 TStatusBar 是 AutoSize 控件，ShouldAutoAdjust 对它
+    返回 False，Height 就留在设计值上（34）—— 与其它已经缩放的坐标不在
+    同一把尺子上，照它画会把底部内容切掉。这里按同一比例折算，和子控件
+    对齐（面板宽度不用折：LCL 已经替我们折过了）。 }
+  h := SB.Height;
+  if (AForm <> nil) and (AForm.DesignTimePPI > 0) and (AForm.PixelsPerInch > 0) and
+     (AForm.DesignTimePPI <> AForm.PixelsPerInch) then
+    h := Round(h * AForm.PixelsPerInch / AForm.DesignTimePPI);
+  if h < 8 then h := SB.Height;
+  Result.Add('h', h);
+  Result.Add('simple', SB.SimplePanel);
+  Result.Add('simpletext', SB.SimpleText);
+  Result.Add('sizegrip', SB.SizeGrip and SB.SizeGripEnabled);
+  arr := TJSONArray.Create;
+  for i := 0 to SB.Panels.Count - 1 do
+  begin
+    p := SB.Panels[i];
+    po := TJSONObject.Create;
+    po.Add('w', p.Width);
+    po.Add('al', Ord(p.Alignment));   { 0 左 / 1 右 / 2 居中 }
+    po.Add('bev', Ord(p.Bevel));      { 0 无 / 1 下凹 / 2 上凸 }
+    arr.Add(po);
+  end;
+  Result.Add('panels', arr);
+end;
+
 function TLWWriter.TreeNodeJson(N: TTreeNode): TJSONObject;
 var
   o: TJSONObject;
@@ -1544,6 +1596,17 @@ begin
   end
   else if AKind = 'image' then
     WriteImage(TImage(C), O)
+  else if AKind = 'captcha' then
+  begin
+    { 图形验证码：src 就是浏览器要拉的那张 PNG 的地址。
+      令牌 = 哪一张图，版本 = 第几次换图 —— 版本号不变时补丁不会重设
+      src，浏览器不会白拉一张新图（用户已经看清的码不会中途失效）。 }
+    O.Add('src', '/lw/api/captcha?k=' + TLWCaptcha(C).Token +
+      '&v=' + IntToStr(TLWCaptcha(C).Version) +
+      '&n=' + IntToStr(TLWCaptcha(C).CaptchaLength) +
+      '&w=' + IntToStr(C.Width) + '&h=' + IntToStr(C.Height));
+    O.Add('captchalen', TLWCaptcha(C).CaptchaLength);
+  end
   else if AKind = 'panel' then
   begin
     O.Add('bevel', Ord(TPanel(C).BevelOuter));
@@ -1961,7 +2024,10 @@ begin
     end;
   end;
   if sb <> nil then
-    o.Add('status', StatusPanels(sb))
+  begin
+    o.Add('status', StatusPanels(sb));
+    o.Add('sb', StatusInfo(sb, AForm));
+  end
   else
     o.Add('status', TJSONArray.Create);
 
