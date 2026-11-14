@@ -7,7 +7,7 @@
     <License Value="LGPL"/>
     <Description Value="lazarusWeb 核心：TLWForm / 上传控件 / 下载令牌 / 工程模板（不依赖任何 widgetset）"/>
     <Version Major="1" Minor="0"/>
-    <Files Count="6">
+    <Files Count="7">
       <Item1>
         <Filename Value="core/lwbase.pas"/>
         <UnitName Value="lwbase"/>
@@ -32,15 +32,22 @@
         <Filename Value="core/lwdlg.pas"/>
         <UnitName Value="lwdlg"/>
       </Item6>
+      <Item7>
+        <Filename Value="core/lwcaptcha.pas"/>
+        <UnitName Value="lwcaptcha"/>
+      </Item7>
     </Files>
     <CompatibilityMode Value="True"/>
-    <RequiredPkgs Count="2">
+    <RequiredPkgs Count="3">
       <Item1>
         <PackageName Value="LCL"/>
       </Item1>
       <Item2>
         <PackageName Value="FCL"/>
       </Item2>
+      <Item3>
+        <PackageName Value="fcl-image"/>
+      </Item3>
     </RequiredPkgs>
     <UsageOptions>
       <UnitPath Value="$(PkgOutDir)"/>

@@ -8,7 +8,7 @@ unit lwcore;
 interface
 
 uses
-  lwbase, lwform, lwfileupload, lwdownload, lwnewproject, lwdlg, 
+  lwbase, lwform, lwfileupload, lwdownload, lwnewproject, lwdlg, lwcaptcha, 
   LazarusPackageIntf;
 
 implementation
