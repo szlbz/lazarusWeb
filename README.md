@@ -2,7 +2,6 @@
 
 Lazarus 桌面程序的 Web 化运行时 —— 参考 uniGUI 的思路，但用**真实的 LCL 控件树**直接序列化成 Ext JS 界面。业务程序只需要把窗体基类从 `TForm` 改成 `TLWForm`，其余代码（事件、属性、`.lfm`）原样保留，就能以服务程序的形式跑在浏览器里。
 
-```
 浏览器 (Ext JS 7.0.0 或 Alpine.js) 服务端 (Lazarus, nogui widgetset)
 | 浏览器端 (Ext JS 7.0.0 或 Alpine.js) | 通信 | 服务端 (Lazarus, nogui widgetset) |
 | :--- | :---: | :--- |
