@@ -1114,6 +1114,24 @@ var LW = (function () {
                 cfg.src = node.src || Ext.BLANK_IMAGE_URL;
                 return addTo(Ext.create('Ext.Img', cfg), ct);
 
+            case 'captcha': {
+                /* 图形验证码（TLWCaptcha）：服务端 /lw/api/captcha 现画的 PNG。
+                   点一下换一张 —— 只改 URL 的 &r=<时间戳>，服务端见到 r
+                   就重新生成答案，不需要一次事件往返 */
+                cfg.src = node.src || Ext.BLANK_IMAGE_URL;
+                c = addTo(Ext.create('Ext.Img', cfg), ct);
+                try {
+                    c.getEl().setStyle('cursor', 'pointer');
+                    c.getEl().on('click', function () {
+                        var s = String((c.getSrc && c.getSrc()) || c.src || '');
+                        var i = s.indexOf('&r=');
+                        if (i >= 0) s = s.slice(0, i);
+                        c.setSrc(s + '&r=' + Date.now());
+                    });
+                } catch (e) { }
+                return c;
+            }
+
             case 'htmlframe':
                 /* TLWHTMLFrame（uniHTMLFrame 对应物）：面板里渲染一段任意 HTML。
                    内容是业务代码给的，视作可信内容原样交给 ext 的 html 配置 */
@@ -1694,18 +1712,19 @@ var LW = (function () {
         /* TPageControl.OnChange：服务端业务经常挂在页签切换上
            （gallery 的 pcMainChange 就靠它回显），之前一直没绑。
            索引按控件 id 建表查——直接 indexOf(children) 在补丁轮次后
-           会失配（children 每次都是新对象），结果永远回 0。 */
-        if ((node.ev || []).indexOf('OnChange') >= 0) {
-            var tabIndex = {};
-            (node.children || []).forEach(function (ch, i) { tabIndex[ch.id] = i; });
-            tabs.on('tabchange', function (tp, newCard) {
-                /* 服务端改 ActivePage 引发的同步不回调，否则两边乒乓 */
-                if (tabs.__lwSilentTab) return;
-                if (!newCard || !newCard.__lwNode) return;
-                var idx = tabIndex[newCard.__lwNode.id];
-                fire(node, 'OnChange', { val: String(idx == null ? 0 : idx) });
-            });
-        }
+           会失配（children 每次都是新对象），结果永远回 0。
+           无条件回发：服务端 LWApplyValue 先把 ActivePage 切过去，没挂
+           handler 时 RTTI 调用是空操作；不回发则服务端停在第 0 页，
+           下次整树重下/重连会把页签弹回第一页（同 alpine 层）。 */
+        var tabIndex = {};
+        (node.children || []).forEach(function (ch, i) { tabIndex[ch.id] = i; });
+        tabs.on('tabchange', function (tp, newCard) {
+            /* 服务端改 ActivePage 引发的同步不回调，否则两边乒乓 */
+            if (tabs.__lwSilentTab) return;
+            if (!newCard || !newCard.__lwNode) return;
+            var idx = tabIndex[newCard.__lwNode.id];
+            fire(node, 'OnChange', { val: String(idx == null ? 0 : idx) });
+        });
         /* Crisp 主题下，标签条如果在宿主还没完成布局时测量会得到 0 高，
            表现为标签文字被拦腰裁掉。渲染后强制再排一次。 */
         tabs.on('afterrender', function () {
@@ -1802,6 +1821,48 @@ var LW = (function () {
         });
     }
 
+    /* ---------------- 状态栏 ----------------
+
+       LCL 的 TStatusBar 是"分格栏"：每格有宽度、对齐、边框，最后一格延到
+       右边缘，高度由 Height 决定。服务端把结构发在 f.sb 里（文本仍在
+       f.status）。缺 f.sb 的老服务端按 24px + 文本自适应兜底。 */
+
+    function statusH(f) {
+        if (f.sb && f.sb.h > 0) return f.sb.h;
+        return 24;
+    }
+
+    function statusItems(f) {
+        if (!f.sb) {
+            if (!(f.status && f.status.length)) return null;
+            return f.status.map(function (t) { return { xtype: 'tbtext', text: esc(t) }; });
+        }
+        var texts = f.status || [];
+        var mk = function (html, align, border, last, w) {
+            var style = 'padding:0 10px;overflow:hidden;white-space:nowrap;' +
+                'text-overflow:ellipsis;text-align:' + align + ';' +
+                (border ? 'border-right:1px solid #c8ccd4;' : '');
+            /* Toolbar 默认给每个 item 加外边距，会把分格挤开（400 的格子
+               实际占 408），状态栏必须是无缝的，这里显式清零 */
+            var it = { xtype: 'component', html: html, style: style, margin: 0 };
+            if (last) it.flex = 1;
+            else if (w > 0) it.width = w;
+            return it;
+        };
+        if (f.sb.simple)
+            return [mk(esc(f.sb.simpletext || ''), 'left', false, true, 0)];
+        var panels = f.sb.panels || [];
+        var n = Math.max(panels.length, texts.length);
+        var out = [];
+        for (var i = 0; i < n; i++) {
+            var p = panels[i] || {};
+            out.push(mk(esc(texts[i] == null ? '' : String(texts[i])),
+                p.al === 1 ? 'right' : (p.al === 2 ? 'center' : 'left'),
+                p.bev !== 0 && i !== n - 1, i === n - 1, parseInt(p.w, 10) || 0));
+        }
+        return n ? out : [{ xtype: 'component', flex: 1, html: '' }];
+    }
+
     function buildForm(f) {
         var win = S.forms[f.id];
         if (win) return win;
@@ -1847,14 +1908,19 @@ var LW = (function () {
 
         /* 状态栏：不要 dock 到窗口底部 —— dock 会把 body 压矮，
            而 LCL 的坐标是相对整个客户区（含状态栏区域）的，
-           铺在底部就与 LCL 坐标一致了 */
-        var sbH = 24;
-        if (f.status && f.status.length) {
+           铺在底部就与 LCL 坐标一致了。
+
+           高度/分格宽度来自 LFM 的 TStatusBar（f.sb）：以前写死 24px、
+           每格按文本自适应，空文本的 Panels（multi 就是两格空文本）会
+           缩成两个贴着左边的小方块，与桌面端差很远。 */
+        var sbH = statusH(f);
+        var sbItems = statusItems(f);
+        if (sbItems) {
             var sb = Ext.create('Ext.toolbar.Toolbar', {
                 x: 0, y: Math.max(0, (f.ch || f.h || 0) - sbH),
                 width: f.w || 300, height: sbH,
-                border: false,
-                items: f.status.map(function (t) { return { xtype: 'tbtext', text: esc(t) }; })
+                border: false, padding: 0,
+                items: sbItems
             });
             win.add(sb);
             win.__lwStatus = sb;
@@ -2157,7 +2223,7 @@ var LW = (function () {
                         try { cmp.getEl().applyStyles(spx); } catch (e) { }
                     }
                 }
-            } else if (n.kind === 'image' || n.kind === 'dbimage') {
+            } else if (n.kind === 'image' || n.kind === 'dbimage' || n.kind === 'captcha') {
                 if (prev.src !== n.src && n.src) cmp.setSrc(n.src);
             } else if (n.kind === 'htmlframe') {
                 /* HTML 内容变了才替换，避免打掉 iframe / 选中状态 */
@@ -2416,19 +2482,20 @@ var LW = (function () {
             seen[f.id] = true;
             var win = S.forms[f.id];
             if (!win) { buildForm(f); return; }
-            var prevStatus = (win.__lwForm || {}).status;
+            var prevF = win.__lwForm || {};
             win.__lwForm = f;
             try {
                 if (win.title !== f.caption) win.setTitle(esc(f.caption || f.name));
             } catch (e) { }
-            /* 状态栏文本（服务端改 Panels[i].Text 后跟着变） */
-            if (win.__lwStatus && f.status &&
-                JSON.stringify(prevStatus || []) !== JSON.stringify(f.status)) {
+            /* 状态栏文本/分格（服务端改 Panels[i].Text 后跟着变）。
+               分格是 component 而不是 tbtext，改文本靠整体重灌 items ——
+               宽度/对齐也跟着新结构走，不会留下旧格子 */
+            if (win.__lwStatus &&
+                (JSON.stringify(prevF.status || []) !== JSON.stringify(f.status || []) ||
+                 JSON.stringify(prevF.sb || null) !== JSON.stringify(f.sb || null))) {
                 try {
-                    var its = win.__lwStatus.items.getRange();
-                    f.status.forEach(function (t, i) {
-                        if (its[i]) its[i].setText(esc(t == null ? '' : String(t)));
-                    });
+                    win.__lwStatus.removeAll();
+                    win.__lwStatus.add(statusItems(f) || []);
                 } catch (e) { }
             }
             syncChildren(win, f);
@@ -2818,23 +2885,83 @@ var LW = (function () {
 
     var booting = false;
 
-    /* ---- 跨页签会话共享 ----
-       sid 存在 localStorage 里，同一浏览器的第二个标签页直接"挂"上去，
-       共享同一份服务端会话（登录身份、打开的窗体、数据游标全都在服务端）。
-       会话没了（服务重启 / 空闲超时清理）服务端回 410，这时才新建。 */
-    var SID_KEY = 'lw.sid';
+    /* ---- 会话归属：一个页签一个会话（sessionStorage） ----
+       sid 存 sessionStorage：关掉这个标签页它就没了，下次打开必须重新登录
+       （"关标签页即退出"，与桌面程序"关窗口 = 退出"一致）；刷新还在同一个
+       页签里，所以刷新不掉登录。放 cookie 是"浏览器级"共享 —— 关页签不掉、
+       放 localStorage 更糟（关浏览器都不掉）。
+       多个页签各自独立会话；要跨页签/跨重启保持，页面里设
+       localStorage['lw.persist']='1'（"记住我"）。与 lw-alpine.js 同语义。 */
+    var SID_KEY = 'lw.sid';         /* sessionStorage 一份；"记住我"额外存 localStorage */
+    var PERSIST_KEY = 'lw.persist';
+
+    /* ---- "关过窗口"的墓碑 ----
+       浏览器"启动时恢复上次打开的网页"会把 sessionStorage 连同 sid 一起还原，
+       于是"关浏览器再打开"又直接进主页面。pagehide 时留个时间戳：刷新（几十
+       毫秒后就来）不算关过，隔了 3 秒以上才回来的页签不认旧 sid。 */
+    var BYE_KEY = 'lw.bye';
+    var BYE_GRACE_MS = 3000;
+
+    try {
+        window.addEventListener('pagehide', function (ev) {
+            if (ev && ev.persisted) return;
+            try { sessionStorage.setItem(BYE_KEY, String(Date.now())); } catch (e) { }
+        });
+    } catch (e) { }
+
+    function tabWasClosed() {
+        var t = 0;
+        try {
+            t = parseInt(sessionStorage.getItem(BYE_KEY) || '0', 10) || 0;
+            sessionStorage.removeItem(BYE_KEY);
+        } catch (e) { return false; }
+        if (!t) return false;
+        /* 用 performance.timeOrigin（本次导航开始的时刻）而不是 Date.now()：
+           差的只是"上次卸载 -> 这次导航开始"的空档，页面本身加载多久不算进来，
+           所以服务器慢、页面重也不至于把刷新误判成"关过窗口" */
+        var navStart = (window.performance && performance.timeOrigin)
+            ? performance.timeOrigin : Date.now();
+        return (navStart - t) > BYE_GRACE_MS;
+    }
+
+    function persisted() {
+        try { return localStorage.getItem(PERSIST_KEY) === '1'; } catch (e) { return false; }
+    }
+
+    /* 清掉老版本遗留的会话 cookie：留着会让"关页签即退出"失效 */
+    function dropLegacySidCookie() {
+        try {
+            var name = 'lw_sid_' + (location.port ||
+                (location.protocol === 'https:' ? '443' : '80'));
+            document.cookie = name + '=; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT; SameSite=Lax';
+        } catch (e) { }
+    }
 
     function rememberSid(sid) {
-        try { if (sid) localStorage.setItem(SID_KEY, sid); } catch (e) { }
+        if (!sid) return;
+        try { sessionStorage.setItem(SID_KEY, sid); } catch (e) { }
+        try { if (persisted()) localStorage.setItem(SID_KEY, sid); } catch (e) { }
     }
 
     function forgetSid() {
+        try { sessionStorage.removeItem(SID_KEY); } catch (e) { }
         try { localStorage.removeItem(SID_KEY); } catch (e) { }
     }
 
     function savedSid() {
+        /* 墓碑先吃掉，别留到下次 */
+        var closed = tabWasClosed();
         /* ?fresh=1 强制开新会话（调试/多人共用一个浏览器时用） */
         if (/[?&]fresh=1/.test(location.search)) return '';
+        try {
+            var sid = sessionStorage.getItem(SID_KEY);
+            if (sid && closed) {   /* 被浏览器还原的旧页签：这份 sid 作废 */
+                sessionStorage.removeItem(SID_KEY);
+                sid = '';
+            }
+            if (sid) return sid;
+        } catch (e) { }
+        if (!persisted()) return '';
         try { return localStorage.getItem(SID_KEY) || ''; } catch (e) { return ''; }
     }
 
@@ -2896,6 +3023,7 @@ var LW = (function () {
         if (booting) return;
         booting = true;
         var cfg = window.LW_CFG || {};
+        dropLegacySidCookie();
         /* 页签标识存 sessionStorage：刷新后还是同一个"页签"（挂起对话框
            的 cmd.to 才能对上），新开标签页自然是新标识 */
         if (!S.tab) {

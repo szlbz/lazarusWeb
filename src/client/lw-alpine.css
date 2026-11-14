@@ -67,6 +67,8 @@
     --lw-track: #dbe3ec;           /* 转圈轨道 / 进度槽 */
     --lw-track2: #e3e8ee;          /* 进度槽 / 图表网格 */
     --lw-mask: rgba(255, 255, 255, .55);
+    /* 验证码图片滤镜：亮色原样，深色反相成"深底浅字" */
+    --lw-captcha-filter: none;
 
     /* 左侧折叠菜单（TLWSideMenu）：亮色下是浅灰蓝面板 */
     --lw-sm-bg: #eef2f7;
@@ -137,6 +139,8 @@ html[data-lw-theme="dark"] {
     --lw-track: #333d48;
     --lw-track2: #333d48;
     --lw-mask: rgba(0, 0, 0, .55);
+    /* 服务端只画浅底版验证码，深色主题靠反相达到同一观感 */
+    --lw-captcha-filter: invert(.92) hue-rotate(180deg) saturate(.85);
 
     /* 左侧折叠菜单：深色下维持原来的深蓝面板 */
     --lw-sm-bg: #2c3947;
@@ -358,9 +362,14 @@ html, body {
 .lw-win {
     position: absolute;
     background: var(--lw-win-bg);
-    border: 1px solid var(--lw-border-strong);
+    /* 边框用 inset 阴影画，不占盒模型空间。
+       LCL 里窗体的 Width 就等于 ClientWidth（nogui 无边框），子控件坐标是
+       相对整宽算的；如果用 border 吃掉左右各 1px，客户区就比 LCL 少 2px，
+      `Align=alNone` 的容器（multi 的 pcMain 宽 820）会溢出 2px，逼出横向
+       滚动条，还顶得状态栏对不齐。box-sizing 已 border-box，去掉 border 后
+       820 就是内容宽 = LCL 的 ClientWidth。 */
+    box-shadow: inset 0 0 0 1px var(--lw-border-strong), 0 8px 30px rgba(0, 0, 0, .25);
     border-radius: 5px;
-    box-shadow: 0 8px 30px rgba(0, 0, 0, .25);
     box-sizing: border-box;
     display: flex;
     flex-direction: column;
@@ -436,6 +445,14 @@ html, body {
 .lw-statusbar {
     position: absolute;
     left: 0;
+    /* 贴窗体客户区最底边：body 是 .lw-win 里 flex:1 的最后一个元素，
+       它的底边就是客户区底边。不用 JS 算 top —— body 出现横向滚动条时
+       clientHeight 会少 15px，算出来会悬空一条 */
+    bottom: 0;
+    /* 高度由 LFM 的 TStatusBar.Height 决定（服务端 f.sb.h 写到内联样式）；
+       这里给的是没有该键时的兜底。box-sizing 让 border-top 算在高度里，
+       否则会比 LCL 的客户区多出 1px，正好压到窗体底边 */
+    box-sizing: border-box;
     height: 24px;
     line-height: 24px;
     background: var(--lw-surface3);
@@ -446,10 +463,17 @@ html, body {
     z-index: 5;
 }
 .lw-status-item {
+    /* 分格宽度用 flex-basis 定死，padding/border 必须算在宽度里，
+       否则每格会胖 21px（LCL 的 Panels[i].Width 是含边框的整格宽） */
+    box-sizing: border-box;
     padding: 0 10px;
     font-size: 12px;
     color: var(--lw-fg3);
     white-space: nowrap;
+    /* 分格宽度是 LFM 里定死的（Panels[i].Width），文本超出要裁掉而不是
+       把格子撑开 */
+    overflow: hidden;
+    text-overflow: ellipsis;
     border-right: 1px solid var(--lw-border2);
 }
 .lw-menubar {
@@ -897,6 +921,19 @@ html, body {
 
 /* ---------- 图形 / 帧 ---------- */
 .lw-img { max-width: 100%; max-height: 100%; }
+/* 图形验证码（TLWCaptcha）：服务端现画的 PNG，铺满控件矩形，点一下换一张。
+   深色主题不做第二张图 —— 用 filter 反相就够了，省一次请求也省一套配色 */
+.lw-captcha {
+    display: block;
+    width: 100%;
+    height: 100%;
+    border-radius: 6px;
+    cursor: pointer;
+    user-select: none;
+    -webkit-user-drag: none;
+    filter: var(--lw-captcha-filter);
+}
+.lw-captcha:hover { box-shadow: 0 0 0 2px var(--lw-accent-dim); }
 .lw-htmlframe, .lw-pdfframe {
     width: 100%;
     height: 100%;

@@ -226,6 +226,18 @@ var LW = (function () {
         return !!(evs && evs.indexOf(ev) >= 0);
     };
 
+    /* 图形验证码：点图换一张。
+       只改 img 的 src（在基础 URL 后追加 &r=时间戳），服务端见到 r 就
+       重新生成答案；不走事件、不占会话执行锁、零往返等待。
+       刻意不写 r.src —— 响应式变量留给服务端 Refresh 发起的版本号变化，
+       否则一次点击会同时触发"前端换图"和"补丁重设 src"，白白多拉一张。 */
+    window.$lwCaptchaTap = function (el) {
+        var s = String(el.getAttribute('src') || '');
+        var i = s.indexOf('&r=');
+        if (i >= 0) s = s.slice(0, i);
+        el.setAttribute('src', s + '&r=' + Date.now());
+    };
+
     /* TComboBox 自绘下拉：展开时按输入框矩形算 fixed 坐标。
        页签卡片 / 滚动区都会裁绝对定位，只有 fixed 能盖出去；
        下方放不下就翻到上方，再不行贴边（下拉项多时最多显示 10 行再滚）。 */
@@ -874,9 +886,32 @@ var LW = (function () {
         var r = S.R[id] || (S.ND[id] ? stateOf(S.ND[id]) : null);
         if (!r || r.active === i) return;
         r.active = i;
+        /* 页签条是静态 innerHTML（没有 Alpine 绑定），点了不会自己重画：
+           以前只切了卡片，出现"内容换到新页、高亮还停在旧页签"（坑 133）。
+           ND 里的 active 也一并改，这样后续补丁能据此判断要不要重建页签条 */
+        if (S.ND[id]) S.ND[id].active = i;
+        paintTabbar(id, i);
         applyTabActive(id, i);
-        if ($lwHas(id, 'OnChange')) fire(id, 'OnChange', { val: String(i) });
+        /* OnChange 无条件回发：服务端 LWApplyValue 会先把 ActivePage 切过去，
+           没挂 handler 时 RTTI 调用是空操作。不回发的话服务端 ActivePage
+           停在第 0 页，之后任何一次重下树/重连都会把页签弹回第一页 */
+        fire(id, 'OnChange', { val: String(i) });
     };
+
+    /* 页签条高亮：只切 class，不重建 DOM（避免点击时页签条闪一下）。
+       tabs 用 lw-tabbar-<id>，tabctl 用 lw-tabbar2-<id>，两边共用。 */
+    function paintTabbar(id, active) {
+        var ids = ['lw-tabbar-' + id, 'lw-tabbar2-' + id];
+        for (var k = 0; k < ids.length; k++) {
+            var bar = document.getElementById(ids[k]);
+            if (!bar) continue;
+            var tabs = bar.querySelectorAll('.lw-tab');
+            for (var i = 0; i < tabs.length; i++) {
+                if (i === active) tabs[i].classList.add('lw-active');
+                else tabs[i].classList.remove('lw-active');
+            }
+        }
+    }
 
     /* 把卡片可见性同步到 active（服务端改 ActivePage / 用户点标签共用） */
     function applyTabActive(id, active) {
@@ -931,10 +966,18 @@ var LW = (function () {
         var fs = fieldStyleOf(node);
 
         switch (k) {
-            case 'label':
-                return '<div class="lw-label" style="white-space:' + (node.wordwrap ? 'normal' : 'nowrap') +
+            case 'label': {
+                /* 宽度不到一个汉字（<16px）的 label 不可能真的"折行排版"。
+                   这种窗体在 LCL 里多半是设计期 Width 留成 1 忘了改（或从
+                   代码建窗的老写法搬过来的），浏览器里若按 WordWrap=True
+                   折行，会把它挤成一根"每行一个字"的竖直细线 —— 用户看到
+                   就是页面上一道莫名其妙的竖线，还会把窗体撑出纵向滚动条。
+                   所以窄到这个程度一律按单行排（宁可截断，也不竖排）。 */
+                var lblWrap = node.wordwrap && !(node.w < 16);
+                return '<div class="lw-label" style="white-space:' + (lblWrap ? 'normal' : 'nowrap') +
                     ';overflow:hidden;' + (node.textalign === 1 ? 'text-align:center;' : node.textalign === 2 ? 'text-align:right;' : '') +
                     fs + '" x-text="' + r + '.txt" @click="' + evAttr(id, 'OnClick') + '"></div>';
+            }
 
             case 'static': {
                 /* TStaticText：一块文字，可选边框（BorderStyle = sbsNone/
@@ -1219,6 +1262,17 @@ var LW = (function () {
                 /* 按钮禁用态由服务端按数据集状态下发：patch 时同步 */
                 return '<div class="lw-nav">' + nav + '</div>';
             }
+
+            case 'captcha':
+                /* 图形验证码（TLWCaptcha）：图片由服务端 /lw/api/captcha 现场画成 PNG。
+                   点一下换一张 —— 只在 URL 后追加 &r=<时间戳>，纯前端、不占会话，
+                   服务端见到 r 就重新生成答案（见 lwhttp.ApiCaptcha）。
+                   属性绑定必须留在 r.src 上：服务端 Refresh 会把版本号 v 改掉，
+                   补丁重设 src 才会真正重拉一次图。 */
+                return '<img class="lw-captcha" :src="' + r + '.src" alt="验证码"' +
+                    ' title="看不清？点击换一张" draggable="false"' +
+                    ' @click="$lwCaptchaTap($el)"' +
+                    ' @dragstart.prevent/>';
 
             case 'image':
             case 'dbimage':
@@ -2108,6 +2162,74 @@ var LW = (function () {
 
     var TITLE_H = 28, STATUS_H = 24;
 
+    /* ---------------- 状态栏 ----------------
+
+       LCL 的 TStatusBar 不是"一行文本"，是"一格一格的栏"：每格有宽度、
+       对齐方式、边框（Bevel），最后一格一直延到右边缘（win32 下发分区
+       时 Rights[last] := -1），高度由 Height 决定（缩放后可能是 23/28…）。
+
+       以前前端只拿到 Panels[i].Text，于是高度写死 24px、每格按内容撑开
+       —— 空文本 + 1px 分隔线 = 21px 的小方块，整条栏看上去"只有左边
+       两个小格子，其余全空"，和桌面端完全不是一回事。现在服务端把结构
+       发在 f.sb 里，这里按它画；f.status 只当文本。 */
+
+    function statusInfo(f) { return f.sb || null; }
+
+    function statusH(f) {
+        var sb = statusInfo(f);
+        if (sb) return sb.h > 0 ? sb.h : STATUS_H;
+        return (f.status && f.status.length) ? STATUS_H : 0;
+    }
+
+    function hasStatusbar(f) {
+        if (statusInfo(f)) return true;
+        return !!(f.status && f.status.length);
+    }
+
+    function paintStatusbar(el, f) {
+        var sb = statusInfo(f) || {};
+        var texts = f.status || [];
+        var h = sb.h > 0 ? sb.h : STATUS_H;
+        el.style.height = h + 'px';
+        el.style.lineHeight = h + 'px';
+
+        var html = '';
+        if (sb.simple) {
+            html = '<span class="lw-status-item" style="flex:1 1 auto;min-width:0;">' +
+                esc(sb.simpletext == null ? '' : String(sb.simpletext)) + '</span>';
+        } else {
+            var panels = sb.panels || [];
+            var n = Math.max(panels.length, texts.length);
+            for (var i = 0; i < n; i++) {
+                var p = panels[i] || {};
+                var w = parseInt(p.w, 10) || 0;
+                var st = 'text-align:' +
+                    (p.al === 1 ? 'right' : (p.al === 2 ? 'center' : 'left')) + ';';
+                if (i === n - 1) st += 'flex:1 1 auto;min-width:0;';
+                else if (w > 0) st += 'flex:0 0 ' + w + 'px;';
+                else st += 'flex:1 1 0;';      /* 宽度 0 = 平分剩余空间 */
+                /* 最后一格右边缘没有分界线（LCL 只在格与格之间画 bevel） */
+                if (p.bev === 0 || i === n - 1) st += 'border-right:0;';
+                html += '<span class="lw-status-item" style="' + st + '">' +
+                    esc(texts[i] == null ? '' : String(texts[i])) + '</span>';
+            }
+            if (!n) html = '<span class="lw-status-item" style="flex:1 1 auto;"></span>';
+        }
+        el.innerHTML = html;
+    }
+
+    /* 状态栏的位置交给 CSS（bottom:0 贴客户区底边），这里只管宽度与高度：
+       宽度取客户区实宽（左侧有折叠菜单时 applySideLayout 会再收窄），
+       高度取 LFM 里的 TStatusBar.Height —— 这样窗口拖大拖小都不会浮空 */
+    function placeStatusbar(win, body, f) {
+        var el = win.__lwStatus;
+        if (!el) return;
+        var h = statusH(f);
+        el.style.width = (body.clientWidth || f.w || 300) + 'px';
+        el.style.height = h + 'px';
+        el.style.lineHeight = h + 'px';
+    }
+
     function buildForm(f) {
         if (S.forms[f.id]) return S.forms[f.id];
 
@@ -2228,16 +2350,18 @@ var LW = (function () {
             if (dh) win.style.height = (win.offsetHeight + dh) + 'px';
         } catch (e) { }
 
-        /* 状态栏：铺在客户区底部（与 LCL 坐标系一致）。
-           body.offsetTop 已含标题栏/菜单栏/边框的全部偏移，直接用它 */
-        if (f.status && f.status.length) {
+        /* 状态栏：贴客户区底边（CSS bottom:0）。
+           高度/分格宽度由 LFM 里的 TStatusBar 决定（f.sb），不是写死 24 */
+        if (hasStatusbar(f)) {
             var sb = document.createElement('div');
             sb.className = 'lw-statusbar';
-            sb.style.top = (body.offsetTop + clientH - STATUS_H) + 'px';
-            sb.style.width = (f.w || 300) + 'px';
-            sb.innerHTML = f.status.map(function (t) { return '<span class="lw-status-item">' + esc(t == null ? '' : String(t)) + '</span>'; }).join('');
+            sb.style.width = (body.clientWidth || f.w || 300) + 'px';
+            paintStatusbar(sb, f);
             win.appendChild(sb);
             win.__lwStatus = sb;
+            /* 建窗时 body 还没量出宽度（同下面空载体的处理）：下一拍按实际
+               客户区宽度再贴一次，避免状态栏宽出窗体/短一截 */
+            defer(function () { placeStatusbar(win, body, f); }, 0);
         }
 
         /* 模态窗体右上角 × == OnClose。必须传 f.id：fire 的第一参数是
@@ -2308,11 +2432,7 @@ var LW = (function () {
                     try {
                         var fm = S.forms[f.id];
                         if (!fm) return;
-                        if (win.__lwStatus) {
-                            win.__lwStatus.style.width = body.clientWidth + 'px';
-                            win.__lwStatus.style.top =
-                                (body.offsetTop + body.clientHeight - STATUS_H) + 'px';
-                        }
+                        if (win.__lwStatus) placeStatusbar(win, body, fm.f);
                         /* 侧栏高度与客户区右移量跟着窗口尺寸走 */
                         if (win.__lwSide) applySideLayout(win, body, kids, fm.f);
                         runLayout({ body: kids }, fm.f.children || []);
@@ -2467,7 +2587,7 @@ var LW = (function () {
             }
         }
         if (ch > 0) {
-            var sbH = (f.status && f.status.length) ? STATUS_H : 0;
+            var sbH = hasStatusbar(f) ? statusH(f) : 0;
             el.style.height = Math.max(0, ch - sbH) + 'px';
         }
     }
@@ -2562,7 +2682,9 @@ var LW = (function () {
                 if (JSON.stringify(prev.items) !== JSON.stringify(n.items)) r.items = n.items || [];
                 if (n.kind === 'checklistbox' && n.index != null &&
                     prev.index !== n.index && typeof n.index === 'number') r.idx = n.index;
-            } else if (n.kind === 'image' || n.kind === 'dbimage') {
+            } else if (n.kind === 'image' || n.kind === 'dbimage' || n.kind === 'captcha') {
+                /* captcha 的 src 只在服务端 Refresh（版本号变化）后才变，
+                   平时补丁不会动它 —— 用户已经看清的码不会中途被换掉 */
                 if (prev.src !== n.src) r.src = n.src || '';
             }
         } catch (e) { }
@@ -2903,10 +3025,18 @@ var LW = (function () {
             /* 标题/状态栏文本 */
             var cap = fm.el.querySelector('.lw-win-cap');
             if (cap && prevF.caption !== f.caption) cap.textContent = f.caption || f.name;
-            if (fm.el.__lwStatus && f.status && JSON.stringify(prevF.status || []) !== JSON.stringify(f.status)) {
-                fm.el.__lwStatus.innerHTML = f.status.map(function (t) {
-                    return '<span class="lw-status-item">' + esc(t == null ? '' : String(t)) + '</span>';
-                }).join('');
+            if (!fm.el.__lwStatus && hasStatusbar(f)) {
+                /* 建窗时没有、后来才加上（运行时 Create 的 TStatusBar） */
+                var sbEl = document.createElement('div');
+                sbEl.className = 'lw-statusbar';
+                paintStatusbar(sbEl, f);
+                fm.el.appendChild(sbEl);
+                fm.el.__lwStatus = sbEl;
+                placeStatusbar(fm.el, fm.body, f);
+            } else if (fm.el.__lwStatus && (JSON.stringify(prevF.status || []) !== JSON.stringify(f.status || []) ||
+                JSON.stringify(prevF.sb || null) !== JSON.stringify(f.sb || null))) {
+                paintStatusbar(fm.el.__lwStatus, f);
+                placeStatusbar(fm.el, fm.body, f);
             }
             syncChildren({ body: fm.body, winId: f.id }, f);
         });
@@ -3184,21 +3314,107 @@ var LW = (function () {
         }
     }
 
-    /* ---------------- 启动（跨页签会话共享，与 lw.js 同语义） ---------------- */
+    /* ---------------- 启动（sid 存 sessionStorage：一个页签一个会话） --------
+
+       sid 的三次迁移，背后是三种语义：
+
+         · localStorage -> "永久"：关掉浏览器再打开会把上一轮**已认证**的
+           会话整个挂回来（一开网站直接进主页面）。不能要。
+         · 会话 cookie  -> "浏览器级"：关浏览器才掉，但**关页签不掉** ——
+           关掉标签页、再开一个，仍然直接进主页面。桌面用户的心智是
+           "关掉窗口 = 退出程序"，所以还不够。
+         · sessionStorage -> "页签级"（当前）：随页签生灭，
+           关标签页即退出登录；刷新还在同一页签里，所以刷新不掉登录；
+           同一浏览器的多个页签各自独立（要共享会话请用"记住我"）。
+
+       还有一个 sessionStorage 单靠自己解决不了的情况：浏览器"启动时恢复
+       上次打开的网页"会把 sessionStorage 一起还原（等于把 sid 一起还回来），
+       于是"关浏览器再打开"又变成直接进主页面。所以下面再加一枚 pagehide
+       墓碑（BYE_KEY），隔了几秒才回来的页签不认旧 sid —— 见 tabWasClosed。
+
+       名字里带端口没有必要了：sessionStorage 本来就按"源"隔离，8130/8111
+       天然互不干扰。要"记住登录"（跨页签/跨浏览器重启保持），在页面里设
+       localStorage['lw.persist'] = '1' 即可（此时 localStorage 里另存一份
+       sid，与 lw.js 同语义）。 */
 
     var booting = false;
-    var SID_KEY = 'lw.sid';
+    var SID_KEY = 'lw.sid';         /* sessionStorage 一份；"记住我"额外存 localStorage */
+    var PERSIST_KEY = 'lw.persist';
+
+    /* ---- "关过窗口"的墓碑 ----
+       sessionStorage 是页签级的，但它有个坑：浏览器"启动时恢复上次打开的
+       网页"会把 sessionStorage **连同 sid 一起还原**——关掉浏览器再打开，
+       上一轮的已认证会话又挂回来了，表现就是"跳过登录直接进主页面"。
+       光看"sessionStorage 里有 sid"分不出"同一个活着的页签"和"被还原的
+       旧页签"，所以在 pagehide（页面真的要走了）留一个时间戳：
+         · 刷新：pagehide 到下一次 load 只隔几十毫秒 -> 不算关过；
+         · 关页签/关浏览器（含之后被还原）：隔了 3 秒以上 -> 这份 sid 作废。
+       注意 browsers 后台标签页会节流定时器，所以这里不用"心跳"，只在
+       pagehide 这一个时刻打点。 */
+    var BYE_KEY = 'lw.bye';
+    var BYE_GRACE_MS = 3000;
+
+    try {
+        window.addEventListener('pagehide', function (ev) {
+            if (ev && ev.persisted) return;      /* 进 bfcache：页面没死，别留墓碑 */
+            try { sessionStorage.setItem(BYE_KEY, String(Date.now())); } catch (e) { }
+        });
+    } catch (e) { }
+
+    /* 上一次页面卸载距今是否已经很久（= 中间关过窗口）。顺手把墓碑吃掉，
+       免得它一直留着影响下一次判断 */
+    function tabWasClosed() {
+        var t = 0;
+        try {
+            t = parseInt(sessionStorage.getItem(BYE_KEY) || '0', 10) || 0;
+            sessionStorage.removeItem(BYE_KEY);
+        } catch (e) { return false; }
+        if (!t) return false;
+        /* 用 performance.timeOrigin（本次导航开始的时刻）而不是 Date.now()：
+           差的只是"上次卸载 -> 这次导航开始"的空档，页面本身加载多久不算进来，
+           所以服务器慢、页面重也不至于把刷新误判成"关过窗口" */
+        var navStart = (window.performance && performance.timeOrigin)
+            ? performance.timeOrigin : Date.now();
+        return (navStart - t) > BYE_GRACE_MS;
+    }
+
+    function persisted() {
+        try { return localStorage.getItem(PERSIST_KEY) === '1'; } catch (e) { return false; }
+    }
+
+    /* 下线时随手清掉老版本遗留的会话 cookie：它会让"关页签即退出"失效 */
+    function dropLegacySidCookie() {
+        try {
+            var name = 'lw_sid_' + (location.port ||
+                (location.protocol === 'https:' ? '443' : '80'));
+            document.cookie = name + '=; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT; SameSite=Lax';
+        } catch (e) { }
+    }
 
     function rememberSid(sid) {
-        try { if (sid) localStorage.setItem(SID_KEY, sid); } catch (e) { }
+        if (!sid) return;
+        try { sessionStorage.setItem(SID_KEY, sid); } catch (e) { }
+        try { if (persisted()) localStorage.setItem(SID_KEY, sid); } catch (e) { }
     }
 
     function forgetSid() {
+        try { sessionStorage.removeItem(SID_KEY); } catch (e) { }
         try { localStorage.removeItem(SID_KEY); } catch (e) { }
     }
 
     function savedSid() {
-        if (/[?&]fresh=1/.test(location.search)) return '';
+        /* 墓碑先吃掉：无论这次用不用 sessionStorage 里的 sid，都不能留到下次 */
+        var closed = tabWasClosed();
+        if (/[?&]fresh=1/.test(location.search)) return '';   /* 显式要求新会话 */
+        try {
+            var sid = sessionStorage.getItem(SID_KEY);
+            if (sid && closed) {   /* 被浏览器还原的旧页签：这份 sid 不算数 */
+                sessionStorage.removeItem(SID_KEY);
+                sid = '';
+            }
+            if (sid) return sid;
+        } catch (e) { }
+        if (!persisted()) return '';
         try { return localStorage.getItem(SID_KEY) || ''; } catch (e) { return ''; }
     }
 
@@ -3257,6 +3473,7 @@ var LW = (function () {
         if (booting) return;
         booting = true;
         var cfg = window.LW_CFG || {};
+        dropLegacySidCookie();
         if (!S.tab) {
             try { S.tab = sessionStorage.getItem('lw.tab') || ''; } catch (e) { }
             if (!S.tab) S.tab = newTabId();
