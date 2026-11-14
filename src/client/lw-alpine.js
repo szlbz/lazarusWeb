@@ -196,6 +196,61 @@ var LW = (function () {
             .replace(/"/g, '&quot;').replace(/'/g, '&#39;');
     }
 
+    /* LCL Caption 的加速键语义（&X 显示成带下划线的 X，Alt+X 触发；
+       && 是字面 &；孤立的 & 原样显示）。输入必须是「已经 esc 过」的
+       文本，返回 HTML —— 只给 x-html / innerHTML 的渲染点用。 */
+    function accHtml(es) {
+        if (!es || es.indexOf('&amp;') < 0) return es || '';
+        var out = '', i = 0;
+        while (i < es.length) {
+            if (es.charAt(i) === '&' && es.substr(i, 5) === '&amp;') {
+                if (es.substr(i + 5, 5) === '&amp;') {   /* && -> 字面 & */
+                    out += '&amp;'; i += 10; continue;
+                }
+                var ch = es.charAt(i + 5);
+                if (ch && ch !== '&' && ch !== '<' && ch !== '"') {
+                    out += '<u>' + ch + '</u>'; i += 6; continue;
+                }
+                out += '&amp;'; i += 5; continue;
+            }
+            out += es.charAt(i); i++;
+        }
+        return out;
+    }
+    /* 模板里的统一入口：原始 Caption 进，可安全注入的 HTML 出。
+       第二个参数是服务端的 acc 字段：只有 ShowAccelChar=False 时才是 0，
+       那种控件 Caption 里的 & 是字面量（LCL 不解析），这里也不解析。 */
+    window.$lwCap = function (s, on) {
+        return on === 0 ? esc(s) : accHtml(esc(s));
+    };
+
+    /* Alt+字母 触发加速键：在可见的可交互元素里找 <u>k</u> 并点击。
+       LCL 的 &O 按钮 = Alt+O；同一套还覆盖复选框/单选钮的 label（点 label
+       就是切状态）、页签、菜单项。对话框与 Ext 部件也走这里，所以
+       .x-btn / .x-tab / .x-menu-item 一并列出。 */
+    var ACCEL_HOSTS = 'button, .x-btn, label, .lw-tab, .lw-menu-top, ' +
+        '.lw-menu-item, .lw-sm-item, .x-tab, .x-menu-item';
+    document.addEventListener('keydown', function (e) {
+        if (!e.altKey || e.ctrlKey || e.metaKey || e.shiftKey) return;
+        var k = (e.key || '').toLowerCase();
+        if (!k || k.length !== 1) return;
+        var els = document.querySelectorAll(ACCEL_HOSTS);
+        for (var i = 0; i < els.length; i++) {
+            var el = els[i];
+            if (el.disabled) continue;
+            if (el.getAttribute && el.getAttribute('aria-disabled') === 'true') continue;
+            if (!(el.offsetWidth || el.offsetHeight)) continue;
+            var us = el.querySelectorAll('u');
+            for (var j = 0; j < us.length; j++) {
+                if ((us[j].textContent || '').trim().toLowerCase() === k) {
+                    e.preventDefault();
+                    el.click();
+                    return;
+                }
+            }
+        }
+    });
+
     function defer(fn, ms) { return setTimeout(fn, ms || 0); }
 
     function api(path, data, cb, opts) {
@@ -412,7 +467,7 @@ var LW = (function () {
         var el = S.E[id];
         if (el) {
             var b = el.querySelector('button, .lw-btn');
-            if (b) b.textContent = txt;
+            if (b) b.innerHTML = accHtml(esc(txt));
         }
     }
 
@@ -574,6 +629,7 @@ var LW = (function () {
             vis: node.visible !== false,
             cap: node.caption != null ? String(node.caption) : '',
             txt: node.text != null ? String(node.text) : '',
+            acc: node.acc === 0 ? 0 : 1,
             chk: !!node.checked,
             ind: node.state === 2,
             down: !!node.down,
@@ -958,6 +1014,57 @@ var LW = (function () {
             '</td>';
     }
 
+    /* 网格 <table> 的 class：配了分组表头时多带一个 lw-hg ——
+       该修饰类把 border-collapse 换成 separate（见 CSS：collapse 下
+       sticky 表头会让数据行文字从表头里透出来） */
+    function tableCls(n) {
+        return 'lw-table' + ((n.hg && n.hg.length) ? ' lw-hg' : '');
+    }
+
+    /* DBGrid 表头（两级表头 TLWDBGrid.HeaderGroups）：
+       没有分组时沿用老的 x-for 模板（Excel 风格，列变化走补丁重建）；
+       有分组时静态拼两行 —— 分组格格 colspan，没进任何分组的列
+       rowspan=2 上下贯通。分组行不挂 OnTitleClick：一块跨列标题
+       没有唯一的列可排序，硬发事件只会让业务代码猜列号。
+       叶子格照旧挂 OnTitleClick（col 仍是"可见列下标"，与 hg 同一套编号）。 */
+    function dbHeadHtml(node, r, id) {
+        var cols = node.cols || [], hg = node.hg || [], i, j;
+        /* 无分组：叶子格在 x-for 里，j 是循环变量 */
+        var click = evAttr(id, 'OnTitleClick', '{col:j}');
+        /* 有分组：表头是静态拼的，不在任何 x-for 作用域里，
+           事件里的列号必须烧成字面量，否则点表头就 "j is not defined" */
+        function leafClick(ci) {
+            return evAttr(id, 'OnTitleClick', '{col:' + ci + '}');
+        }
+        if (!hg.length) {
+            return '<thead><tr><template x-for="(c,j) in ' + r + '.cols" :key="j">' +
+                '<th @click="' + click + '" x-text="c"></th></template></tr></thead>';
+        }
+        /* 先定归属：已被告知"这一列属于第几个分组"，重叠的分组按先来先占 */
+        var owner = [], nc = cols.length;
+        for (i = 0; i < nc; i++) owner[i] = -1;
+        for (i = 0; i < hg.length; i++) {
+            var a = hg[i].a | 0, n = hg[i].n | 0, ok = n > 0 && a >= 0 && a + n <= nc;
+            for (j = a; ok && j < a + n; j++) if (owner[j] !== -1) ok = false;
+            if (ok) for (j = a; j < a + n; j++) owner[j] = i;
+        }
+        var row1 = '', row2 = '';
+        i = 0;
+        while (i < nc) {
+            if (owner[i] >= 0) {
+                var g = hg[owner[i]], ga = g.a | 0, gn = g.n | 0;
+                row1 += '<th class="lw-th-grp" colspan="' + gn + '">' + esc(g.t) + '</th>';
+                for (j = ga; j < ga + gn; j++)
+                    row2 += '<th @click="' + leafClick(j) + '" x-text="' + r + '.cols[' + j + ']"></th>';
+                i = ga + gn;
+            } else {
+                row1 += '<th @click="' + leafClick(i) + '" rowspan="2" x-text="' + r + '.cols[' + i + ']"></th>';
+                i++;
+            }
+        }
+        return '<thead class="lw-thead-hg"><tr>' + row1 + '</tr><tr>' + row2 + '</tr></thead>';
+    }
+
     /* 内部标记（不含包装 div）。st = 状态对象，node = 最新 JSON */
     function innerOf(node, st) {
         var k = node.kind, id = node.id, r = '$lwN(\'' + id + '\')';
@@ -976,7 +1083,8 @@ var LW = (function () {
                 var lblWrap = node.wordwrap && !(node.w < 16);
                 return '<div class="lw-label" style="white-space:' + (lblWrap ? 'normal' : 'nowrap') +
                     ';overflow:hidden;' + (node.textalign === 1 ? 'text-align:center;' : node.textalign === 2 ? 'text-align:right;' : '') +
-                    fs + '" x-text="' + r + '.txt" @click="' + evAttr(id, 'OnClick') + '"></div>';
+                    fs + '" x-html="$lwCap(' + r + '.txt, ' + r + '.acc)" @click="' +
+                    evAttr(id, 'OnClick') + '"></div>';
             }
 
             case 'static': {
@@ -992,7 +1100,8 @@ var LW = (function () {
                 var sj = node.textalign === 1 ? 'center' : (node.textalign === 2 ? 'flex-end' : 'flex-start');
                 return '<div class="lw-label lw-static' + sb + '" style="display:flex;align-items:center;' +
                     'justify-content:' + sj + ';white-space:nowrap;overflow:hidden;' + sbg + fs +
-                    '" x-text="' + r + '.txt" @click="' + evAttr(id, 'OnClick') + '"></div>';
+                    '" x-html="$lwCap(' + r + '.txt, ' + r + '.acc)" @click="' +
+                    evAttr(id, 'OnClick') + '"></div>';
             }
 
             case 'button':
@@ -1009,13 +1118,13 @@ var LW = (function () {
                     : '$lwBtnClick(\'' + id + '\',\'OnClick\')';
                 return '<button type="button" class="lw-btn' + bic + '" style="' + fs + '" ' + dis +
                     ' :class="' + r + '.down ? \'lw-btn-pressed\' : \'\'" @click="' + clickExp +
-                    '" x-text="' + r + '.cap"></button>';
+                    '" x-html="$lwCap(' + r + '.cap, ' + r + '.acc)"></button>';
             }
 
             case 'toolbutton':
                 if (node.sep) return '<div class="lw-tbsep"></div>';
                 return '<button type="button" class="lw-btn lw-tool" style="' + fs + '" ' + dis +
-                    ' @click="$lwBtnClick(\'' + id + '\',\'OnClick\')" x-text="' + r + '.cap"></button>';
+                    ' @click="$lwBtnClick(\'' + id + '\',\'OnClick\')" x-html="$lwCap(' + r + '.cap, ' + r + '.acc)"></button>';
 
             case 'edit':
             case 'maskedit':
@@ -1062,14 +1171,14 @@ var LW = (function () {
                 return '<label class="lw-cb" style="' + fs + '"><input type="checkbox" x-model="' + r + '.chk" ' + dis +
                     ' x-effect="if(' + r + '.ind) $el.indeterminate = true"' +
                     ' @change="' + evAttr(id, 'OnChange', '{val:' + r + '.chk ? \'1\' : \'0\'}') + '"/>' +
-                    '<span x-text="' + r + '.cap"></span></label>';
+                    '<span x-html="$lwCap(' + r + '.cap, ' + r + '.acc)"></span></label>';
 
             case 'radio':
                 return '<label class="lw-cb" style="' + fs + '"><input type="radio" name="lwradio_' +
                     (node.group || 'g') + '" :checked="' + r + '.chk" ' + dis +
                     ' @click="' + r + '.chk = true; ' + evAttr(id, 'OnClick') + '" ' +
                     '@change="' + evAttr(id, 'OnChange', '{val:' + r + '.chk ? \'1\' : \'0\'}') + '"/>' +
-                    '<span x-text="' + r + '.cap"></span></label>';
+                    '<span x-html="$lwCap(' + r + '.cap, ' + r + '.acc)"></span></label>';
 
             case 'combo':
             case 'dbcombo': {
@@ -1115,9 +1224,9 @@ var LW = (function () {
                 var rgIn = '<template x-for="(t,i) in ' + r + '.items" :key="i">' +
                     '<label class="lw-cb"><input type="radio" name="lwrg-' + id + '" :checked="i===' + r + '.idx" ' + dis +
                     ' @click="' + r + '.idx = i; ' + evAttr(id, 'OnClick', '{val:String(i)}') + '"/>' +
-                    '<span x-text="t"></span></label></template>';
+                    '<span x-html="$lwCap(t)"></span></label></template>';
                 return '<div class="lw-group' + (node.border !== 'none' ? ' lw-boxed' : '') + '">' +
-                    '<div class="lw-group-title" x-text="' + r + '.cap"></div>' +
+                    '<div class="lw-group-title" x-html="$lwCap(' + r + '.cap, ' + r + '.acc)"></div>' +
                     '<div class="lw-group-body">' + rgIn + '</div></div>';
             }
 
@@ -1128,20 +1237,20 @@ var LW = (function () {
                     ' :checked="String(' + r + '.keys[i] == null ? i : ' + r + '.keys[i]) === String(' + r + '.val)"' +
                     ' @click="' + r + '.val = String(' + r + '.keys[i] == null ? i : ' + r + '.keys[i]); ' +
                     evAttr(id, 'OnChange', '{val:' + r + '.keys[i] == null ? String(i) : String(' + r + '.keys[i])}') + '"/>' +
-                    '<span x-text="t"></span></label></template>';
+                    '<span x-html="$lwCap(t)"></span></label></template>';
                 return '<div class="lw-group' + (node.border !== 'none' ? ' lw-boxed' : '') + '">' +
-                    '<div class="lw-group-title" x-text="' + r + '.cap"></div>' +
+                    '<div class="lw-group-title" x-html="$lwCap(' + r + '.cap, ' + r + '.acc)"></div>' +
                     '<div class="lw-group-body">' + drgIn + '</div></div>';
             }
 
             case 'checkgroup':
                 return '<div class="lw-group' + (node.border !== 'none' ? ' lw-boxed' : '') + '">' +
-                    '<div class="lw-group-title" x-text="' + r + '.cap"></div>' +
+                    '<div class="lw-group-title" x-html="$lwCap(' + r + '.cap, ' + r + '.acc)"></div>' +
                     '<div class="lw-group-body">' +
                     '<template x-for="(t,i) in ' + r + '.items" :key="i">' +
                     '<label class="lw-cb"><input type="checkbox" x-model="' + r + '.checked[i]" ' + dis +
                     ' @change="' + evAttr(id, 'OnItemClick', '{idx:i, val:' + r + '.checked[i] ? \'1\' : \'0\', checked:' + r + '.checked.slice()}') + '"/>' +
-                    '<span x-text="t"></span></label></template></div></div>';
+                    '<span x-html="$lwCap(t)"></span></label></template></div></div>';
 
             case 'checklistbox':
                 return '<div class="lw-list lw-boxed lw-clb">' +
@@ -1239,10 +1348,8 @@ var LW = (function () {
                       '</div>'
                     : '';
                 return '<div class="lw-dbgrid">' + filterBar +
-                    '<div class="lw-grid lw-boxed lw-dbgrid-body"><table class="lw-table"><thead><tr>' +
-                    '<template x-for="(c,j) in ' + r + '.cols" :key="j">' +
-                    '<th @click="' + evAttr(dgid, 'OnTitleClick', '{col:j}') + '" x-text="c"></th></template>' +
-                    '</tr></thead><tbody>' +
+                    '<div class="lw-grid lw-boxed lw-dbgrid-body"><table class="' + tableCls(node) + '">' + dbHeadHtml(node, r, dgid) +
+                    '<tbody>' +
                     '<template x-for="(row,i) in ' + r + '.rows" :key="i">' +
                     '<tr :class="i === ' + r + '.recno - 1 ? \'lw-sel\' : \'\'" @click="$lwDbRow(\'' + dgid + '\', i, $event)">' +
                     '<template x-for="(cell,j) in row" :key="j">' +
@@ -1316,7 +1423,7 @@ var LW = (function () {
                   else if (node.bevel === 3) { bevCls += ' lw-bev-space'; }
                   var pOvf = (node.autoscroll || k === 'scrollbox') ? ';overflow:auto' : '';
                   var pCap = (node.caption && node.caption !== node.name) ?
-                      '<div class="lw-panel-cap" x-text="' + r + '.cap"></div>' : '';
+                      '<div class="lw-panel-cap" x-html="$lwCap(' + r + '.cap, ' + r + '.acc)"></div>' : '';
                   return '<div class="lw-body' + bevCls +
                       '" style="background:' + (node.bg || 'transparent') + pOvf +
                       '">' + pCap + '<div class="lw-kids"></div></div>';
@@ -1327,7 +1434,7 @@ var LW = (function () {
                    恒 overflow:auto 会因映射误差（标题条高度近似）伪造出
                    比控件矮一大截的滚动条（AutoScroll 关着却出现滚动条） */
                 return '<div class="lw-group lw-group-abs' + (node.border !== 'none' ? ' lw-boxed' : '') + '">' +
-                    '<div class="lw-group-title" x-text="' + r + '.cap"></div>' +
+                    '<div class="lw-group-title" x-html="$lwCap(' + r + '.cap, ' + r + '.acc)"></div>' +
                     '<div class="lw-body lw-group-body" style="overflow:' + (node.autoscroll ? 'auto' : 'hidden') +
                     '"><div class="lw-kids"></div></div></div>';
 
@@ -1527,9 +1634,24 @@ var LW = (function () {
         });
     };
 
-    /* DBGrid：行点击定位数据集游标；可编辑列点击开编辑器 */
+    /* DBGrid：行点击定位数据集游标；可编辑列点击开编辑器。
+       LCL 里点 TDBGrid 的任意一行，数据集游标就移过去 —— 这是网格的
+       内部行为，跟业务挂没挂 OnCellClick 无关。以前 fire 套在 $lwHas
+       里：没挂 OnCellClick 的网格（gallery 的 grdDb 就没挂）点了行
+       事件都不发，游标不动、高亮不跟、右侧 DBEdit/TDBMemo 也不换记录。
+       现在无条件发 OnCellClick：服务端 LWApplyGridPos 先定位游标，
+       LWInvokeEvent 没挂 handler 就是空操作，一条往返两件事都做完
+       （Ext 端一直是无条件发的，行为对齐）。 */
+    function lwDbLocate(id, row, col) {
+        var r = S.R[id];
+        /* 乐观高亮：recno 是页内 1 基行号（服务端 WriteDBGrid 同一约定），
+           先亮起来，服务端补丁回来再按权威值校准（不在本页会发 0 取消） */
+        if (r) r.recno = row + 1;
+        fire(id, 'OnCellClick', { row: row, col: col || 0 });
+    }
+
     window.$lwDbRow = function (id, row, e) {
-        if ($lwHas(id, 'OnCellClick')) fire(id, 'OnCellClick', { row: row, col: 0 });
+        lwDbLocate(id, row, 0);
     };
 
     /* DBGrid 布尔列（服务端 cedit=4）：单元格常驻勾选框，点一下即写回
@@ -1552,7 +1674,9 @@ var LW = (function () {
     };
 
     window.$lwDbCell = function (id, row, col, e) {
-        if ($lwHas(id, 'OnCellClick')) fire(id, 'OnCellClick', { row: row, col: col });
+        /* 定位游标在前：只读列 / 只读网格点了也要移动游标（LCL 同款），
+           不能跟编辑器一起被 readonly 拦掉 */
+        lwDbLocate(id, row, col);
         var n = S.ND[id], r = S.R[id];
         if (!n || n.readonly || !r) return;
         /* 列编辑器类型（服务端 cedit）：0=只读 1=文本 2=PickList 下拉
@@ -1741,7 +1865,7 @@ var LW = (function () {
             if (m.sep) { h += '<div class="lw-menu-sep"></div>'; return; }
             h += '<div class="lw-menu-item' + (m.enabled === false ? ' lw-disabled' : '') +
                 (m.items && m.items.length ? ' lw-has-sub' : '') + '" data-mid="' + esc(m.caption || '') + '">' +
-                esc(m.caption || '') + (m.shortcut ? '<span class="lw-mn">' + esc(m.shortcut) + '</span>' : '') +
+                accHtml(esc(m.caption || '')) + (m.shortcut ? '<span class="lw-mn">' + esc(m.shortcut) + '</span>' : '') +
                 (m.checked ? '<span class="lw-menu-check">✓</span>' : '') + '</div>';
         });
         return h + '</div>';
@@ -1944,7 +2068,7 @@ var LW = (function () {
         var html = '';
         (node.children || []).forEach(function (ts, i) {
             html += '<div class="lw-tab' + (i === active ? ' lw-active' : '') + '" data-ti="' + i + '">' +
-                esc(ts.caption || ts.name || '') + '</div>';
+                accHtml(esc(ts.caption || ts.name || '')) + '</div>';
         });
         bar.innerHTML = html;
         bar.querySelectorAll('.lw-tab').forEach(function (el) {
@@ -1971,7 +2095,8 @@ var LW = (function () {
             if (S.ND[id]) S.ND[id].tabindex = active;
             var html = '';
             (node.tabitems || []).forEach(function (t, i) {
-                html += '<div class="lw-tab' + (i === active ? ' lw-active' : '') + '" data-ti="' + i + '">' + esc(t) + '</div>';
+                html += '<div class="lw-tab' + (i === active ? ' lw-active' : '') + '" data-ti="' + i + '">' +
+                    accHtml(esc(t)) + '</div>';
             });
             bar.innerHTML = html;
             bar.querySelectorAll('.lw-tab').forEach(function (el) {
@@ -2309,7 +2434,7 @@ var LW = (function () {
             var mb = document.createElement('div');
             mb.className = 'lw-menubar';
             mb.innerHTML = f.menu.map(function (m, i) {
-                return '<div class="lw-menu-top" data-mi="' + i + '">' + esc(m.caption || '') + '</div>';
+                return '<div class="lw-menu-top" data-mi="' + i + '">' + accHtml(esc(m.caption || '')) + '</div>';
             }).join('');
             win.insertBefore(mb, body);
             mbH = mb.offsetHeight || 26;
@@ -2515,7 +2640,7 @@ var LW = (function () {
             if (!subs.length) {
                 h += '<div class="lw-sm-item lw-sm-top' + (g.checked ? ' on' : '') +
                     (g.enabled === false ? ' dis' : '') + '" data-mid="' + g.id + '">' +
-                    smIcon(g) + '<span class="lw-sm-t">' + esc(g.caption || '') + '</span></div>';
+                    smIcon(g) + '<span class="lw-sm-t">' + accHtml(esc(g.caption || '')) + '</span></div>';
                 return;
             }
             var isOpen = (open[gi] === undefined) ?
@@ -2523,13 +2648,13 @@ var LW = (function () {
             h += '<div class="lw-sm-grp">' +
                 '<div class="lw-sm-grphead' + (isOpen ? ' open' : '') + '" data-gi="' + gi + '">' +
                 '<span class="lw-sm-arw">\u25B6</span>' +
-                '<span class="lw-sm-t">' + esc(g.caption || '') + '</span></div>' +
+                '<span class="lw-sm-t">' + accHtml(esc(g.caption || '')) + '</span></div>' +
                 '<div class="lw-sm-items"' + (isOpen ? '' : ' style="display:none"') + '>';
             subs.forEach(function (it) {
                 if (it.sep) { h += '<div class="lw-sm-sep"></div>'; return; }
                 h += '<div class="lw-sm-item' + (it.checked ? ' on' : '') +
                     (it.enabled === false ? ' dis' : '') + '" data-mid="' + it.id + '">' +
-                    smIcon(it) + '<span class="lw-sm-t">' + esc(it.caption || '') + '</span>' +
+                    smIcon(it) + '<span class="lw-sm-t">' + accHtml(esc(it.caption || '')) + '</span>' +
                     (it.shortcut ? '<i class="lw-sm-sc">' + esc(it.shortcut) + '</i>' : '') +
                     '</div>';
             });
@@ -2623,6 +2748,8 @@ var LW = (function () {
             } else if (n.kind === 'groupbox' || n.kind === 'radiogroup' || n.kind === 'checkgroup' || n.kind === 'dbradiogroup') {
                 if (prev.caption !== n.caption) r.cap = n.caption || '';
             }
+            /* ShowAccelChar 运行期被改（少见但合法）：0/1 切换后重画 */
+            if ((prev.acc === 0) !== (n.acc === 0)) r.acc = n.acc === 0 ? 0 : 1;
         } catch (e) { }
 
         /* 绑定标签重新贴 */
@@ -2715,8 +2842,9 @@ var LW = (function () {
                     r.t0 = ts[0] || 'Key'; r.t1 = ts[1] || 'Value';
                 }
             } else if (n.kind === 'dbgrid') {
-                var dsig = JSON.stringify(n.rows || null) + '#' + JSON.stringify(n.cols || null);
-                var csig2 = JSON.stringify(n.cols || null);
+                var dsig = JSON.stringify(n.rows || null) + '#' + JSON.stringify(n.cols || null) +
+                    '#' + JSON.stringify(n.hg || null);
+                var csig2 = JSON.stringify(n.cols || null) + '|' + JSON.stringify(n.hg || null);
                 if (prev.__dbSig !== dsig) {
                     if (n.rows) {
                         if (prev.__dbColSig === csig2) {
@@ -2993,10 +3121,7 @@ var LW = (function () {
         if (gridBox) {
             var fresh = document.createElement('div');
             fresh.className = 'lw-grid lw-boxed lw-dbgrid-body';
-            fresh.innerHTML = '<table class="lw-table"><thead><tr>' +
-                '<template x-for="(c,j) in $lwN(\'' + id + '\').cols" :key="j">' +
-                '<th @click="' + evAttr(id, 'OnTitleClick', '{col:j}') + '" x-text="c"></th></template>' +
-                '</tr></thead><tbody>' +
+            fresh.innerHTML = '<table class="' + tableCls(n) + '">' + dbHeadHtml(n, '$lwN(\'' + id + '\')', id) + '<tbody>' +
                 '<template x-for="(row,i) in $lwN(\'' + id + '\').rows" :key="i">' +
                 '<tr :class="i === $lwN(\'' + id + '\').recno - 1 ? \'lw-sel\' : \'\'" @click="$lwDbRow(\'' + id + '\', i, $event)">' +
                 '<template x-for="(cell,j) in row" :key="j">' +

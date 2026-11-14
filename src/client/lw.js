@@ -45,6 +45,55 @@ var LW = (function () {
         return Ext.util.Format.htmlEncode(s == null ? '' : String(s));
     }
 
+    /* LCL Caption 的加速键语义（&X 显示成带下划线的 X，Alt+X 触发；
+       && 是字面 &；孤立的 & 原样显示）。与 lw-alpine.js 的 accHtml 同一算法：
+       输入「已经 esc 过」的文本，返回 HTML。accText = esc + accHtml。 */
+    function accHtml(es) {
+        if (!es || es.indexOf('&amp;') < 0) return es || '';
+        var out = '', i = 0;
+        while (i < es.length) {
+            if (es.charAt(i) === '&' && es.substr(i, 5) === '&amp;') {
+                if (es.substr(i + 5, 5) === '&amp;') {
+                    out += '&amp;'; i += 10; continue;
+                }
+                var ch = es.charAt(i + 5);
+                if (ch && ch !== '&' && ch !== '<' && ch !== '"') {
+                    out += '<u>' + ch + '</u>'; i += 6; continue;
+                }
+                out += '&amp;'; i += 5; continue;
+            }
+            out += es.charAt(i); i++;
+        }
+        return out;
+    }
+    /* on === 0 表示服务端说这个控件的 ShowAccelChar=False：
+       Caption 里的 & 是字面量，和 LCL 一样原样显示 */
+    function accText(s, on) { return on === 0 ? esc(s) : accHtml(esc(s)); }
+
+    /* Alt+字母 触发加速键：找可见的可交互元素（按钮 / 复选框 label /
+       页签 / 菜单项）里带 <u>k</u> 的那个并点击。 */
+    var ACCEL_HOSTS = '.x-btn, button, label, .x-tab, .x-menu-item, ' +
+        '.lw-tab, .lw-menu-item, .lw-menu-top';
+    document.addEventListener('keydown', function (e) {
+        if (!e.altKey || e.ctrlKey || e.metaKey || e.shiftKey) return;
+        var k = (e.key || '').toLowerCase();
+        if (!k || k.length !== 1) return;
+        var els = document.querySelectorAll(ACCEL_HOSTS);
+        for (var i = 0; i < els.length; i++) {
+            var el = els[i];
+            if (el.disabled || (el.getAttribute && el.getAttribute('aria-disabled') === 'true')) continue;
+            if (!(el.offsetWidth || el.offsetHeight)) continue;
+            var us = el.querySelectorAll('u');
+            for (var j = 0; j < us.length; j++) {
+                if ((us[j].textContent || '').trim().toLowerCase() === k) {
+                    e.preventDefault();
+                    el.click();
+                    return;
+                }
+            }
+        }
+    });
+
     function px(n) { return (n || 0) + 'px'; }
 
     function isContainer(node) {
@@ -619,7 +668,7 @@ var LW = (function () {
             case 'static':
                 cfg.autoEl = {
                     tag: 'div',
-                    html: esc(node.text != null ? node.text : node.caption),
+                    html: accText(node.text != null ? node.text : node.caption, node.acc),
                     style: 'white-space:' + (node.wordwrap ? 'normal' : 'nowrap') + ';overflow:hidden;'
                 };
                 if (node.textalign === 1) cfg.autoEl.style += 'text-align:center;';
@@ -696,7 +745,8 @@ var LW = (function () {
             case 'button':
             case 'bitbtn':
             case 'speedbutton':
-                cfg.text = node.caption || '';
+                /* caption 走 esc+加速键解析（&O -> <u>O</u>），顺带堵住 HTML 注入 */
+                cfg.text = accText(node.caption || '', node.acc);
                 cfg.scale = 'small';
                 /* TToggleBox（node.down = Checked）：可保持按下的普通按钮 */
                 if (k !== 'speedbutton' && node.down != null) {
@@ -722,7 +772,7 @@ var LW = (function () {
 
             case 'toolbutton':
                 if (node.sep) return addTo(Ext.create('Ext.toolbar.Separator', {}), ct);
-                cfg.text = node.caption || '';
+                cfg.text = accText(node.caption || '', node.acc);
                 cfg.scale = 'small';
                 /* nogui 下 TToolButton 的 Width/Height 是 LCL 默认值（约 11px），
                    不会按 Caption 自算 —— 照搬会把"动作 1"截成"动"或者压成扁条。
@@ -734,7 +784,7 @@ var LW = (function () {
                 return addTo(Ext.create('Ext.button.Button', cfg), ct);
 
             case 'fileupload':
-                cfg.text = node.caption || '上传文件…';
+                cfg.text = accText(node.caption || '上传文件…', node.acc);
                 cfg.scale = 'small';
                 c = Ext.create('Ext.button.Button', cfg);
                 addTo(c, ct);
@@ -836,7 +886,7 @@ var LW = (function () {
 
             case 'checkbox':
             case 'dbcheckbox':
-                cfg.boxLabel = node.caption || '';
+                cfg.boxLabel = accText(node.caption || '', node.acc);
                 /* LCL 三态：State=cbGrayed(2)。Ext 复选框原生不支持第三态，
                    用 DOM 的 indeterminate 补上（渲染后打补丁） */
                 cfg.checked = !!node.checked;
@@ -868,7 +918,7 @@ var LW = (function () {
                 return c;
 
             case 'radio':
-                cfg.boxLabel = node.caption || '';
+                cfg.boxLabel = accText(node.caption || '', node.acc);
                 cfg.checked = !!node.checked;
                 cfg.name = 'lwradio_' + (node.group || 'g');
                 cfg.inputValue = String(node.id);
@@ -906,7 +956,7 @@ var LW = (function () {
                 /* 单选组：Values[i] 才是写进字段的值，Items[i] 只是显示文字 */
                 var rcfg = Ext.apply({}, cfg);
                 delete rcfg.items; delete rcfg.values; delete rcfg.value; delete rcfg.field;
-                rcfg.title = esc(node.caption || '');
+                rcfg.title = accText(node.caption, node.acc);
                 rcfg.layout = 'anchor';
                 rcfg.defaults = { anchor: '100%' };
                 c = addTo(Ext.create('Ext.form.FieldSet', rcfg), ct);
@@ -915,7 +965,7 @@ var LW = (function () {
                     items.forEach(function (t, i) {
                         var v = String(values[i] == null ? i : values[i]);
                         var r = Ext.create('Ext.form.field.Radio', {
-                            boxLabel: esc(t),
+                            boxLabel: accText(t),
                             name: 'lwrg_' + node.id,
                             inputValue: v,
                             checked: v === String(node.value)
@@ -933,13 +983,13 @@ var LW = (function () {
                 /* 普通单选组：val 是"第几项"（与 dbradiogroup 的 Value 语义不同） */
                 var rg = Ext.apply({}, cfg);
                 delete rg.items; delete rg.values; delete rg.value; delete rg.field;
-                rg.title = esc(node.caption || '');
+                rg.title = accText(node.caption, node.acc);
                 rg.layout = 'anchor';
                 rg.defaults = { anchor: '100%' };
                 c = addTo(Ext.create('Ext.form.FieldSet', rg), ct);
                 (node.items || []).forEach(function (t, i) {
                     var r = Ext.create('Ext.form.field.Radio', {
-                        boxLabel: esc(t),
+                        boxLabel: accText(t),
                         name: 'lwrg_' + node.id,
                         inputValue: String(i),
                         checked: i === (node.index || -1)
@@ -955,14 +1005,14 @@ var LW = (function () {
             case 'checkgroup': {
                 var cg = Ext.apply({}, cfg);
                 delete cg.items; delete cg.values; delete cg.value; delete cg.field;
-                cg.title = esc(node.caption || '');
+                cg.title = accText(node.caption, node.acc);
                 cg.layout = 'anchor';
                 cg.defaults = { anchor: '100%' };
                 c = addTo(Ext.create('Ext.form.FieldSet', cg), ct);
                 var cks = node.checked || [];
                 (node.items || []).forEach(function (t, i) {
                     var k = Ext.create('Ext.form.field.Checkbox', {
-                        boxLabel: esc(t),
+                        boxLabel: accText(t),
                         checked: !!cks[i]
                     });
                     k.on('change', function (cb, nv) {
@@ -983,6 +1033,7 @@ var LW = (function () {
                 var boxes = [];
                 (node.items || []).forEach(function (t, i) {
                     var b = Ext.create('Ext.form.field.Checkbox', {
+                        /* 同上：条目文字是列表内容不是 Caption，& 原样 */
                         boxLabel: esc(t),
                         checked: !!ckl[i],
                         margin: '2 6'
@@ -1160,14 +1211,15 @@ var LW = (function () {
                 cfg.bodyStyle = node.bg ? 'background:' + node.bg : '';
                 if (node.autoscroll || node.kind === 'scrollbox') cfg.autoScroll = true;
                 if (node.caption && node.caption !== node.name)
-                    cfg.html = '<div class="lw-panel-cap">' + esc(node.caption) + '</div>';
+                    cfg.html = '<div class="lw-panel-cap">' +
+                        accText(node.caption, node.acc) + '</div>';
                 c = Ext.create('Ext.panel.Panel', cfg);
                 addTo(c, ct);
                 syncChildren(c, node);
                 return c;
 
             case 'groupbox':
-                cfg.title = esc(node.caption || '');
+                cfg.title = accText(node.caption, node.acc);
                 cfg.layout = 'absolute';
                 cfg.bodyPadding = 0;
                 cfg.collapsible = false;
@@ -1530,6 +1582,9 @@ var LW = (function () {
             fire(node, 'OnCellClick', { row: rec.get('lwRow'), col: col });
         });
         grid.on('headerclick', function (ct, column) {
+            /* 两级表头的上层（分组列）没有 dataIndex：一块跨列标题没有
+               唯一的列可排序，硬发事件只会让业务代码收到一个假的 col=0 */
+            if (!column || column.dataIndex == null) return;
             var col = 0;
             try { col = parseInt(String(column.dataIndex).substring(1), 10) || 0; } catch (x) { }
             fire(node, 'OnTitleClick', { col: col });
@@ -1550,7 +1605,8 @@ var LW = (function () {
         return grid;
     }
 
-    function dbColumns(n) {
+    /* 平铺列（不含分组）：可见列一个一个对应 dataIndex c<i> */
+    function dbFlatCols(n) {
         var cols = n.cols || [], widths = n.colwidths || [], out = [];
         for (var i = 0; i < cols.length; i++) {
             var w = widths[i] > 0 ? widths[i] : null;
@@ -1564,6 +1620,45 @@ var LW = (function () {
             });
         }
         return out;
+    }
+
+    /* 两级表头（TLWDBGrid.HeaderGroups 下发的 hg = [{t,a,n}]）：
+       Ext 原生支持列嵌套 —— 一个带 columns 的"分组列"就是跨列表头。
+       hg 的 a/n 用的是"可见列下标"，和 dataIndex 的 c<i> 同一套编号，
+       所以分组只改表头的画法，数据字段一个都不用动。 */
+    function dbGroupCols(flat, n) {
+        var hg = n.hg || [], i, j;
+        if (!hg.length) return flat;
+        var owner = [], nc = flat.length;
+        for (i = 0; i < nc; i++) owner[i] = -1;
+        for (i = 0; i < hg.length; i++) {
+            var a = hg[i].a | 0, cnt = hg[i].n | 0, ok = cnt > 0 && a >= 0 && a + cnt <= nc;
+            /* 与前面的分组重叠：丢弃后写的那个，别把同一列塞进两个分组 */
+            for (j = a; ok && j < a + cnt; j++) if (owner[j] !== -1) ok = false;
+            if (ok) for (j = a; j < a + cnt; j++) owner[j] = i;
+        }
+        var out = [];
+        i = 0;
+        while (i < nc) {
+            if (owner[i] >= 0) {
+                var g = hg[owner[i]], ga = g.a | 0, gn = g.n | 0;
+                out.push({
+                    text: esc(g.t),
+                    menuDisabled: true,
+                    sortable: false,
+                    columns: flat.slice(ga, ga + gn)
+                });
+                i = ga + gn;
+            } else {
+                out.push(flat[i]);
+                i++;
+            }
+        }
+        return out;
+    }
+
+    function dbColumns(n) {
+        return dbGroupCols(dbFlatCols(n), n);
     }
 
     /* 行数据 -> store 记录。布尔列（cedit=4）必须转成真正的 boolean：
@@ -1582,13 +1677,14 @@ var LW = (function () {
 
     /* 行数据 + 列定义的指纹；服务端在编辑态下不发 rows，指纹保持不变 */
     function dbSig(n) {
-        return JSON.stringify(n.rows || null) + '#' + JSON.stringify(n.cols || null);
+        return JSON.stringify(n.rows || null) + '#' + JSON.stringify(n.cols || null) +
+            '#' + JSON.stringify(n.hg || null);
     }
 
     /* 列定义指纹（补丁路径判断"列没变"用；dbSig 里 rows 文本可能含 '#'，
        不能用 split 取列部分） */
     function dbColSig(n) {
-        return JSON.stringify(n.cols || null);
+        return JSON.stringify(n.cols || null) + '|' + JSON.stringify(n.hg || null);
     }
 
     /* 坑79：行数据直接灌进现有 store。reconfigure 会复用列实例但销毁
@@ -1606,7 +1702,7 @@ var LW = (function () {
        列，若这里不带 editor，第一次编辑完成后 CellEditing 就再也起不来
        （只能改一个单元格）。 */
     function dbEditColumns(n) {
-        var cols = dbColumns(n);
+        var cols = dbFlatCols(n);
         if (!n.readonly) {
             var eds = n.cedit || [];
             var pls = n.plist || [];
@@ -1633,7 +1729,7 @@ var LW = (function () {
                 }
             }
         }
-        return cols;
+        return dbGroupCols(cols, n);
     }
 
     function selectDBRow(grid, node) {
@@ -1691,6 +1787,35 @@ var LW = (function () {
         return p;
     }
 
+    /* Ext.tab.Panel 的两个连体坑（Ext 7.0.0，ext-all.js initComponent）：
+          a.layout = Ext.apply({type:'card', ..., activeItem: c}, a.layout)
+       这里 c 是 activeTab 这个"索引数字"。构造时 items 还是空的，拿不到组件，
+       于是 card 布局的 activeItem 就永久留着那个数字（实测 tabpanel 的
+       layout.activeItem === 10）。之后任何一次 setActiveTab 都在
+          if (b && b.fireEvent('beforedeactivate', b, a))
+       上抛 TypeError（数字没有 fireEvent）；而 setActiveTab 内部是
+          Ext.suspendLayouts(); ...; Ext.resumeLayouts(true)
+       异常一跳就少了一次 resume，全局 Ext.Component.layoutSuspendCount 卡在 1
+       —— 此后所有 updateLayout 只排队不 flush，整页只剩窗口标题（gallery
+       Ext 端白屏就是这么来的，与渲染/构建无关）。
+       两处一起躲：① 显式把 layout.activeItem 清成 undefined，让它走 undefined
+       分支；② 前后快照 layoutSuspendCount，无论怎么跳出都把计数还回去。 */
+    function lwSetActiveTab(tabs, want) {
+        var C = (Ext.Component || null);
+        var mark = C && typeof C.layoutSuspendCount === 'number' ? C.layoutSuspendCount : 0;
+        try {
+            if (tabs.layout) tabs.layout.activeItem = undefined;
+            var card = tabs.items ? tabs.items.getAt(want) : null;
+            if (card) tabs.setActiveTab(card);
+        } finally {
+            try {
+                for (var i = 0; C && C.layoutSuspendCount > mark && i < 64; i++) {
+                    Ext.resumeLayouts(true);
+                }
+            } catch (e2) { }
+        }
+    }
+
     function buildTabs(node, cfg) {
         cfg.layout = 'card';
         cfg.activeTab = node.active || 0;
@@ -1707,7 +1832,7 @@ var LW = (function () {
            此时 tabchange 还没绑，不会误回传服务端。 */
         try {
             var want = typeof node.active === 'number' ? node.active : 0;
-            if (want >= 0 && want < tabs.items.getCount()) tabs.setActiveTab(want);
+            if (want >= 0 && want < tabs.items.getCount()) lwSetActiveTab(tabs, want);
         } catch (e) { }
         /* TPageControl.OnChange：服务端业务经常挂在页签切换上
            （gallery 的 pcMainChange 就靠它回显），之前一直没绑。
@@ -1749,7 +1874,7 @@ var LW = (function () {
             hidden: cfg.hidden, disabled: cfg.disabled,
             activeTab: node.tabindex || 0, border: false,
             items: items.map(function (t) {
-                return { title: esc(t), layout: 'absolute', border: false, bodyPadding: 0 };
+                return { title: accText(t), layout: 'absolute', border: false, bodyPadding: 0 };
             })
         };
         if (!tcfg.items.length) {
@@ -1770,7 +1895,7 @@ var LW = (function () {
     }
 
     function buildTabSheet(node, cfg) {
-        cfg.title = esc(node.caption || '');
+        cfg.title = accText(node.caption, node.acc);
         cfg.layout = 'absolute';
         cfg.border = false;
         cfg.closable = false;
@@ -1791,7 +1916,7 @@ var LW = (function () {
         (list || []).forEach(function (m) {
             if (m.sep) { out.push('-'); return; }
             var it = {
-                text: esc(m.caption),
+                text: accText(m.caption),
                 disabled: m.enabled === false,
                 checked: m.checked || undefined,
                 handler: function () { fire(m, 'OnClick'); }
@@ -1812,11 +1937,11 @@ var LW = (function () {
             items: list.map(function (m) {
                 if (!m.items || !m.items.length) {
                     return {
-                        text: esc(m.caption), disabled: m.enabled === false,
+                        text: accText(m.caption), disabled: m.enabled === false,
                         handler: function () { fire(m, 'OnClick'); }
                     };
                 }
-                return { text: esc(m.caption), menu: items(m.items) };
+                return { text: accText(m.caption), menu: items(m.items) };
             })
         });
     }
@@ -1973,26 +2098,44 @@ var LW = (function () {
         }
     }
 
+    /* 容器量不出尺寸（未渲染 / 0×0 / 隐藏页签）时的延迟重试。
+       次数上限 6，递增间隔，避免未激活页签里无限空转。 */
+    function scheduleRetry(ct, list) {
+        var tries = (ct.__lwLayoutTries || 0);
+        if (tries >= 6) return;
+        ct.__lwLayoutTries = tries + 1;
+        Ext.defer(function () {
+            try { runLayout(ct, ct.__lwKidsNodes || list); } catch (e2) { }
+        }, 60 * (tries + 1));
+    }
+
     /* 服务端已经算好坐标；这里只处理 align 拉伸（窗口尺寸与设计期不一致时） */
     function runLayout(ct, list) {
         /* Ext toolbar 是 hbox 流式布局，自己会排子项，
            服务端坐标（TToolButton 没有 x）套上来只会互相踩 */
         try { if (ct instanceof Ext.toolbar.Toolbar) return; } catch (e0) { }
+        /* 取尺寸要"先判存在再取"，不能用 try/catch 把错误当"没尺寸"吞掉：
+           ct.body 还没建出来时 body 会退化成 ct 本身（Ext.Component 没有
+           getWidth），以前这里 TypeError 被 catch 直接 return，绝对定位的
+           子项就永远停在 (0,0)。 */
         var body = ct.body || ct;
         var w = 0, h = 0;
+        if (!body || typeof body.getWidth !== 'function' || !body.dom) {
+            scheduleRetry(ct, list);
+            return;
+        }
         try {
             w = body.getWidth();
             h = body.getHeight();
-        } catch (e) { return; }
+        } catch (e) {
+            scheduleRetry(ct, list);
+            return;
+        }
         /* 容器还没显示（窗口 hide 着、页签没激活）时量出来是 0×0。此时
            直接 return 会让绝对定位的 Ext.Component（TLabel 之类）永远停在
            (0,0)——刷新后"标签不见了"就是这么来的。等布局出来了再来一次。 */
         if (!w || !h) {
-            var tries = (ct.__lwLayoutTries || 0);
-            if (tries < 6) {
-                ct.__lwLayoutTries = tries + 1;
-                Ext.defer(function () { try { runLayout(ct, list); } catch (e2) { } }, 60 * (tries + 1));
-            }
+            scheduleRetry(ct, list);
             return;
         }
         ct.__lwLayoutTries = 0;
@@ -2074,18 +2217,18 @@ var LW = (function () {
             if (n.kind === 'tabs' && cmp.setActiveTab && prev.active !== undefined &&
                 typeof n.active === 'number' && prev.active !== n.active) {
                 cmp.__lwSilentTab = true;
-                try { cmp.setActiveTab(n.active); } finally { cmp.__lwSilentTab = false; }
+                try { lwSetActiveTab(cmp, n.active); } finally { cmp.__lwSilentTab = false; }
             }
         } catch (e) { }
 
         /* 文本/标题 */
         try {
             if (n.kind === 'label' || n.kind === 'static' || n.kind === 'statusbar') {
-                if (prev.text !== n.text && cmp.getEl()) {
-                    cmp.getEl().update(esc(n.text != null ? n.text : n.caption));
+                if ((prev.text !== n.text || prev.caption !== n.caption) && cmp.getEl()) {
+                    cmp.getEl().update(accText(n.text != null ? n.text : n.caption, n.acc));
                 }
             } else if (cmp.setText && (n.kind === 'button' || n.kind === 'bitbtn' || n.kind === 'speedbutton' || n.kind === 'toolbutton')) {
-                if (prev.caption !== n.caption) cmp.setText(n.caption || '');
+                if (prev.caption !== n.caption) cmp.setText(accText(n.caption || ''));
                 /* TSpeedButton 按下态跟随服务端（点击后服务端把 Down 置位） */
                 if (n.kind === 'speedbutton' && cmp.setPressed && prev.down !== undefined && prev.down !== n.down) {
                     try { cmp.setPressed(!!n.down); } catch (e2) { }
@@ -2093,9 +2236,9 @@ var LW = (function () {
             } else if (cmp.setText && n.kind === 'fileupload') {
                 /* 上传中按钮文字是进度，结束后由 uploadFiles 还原；
                    服务端改 Caption 时这里跟过去 */
-                if (prev.caption !== n.caption && prev.caption !== undefined) cmp.setText(n.caption || '');
+                if (prev.caption !== n.caption && prev.caption !== undefined) cmp.setText(accText(n.caption || ''));
             } else if (cmp.setTitle && (n.kind === 'groupbox' || n.kind === 'tabsheet')) {
-                if (prev.caption !== n.caption) cmp.setTitle(esc(n.caption || ''));
+                if (prev.caption !== n.caption) cmp.setTitle(accText(n.caption, n.acc));
             }
         } catch (e) { }
 
@@ -2169,6 +2312,8 @@ var LW = (function () {
                         cmp.__lwBoxes = [];
                         (n.items || []).forEach(function (t, i) {
                             var b = Ext.create('Ext.form.field.Checkbox', {
+                                /* TCheckListBox 的条目是 owner-draw 文本，
+                                   LCL 不解析 &（同 TListBox/TComboBox），原样画 */
                                 boxLabel: esc(t),
                                 checked: !!((n.checked || [])[i]),
                                 margin: '2 6'
@@ -2679,7 +2824,7 @@ var LW = (function () {
             if (kind === 'openfile') {
                 /* 选文件：第一个按钮换成"浏览…"，点了才打开文件选择框 */
                 btnCfg.push({
-                    text: b['default'] ? (b.text || '选择文件…') : b.text,
+                    text: b['default'] ? accText(b.text || '选择文件…') : accText(b.text),
                     cls: b['default'] ? 'lw-dlg-default' : '',
                     handler: function () {
                         if (b['default']) fileInput.click();
@@ -2689,7 +2834,7 @@ var LW = (function () {
                 return;
             }
             btnCfg.push({
-                text: b.text,
+                text: accText(b.text),
                 cls: b['default'] ? 'lw-dlg-default' : '',
                 handler: function () { answer(b.id, currentText()); }
             });

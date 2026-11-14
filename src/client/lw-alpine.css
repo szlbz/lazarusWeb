@@ -40,8 +40,13 @@
     --lw-surface4: #f6f8fa;        /* 只读框 / 键列 */
     --lw-surface5: #fdfefe;        /* 按钮渐变顶 / tooltip */
     --lw-win-bg: #f0f0f0;          /* 窗体客户区（LCL clBtnFace） */
-    --lw-title-a: #f7f9fb;         /* 标题栏渐变起 */
-    --lw-title-b: #e8edf2;         /* 标题栏渐变止 */
+    /* 标题栏：独立配色（比客户区明显深一档的蓝灰），与 #f0f0f0 的
+       客户区一眼可分。不能复用 --lw-title-b —— 它还是进度条槽色 */
+    --lw-cap-a: #dbe6f2;           /* 标题栏渐变起 */
+    --lw-cap-b: #c6d6e8;           /* 标题栏渐变止 */
+    --lw-cap-fg: #23374d;          /* 标题栏文字 */
+    --lw-title-a: #f7f9fb;         /* 标题栏渐变起（旧名，进度条槽等复用） */
+    --lw-title-b: #e8edf2;         /* 标题栏渐变止（旧名，进度条槽等复用） */
     --lw-btn-b: #eef2f6;           /* 按钮渐变止 */
 
     /* 线 */
@@ -114,6 +119,10 @@ html[data-lw-theme="dark"] {
     --lw-surface4: #262d36;
     --lw-surface5: #252c34;
     --lw-win-bg: #191d23;
+    /* 标题栏：比客户区 #191d23 亮一档的蓝灰，暗色下同样可分 */
+    --lw-cap-a: #333f4d;
+    --lw-cap-b: #273140;
+    --lw-cap-fg: #dbe4ee;
     --lw-title-a: #262d36;
     --lw-title-b: #1f252c;
     --lw-btn-b: #232a32;
@@ -377,8 +386,8 @@ html, body {
 .lw-win-title {
     height: 28px;
     min-height: 28px;
-    background: linear-gradient(var(--lw-title-a), var(--lw-title-b));
-    border-bottom: 1px solid var(--lw-border3);
+    background: linear-gradient(var(--lw-cap-a), var(--lw-cap-b));
+    border-bottom: 1px solid var(--lw-border-strong);
     border-radius: 5px 5px 0 0;
     display: flex;
     align-items: center;
@@ -386,7 +395,7 @@ html, body {
     cursor: move;
     user-select: none;
     font-weight: bold;
-    color: var(--lw-fg2);
+    color: var(--lw-cap-fg);
     font-size: 13px;
 }
 /* 标题占满剩余宽度：右侧图标（最大化/×）才能贴到标题栏最右。
@@ -414,6 +423,12 @@ html, body {
 }
 .lw-win-max:hover, .lw-win-theme:hover { background: var(--lw-hover); color: var(--lw-accent-strong); }
 .lw-win-x:hover { background: var(--lw-hover); color: var(--lw-danger); }
+
+/* 标题栏底色加深后，--lw-icon 的灰在蓝灰渐变上对比不够，统一压暗一点
+   （用透明度而不是换色：hover 的变色规则继续生效） */
+.lw-win-title .lw-win-max, .lw-win-title .lw-win-x, .lw-win-title .lw-win-theme {
+    opacity: .78;
+}
 
 /* 右上角最大化/还原图标（对齐 Ext maximizable；排在 × 左边，
    靠 .lw-win-cap 的 flex:1 推到最右） */
@@ -796,6 +811,21 @@ html, body {
 }
 .lw-ve-key { width: 110px; background: var(--lw-surface4); }
 .lw-ve-edit { cursor: text; min-width: 120px; }
+
+/* ---------- 两级表头（TLWDBGrid.HeaderGroups） ----------
+   分组行是跨列标题：居中、底色比叶子表头深一档，看得出层级。
+   两行表头整体粘顶（thead 上 sticky）：逐格 sticky 的 top 要按第一行
+   的高度算，字体/DPI 一变就叠字；整块粘就不需要那个数字。
+   Chromium 在 border-collapse: collapse 的表格上做 sticky 表头时，数据行的
+   文字会从表头格里透出来（滚到表格中间最明显，见 tests/dbgrid_hg_*.png）。
+   分组表头改成 separate + 手工边框：每格只画右/下，首行补上、首列补左，
+   视觉与 collapse 一样，但不共享边框就不会和 sticky 打架。 */
+.lw-table.lw-hg { border-collapse: separate; border-spacing: 0; }
+.lw-table.lw-hg th, .lw-table.lw-hg td { border-width: 0 1px 1px 0; }
+.lw-table.lw-hg thead tr:first-child th { border-top-width: 1px; }
+.lw-table thead.lw-thead-hg { position: sticky; top: 0; z-index: 2; }
+.lw-table thead.lw-thead-hg th { position: static; }
+.lw-table th.lw-th-grp { text-align: center; background: var(--lw-surface4); }
 
 /* ---------- drawgrid 自绘单元格（$lwDrawCell） ---------- */
 /* 进度条：细槽 + 填充条 + 百分比文本 */
