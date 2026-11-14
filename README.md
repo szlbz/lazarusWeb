@@ -563,7 +563,7 @@ FormField()` 与 `Session`（`?sid=` 或 `X-LW-Sid` 头，可读会话级数据�
 
 回归：`tests/t_multitab.py`（22 项）+ `tests/cdp_multitab.py`（CDP 双真实标签页 6 项）。
 
-## GUI 服务端面板（不再是大黑终端）
+## GUI 服务端面板  
 
 每个 demo 有两种构建（以 dbaware 为例）：
 
