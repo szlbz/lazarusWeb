@@ -20,11 +20,16 @@ interface
 
 uses
   Classes, SysUtils, Forms, Controls, Graphics, StdCtrls, ExtCtrls, DB,
-  sqldb, sqlite3conn, lwform, lwlogin, lwbase;
+  sqldb, sqlite3conn, lwform, lwlogin, lwbase, lwcaptcha;
 
 type
+
+  { TLoginForm }
+
   TLoginForm = class(TLWLoginForm)
   published
+    edCode: TEdit;
+    Label1: TLabel;
     { ---- 控件：名字与 uLogin.lfm 里的对象一一对应，LFM 加载时自动绑定 ---- }
     lblLogo: TLabel;
     lblSub: TLabel;
@@ -35,6 +40,7 @@ type
     btnOk: TButton;
     btnReset: TButton;
     lblHint: TLabel;
+    LWCaptcha1: TLWCaptcha;
 
     { ---- 事件（LFM 里按名字绑定）---- }
     procedure FormCreate(Sender: TObject);
@@ -159,10 +165,13 @@ begin
   edUser.Text := 'admin';
   edPass.Text := '123456';
   btnOk.Default := True;
+  { AutoSize 必须先关：开着的话 LCL 会按文字重算尺寸，把它撑得比 lfm 里
+    的框子还高 —— 浏览器端那块多出来的高度会把窗体顶出纵向滚动条 }
+  lblHint.AutoSize := False;
   lblHint.WordWrap := True;
   lblHint.Caption :=
-  '演示账号：admin / 123456（管理员）· guest / guest（只读）。' +
-  '账号存在 dbaware.db 的 users 表里，认证失败会在浏览器右上角弹提示。';
+  '演示账号：admin / 123456（管理员）· guest / guest（只读）；' +
+  '账号存在 dbaware.db 的 users 表里。';
 end;
 
 procedure TLoginForm.DoAuth(Sender: TObject; const AUser, APass: string;

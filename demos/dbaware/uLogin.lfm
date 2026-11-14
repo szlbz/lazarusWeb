@@ -1,81 +1,108 @@
 object LoginForm: TLoginForm
   Left = 0
-  Height = 322
+  Height = 483
   Top = 0
-  Width = 420
+  Width = 630
   Caption = 'lazarusWeb · 登录'
-  ClientHeight = 322
-  ClientWidth = 420
+  ClientHeight = 483
+  ClientWidth = 630
+  DesignTimePPI = 144
+  LCLVersion = '4.8.0.0'
   OnCreate = FormCreate
   object lblLogo: TLabel
-    Left = 28
-    Height = 30
-    Top = 24
-    Width = 360
+    Left = 42
+    Height = 42
+    Top = 36
+    Width = 324
     Caption = 'lazarusWeb 综合演示'
-    Font.Color = clNavy
-    Font.Height = -21
+    Font.Color = 4227327
+    Font.Height = -32
     Font.Style = [fsBold]
     ParentFont = False
   end
   object lblSub: TLabel
-    Left = 30
-    Height = 18
-    Top = 56
-    Width = 360
+    Left = 45
+    Height = 24
+    Top = 84
+    Width = 341
     Caption = 'dbaware · 登录后进入数据管理 / 报表中心'
     Font.Color = clGray
     ParentFont = False
   end
   object lblUser: TLabel
-    Left = 30
-    Height = 18
-    Top = 96
-    Width = 80
+    Left = 45
+    Height = 24
+    Top = 144
+    Width = 54
     Caption = '用户名'
   end
   object edUser: TEdit
-    Left = 112
-    Height = 26
-    Top = 92
-    Width = 240
+    Left = 168
+    Height = 32
+    Top = 138
+    Width = 360
+    TabOrder = 0
   end
   object lblPass: TLabel
-    Left = 30
-    Height = 18
-    Top = 136
-    Width = 80
+    Left = 45
+    Height = 24
+    Top = 204
+    Width = 36
     Caption = '密码'
   end
   object edPass: TEdit
-    Left = 112
-    Height = 26
-    Top = 132
-    Width = 240
+    Left = 168
+    Height = 32
+    Top = 198
+    Width = 360
+    EchoMode = emPassword
     PasswordChar = '*'
+    TabOrder = 1
   end
   object btnOk: TButton
-    Left = 112
-    Height = 32
-    Top = 176
-    Width = 116
+    Left = 168
+    Height = 48
+    Top = 312
+    Width = 174
     Caption = '登录'
+    TabOrder = 2
     OnClick = DoLogin
   end
   object btnReset: TButton
-    Left = 236
-    Height = 32
-    Top = 176
-    Width = 116
+    Left = 352
+    Height = 48
+    Top = 312
+    Width = 174
     Caption = '重置'
+    TabOrder = 3
     OnClick = DoReset
   end
   object lblHint: TLabel
-    Left = 30
-    Height = 60
-    Top = 226
-    Width = 360
+    Left = 45
+    Height = 1
+    Top = 384
+    Width = 1
     Font.Color = clGray
     ParentFont = False
+  end
+  object LWCaptcha1: TLWCaptcha
+    Left = 360
+    Height = 40
+    Top = 252
+    Width = 165
+  end
+  object edCode: TEdit
+    Left = 168
+    Height = 32
+    Top = 256
+    Width = 174
+    TabOrder = 4
+  end
+  object Label1: TLabel
+    Left = 45
+    Height = 24
+    Top = 258
+    Width = 54
+    Caption = '验证码'
   end
 end
