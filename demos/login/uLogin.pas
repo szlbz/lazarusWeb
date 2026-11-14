@@ -12,6 +12,7 @@
     - 主窗体上"退出登录"回到登录窗体（会话重新要求认证）。
 
   跑起来：logindemo.exe --port=8130  ->  浏览器 admin / 123456
+          验证码点图即可换一张；账号或密码错、验证码错都会自动换新图。
 }
 unit uLogin;
 
@@ -20,7 +21,7 @@ unit uLogin;
 interface
 
 uses
-  Classes, SysUtils, Forms, Controls, StdCtrls, lwform, lwlogin;
+  Classes, SysUtils, Forms, Controls, StdCtrls, lwform, lwlogin, lwcaptcha;
 
 type
   { 登录窗体：lfm 在 uLogin.lfm，业务代码只挂认证回调。
@@ -30,8 +31,11 @@ type
     lblTitle: TLabel;
     lblUser: TLabel;
     lblPass: TLabel;
+    lblCode: TLabel;
     edUser: TEdit;
     edPass: TEdit;
+    edCode: TEdit;
+    captcha1: TLWCaptcha;
     btnOk: TButton;
     btnReset: TButton;
   published

@@ -1,10 +1,10 @@
 object LoginForm: TLoginForm
   Left = 420
-  Height = 200
+  Height = 250
   Top = 260
   Width = 390
   Caption = '登录 lazarusWeb'
-  ClientHeight = 200
+  ClientHeight = 250
   ClientWidth = 390
   LCLVersion = '3.0'
   OnCreate = FormCreate
@@ -13,7 +13,7 @@ object LoginForm: TLoginForm
     Height = 18
     Top = 18
     Width = 344
-    Caption = '演示登录 / 权限框架（账号 admin，密码 123456）'
+    Caption = '演示登录 / 权限框架（admin / 123456 + 图形验证码）'
   end
   object lblUser: TLabel
     Left = 24
@@ -44,22 +44,43 @@ object LoginForm: TLoginForm
     PasswordChar = '*'
     TabOrder = 1
   end
+  object lblCode: TLabel
+    Left = 24
+    Height = 18
+    Top = 140
+    Width = 60
+    Caption = '验证码'
+  end
+  object captcha1: TLWCaptcha
+    Left = 110
+    Height = 34
+    Top = 134
+    Width = 110
+    CaptchaLength = 4
+  end
+  object edCode: TEdit
+    Left = 230
+    Height = 26
+    Top = 138
+    Width = 130
+    TabOrder = 2
+  end
   object btnOk: TButton
     Left = 110
     Height = 30
-    Top = 148
+    Top = 196
     Width = 110
     Caption = '登 录'
     OnClick = DoLogin
-    TabOrder = 2
+    TabOrder = 3
   end
   object btnReset: TButton
     Left = 250
     Height = 30
-    Top = 148
+    Top = 196
     Width = 110
     Caption = '重 置'
     OnClick = DoReset
-    TabOrder = 3
+    TabOrder = 4
   end
 end
