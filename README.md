@@ -14,6 +14,11 @@ Lazarus 桌面程序的 Web 化运行时 —— 参考 uniGUI 的思路，但用
 - Ext JS 7.0.0（GPLv3 版，**可选**：发布包不包含，需自行从 Sencha 官方渠道获取后放入 `ext-7.0.0\`；不放置时默认使用内置的 Alpine.js 渲染层）  
 - **Ext 支持为可选功能，ext-js 文件由用户自行获取，其授权合规由使用者自行负责。**  
 
+## 安装lazarusWeb
+- wserver.lpk  只编译
+- lwcore.lpk   只编译  
+- lwdesign.lpk 编译并安装
+
 ## 跨平台构建矩阵（宿主 → 目标）
 
 全部源码（`src/`、`tools/`、`demos/`）均为跨平台代码：核心单元的平台差异
