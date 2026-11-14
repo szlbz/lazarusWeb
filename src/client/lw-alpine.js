@@ -62,6 +62,31 @@ var LW = (function () {
         }
         return s + '</svg>';
     }
+    /* 标题栏窗口按钮图标：最大化 / 还原 / 关闭。
+       与主题按钮同一套画法（内联 SVG，currentColor 跟随文字色）。
+       最大化不用"一个方框"：方框在标题栏里和"复选框/占位方块"没有区别
+       （原字形 ▢ 更是常被字体渲染成缺字方块）。改用标准的双向斜箭头：
+       向外指 = 放大铺满，向内收 = 还原窗口，13px 下方向仍然清楚。 */
+    function winIcon(kind) {
+        var s = '<svg width="13" height="13" viewBox="0 0 16 16" fill="none" ' +
+            'stroke="currentColor" stroke-width="1.35" stroke-linecap="round" ' +
+            'stroke-linejoin="round">';
+        if (kind === 'restore') {
+            /* 还原：两层窗口叠角（前窗左下、后窗右上），系统里"还原窗口"
+               就是这个形状 —— 与最大化的斜箭头形成明确对比，不会看混 */
+            s += '<rect x="2.6" y="5.4" width="8" height="8" rx="0.8"/>' +
+                '<path d="M5.2 5.4V3.3a0.9 0.9 0 0 1 0.9-0.9h6.3a0.9 0.9 0 0 1 0.9 0.9v6.3' +
+                'a0.9 0.9 0 0 1-0.9 0.9h-2.2"/>';
+        } else if (kind === 'close') {
+            s += '<path d="M3.6 3.6l8.8 8.8M12.4 3.6l-8.8 8.8"/>';
+        } else {
+            /* 最大化：两支斜向外扩的双箭头，箭头头部贴住外角 */
+            s += '<path d="M9.8 2.8h3.4v3.4"/><path d="M13.0 3.0L9.4 6.6"/>' +
+                '<path d="M6.2 13.2H2.8V9.8"/><path d="M3.0 13.0l3.6-3.6"/>';
+        }
+        return s + '</svg>';
+    }
+
     function themeBtnSync(b) {
         b.innerHTML = themeIcon(themePref);
         b.title = '配色：' + themeLabel(themePref) + '（点击切换）';
@@ -567,6 +592,9 @@ var LW = (function () {
         if (k === 'combo') {
             r.txt = node.text || (node.items && node.index >= 0 ? node.items[node.index] : '');
         }
+        /* TStaticText 早先的服务端只发 caption（没有 text），这里兜一层，
+           避免旧服务端配新客户端时静态文本又变回空 div */
+        if (k === 'static' && node.text == null) r.txt = node.caption != null ? String(node.caption) : '';
         if (k === 'dbgrid') {
             r.pgtext = pagerTextOf(node);
             r.sumtext = node.summary ? summaryTextOf(node.summary) : '';
@@ -904,10 +932,25 @@ var LW = (function () {
 
         switch (k) {
             case 'label':
-            case 'static':
                 return '<div class="lw-label" style="white-space:' + (node.wordwrap ? 'normal' : 'nowrap') +
                     ';overflow:hidden;' + (node.textalign === 1 ? 'text-align:center;' : node.textalign === 2 ? 'text-align:right;' : '') +
                     fs + '" x-text="' + r + '.txt" @click="' + evAttr(id, 'OnClick') + '"></div>';
+
+            case 'static': {
+                /* TStaticText：一块文字，可选边框（BorderStyle = sbsNone/
+                   sbsSingle/sbsSunken）。服务端已下发 text；老服务端只有
+                   caption，所以状态里的 txt 也带 caption 兜底（见 stateOf），
+                   否则这里就是个空 div —— 控件"在浏览器里看不见"。
+                   用 flex 而不是 text-align：带边框时文字要在框内垂直居中，
+                   Alignment 换成 justify-content 表达。 */
+                var sb = node.staticborder === 1 ? ' lw-static-single'
+                    : node.staticborder === 2 ? ' lw-static-sunken' : '';
+                var sbg = (node.transparent === false && node.bg) ? 'background:' + node.bg + ';' : '';
+                var sj = node.textalign === 1 ? 'center' : (node.textalign === 2 ? 'flex-end' : 'flex-start');
+                return '<div class="lw-label lw-static' + sb + '" style="display:flex;align-items:center;' +
+                    'justify-content:' + sj + ';white-space:nowrap;overflow:hidden;' + sbg + fs +
+                    '" x-text="' + r + '.txt" @click="' + evAttr(id, 'OnClick') + '"></div>';
+            }
 
             case 'button':
             case 'bitbtn':
@@ -2113,9 +2156,12 @@ var LW = (function () {
         title.className = 'lw-win-title';
         title.innerHTML = '<span class="lw-win-cap">' + esc(f.caption || f.name) + '</span>' +
             /* 右上角图标（对齐 Ext 版 maximizable: true）：最大化/还原 +
-              模态窗体的 × 关闭 */
-            '<span class="lw-win-max" title="最大化/还原">▢</span>' +
-            (f.modal ? '<span class="lw-win-x" title="关闭">×</span>' : '');
+               模态窗体的 × 关闭。图标是手绘 SVG 而不是 ▢ / × 这些字形：
+               ▢（U+25A2）在很多字体里会落成"缺字方块"，看起来像坏掉的
+               边框，完全没有"放大"的含义；自绘的方形描边（还原时是双框
+               叠角）在 14px 下轮廓稳定，配 hover 底色就是标准窗口按钮。 */
+            '<span class="lw-win-max" title="最大化">' + winIcon('max') + '</span>' +
+            (f.modal ? '<span class="lw-win-x" title="关闭">' + winIcon('close') + '</span>' : '');
         win.appendChild(title);
         /* 配色切换按钮：只放在非模态窗口（模态对话框标题栏已经够挤，
            而且它往往只显示几秒，不给它加控件） */
@@ -2207,6 +2253,9 @@ var LW = (function () {
         if (maxBtn) maxBtn.addEventListener('click', function () {
             win.__lwMax = !win.__lwMax;
             win.classList.toggle('lw-max', win.__lwMax);
+            /* 图标与提示同步：最大化后换成"双框叠角"的还原图标，
+               否则用户只看到一个方框，分不清当前是放大还是缩回 */
+            maxBtn.innerHTML = winIcon(win.__lwMax ? 'restore' : 'max');
             maxBtn.title = win.__lwMax ? '还原' : '最大化';
         });
 

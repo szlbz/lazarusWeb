@@ -385,25 +385,30 @@ html, body {
    多个 auto 边距，最大化图标会被顶到标题栏中间（坑：关于对话框）。
    min-width:0 让 ellipsis 在 flex 里继续生效 */
 .lw-win-cap { flex: 1; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.lw-win-x {
+
+/* 标题栏右侧图标按钮（最大化/还原、关闭）：图标换成手绘 SVG 之后统一成
+   14px 见方的可点区域 + hover 底色 —— 与系统窗口按钮同一套视觉语言，
+   一眼能看出是可点的按钮，而不是标题旁边的装饰方块 */
+.lw-win-max, .lw-win-x, .lw-win-theme {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    box-sizing: border-box;
+    width: 22px;
+    height: 20px;
+    flex: 0 0 auto;
+    border-radius: 3px;
+    line-height: 1;
     cursor: pointer;
     color: var(--lw-icon);
-    font-size: 18px;
-    line-height: 1;
-    padding: 0 6px;
+    font-family: "Segoe UI Symbol", "Segoe UI", "Microsoft YaHei", sans-serif;
 }
-.lw-win-x:hover { color: var(--lw-danger); }
+.lw-win-max:hover, .lw-win-theme:hover { background: var(--lw-hover); color: var(--lw-accent-strong); }
+.lw-win-x:hover { background: var(--lw-hover); color: var(--lw-danger); }
 
 /* 右上角最大化/还原图标（对齐 Ext maximizable；排在 × 左边，
    靠 .lw-win-cap 的 flex:1 推到最右） */
-.lw-win-max {
-    cursor: pointer;
-    color: var(--lw-icon);
-    font-size: 13px;
-    line-height: 1;
-    padding: 0 7px;
-}
-.lw-win-max:hover { color: var(--lw-accent-strong); }
+.lw-win-max { font-size: 13px; }
 
 /* 可调大小（LFM bsSizeable/bsSizeToolWin）：CSS resize 的唯一入口是
    拖右下角；overflow 必须非 visible，句柄才出现 */
@@ -597,6 +602,14 @@ html, body {
 
 /* ---------- 基础控件 ---------- */
 .lw-label { line-height: 1.4; }
+/* TStaticText 的边框：LCL 的 TStaticBorderStyle = sbsNone / sbsSingle / sbsSunken。
+   文字本身与 .lw-label 共用一套排版，这里只补边框，且颜色全部走主题变量。 */
+.lw-static { padding: 1px 2px; }
+.lw-static-single { border: 1px solid var(--lw-border); }
+.lw-static-sunken {
+    border: 1px solid var(--lw-border-strong);
+    box-shadow: inset 1px 1px 0 var(--lw-border3);
+}
 .lw-input, .lw-select, .lw-memo {
     box-sizing: border-box;
     width: 100%;
@@ -1128,17 +1141,7 @@ html, body {
 /* ---------- 主题切换按钮（标题栏右侧） ----------
    ☀ 亮色 / ☾ 深色 / ◐ 跟随系统，点开是三选一弹层（复用 .lw-menu-pop）。
    放在标题栏里而不是浮在右下角：不会压住状态栏文字，也不需要额外定位。 */
-.lw-win-theme {
-    cursor: pointer;
-    display: inline-flex;
-    align-items: center;
-    color: var(--lw-icon);
-    font-size: 13px;
-    line-height: 1;
-    padding: 0 7px;
-    font-family: "Segoe UI Symbol", "Segoe UI", "Microsoft YaHei", sans-serif;
-}
-.lw-win-theme:hover { color: var(--lw-accent); }
+/* 当前配色不是"跟随系统"时点亮（图标本身见 .lw-win-max / .lw-win-x 的共用块） */
 .lw-win-theme.lw-on { color: var(--lw-accent); }
 
 /* ---------- 图表 / 仪表盘的 SVG 配色 ----------
