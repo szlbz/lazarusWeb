@@ -209,7 +209,7 @@ TMainForm = class(TLWForm)   // 原来是 class(TForm)
 ```
 MyApp/
   MyApp.exe
-  ext-7.0.0/           Ext JS 目录（可选；精简版约 23 MB，完整版 75 MB，见下）
+  ext-7.0.0/           Ext JS 目录
   src/client/lw.js     86 KB
   src/client/lw.css    3 KB
 ```
