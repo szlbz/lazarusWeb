@@ -1175,7 +1175,11 @@ var
   lx, ly, sp: Integer;
   i, j: Integer;
 begin
-  if AKind = 'label' then
+  { TStaticText 与 TLabel 在浏览器端都渲染成一块文字（前端 kind 分别是
+    static / label），共用这里输出的 text。之前这里只判 'label'，
+    'static' 节点因此没有 text 字段，前端 x-text 绑到空串、控件整个看不见
+    （lfm 里 Caption 有值；Ext 层因为拿 caption 兜底才没暴露这个问题）。 }
+  if (AKind = 'label') or (AKind = 'static') then
   begin
     { TDBText 的 Caption 由 LCL 的 DataChange 填，但 nogui 下这个赋值链
       并不总能落到 Caption 上（实测一直为空）。直接读绑定字段的 DisplayText，
@@ -1200,6 +1204,18 @@ begin
         标题就会被推到窗中央（About 对话框标题跑中间就是这个）。
         把 AutoSize 下发，浏览器端让 DOM 自适应宽度，与真实 LCL 一致。 }
       O.Add('autosize', TLabel(C).AutoSize);
+    end
+    else if C is TStaticText then
+    begin
+      { TStaticText 不是 TLabel：没有 WordWrap / Layout，Alignment 与
+        TLabel.Alignment 同为 TAlignment（taLeft/taCenter/taRight = 0/1/2），
+        BorderStyle 是 TStaticBorderStyle（sbsNone/sbsSingle/sbsSunken = 0/1/2），
+        Transparent 缺省 True（不画底色）。这三个都决定外观，必须下发，
+        否则 sbsSunken 的静态文本在浏览器里会少一圈边框。 }
+      O.Add('wordwrap', False);
+      O.Add('textalign', Ord(TStaticText(C).Alignment));
+      O.Add('staticborder', Ord(TStaticText(C).BorderStyle));
+      O.Add('transparent', TStaticText(C).Transparent);
     end;
     { TBoundLabel（TLabeledEdit 的标签）：nogui 下 LCL 的锚点没机会解析，
       位置是 (0,0)。按 LCL 的 DoPositionLabel 语义（枚举 lpAbove/lpBelow/
