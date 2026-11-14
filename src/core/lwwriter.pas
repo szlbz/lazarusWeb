@@ -40,6 +40,8 @@ type
     FIds: TLWIdFunc;
     function NodeId(C: TComponent): Integer;
     function CaptionOf(C: TControl): string;
+    { 控件的 ShowAccelChar 被显式关掉了吗（关掉时 Caption 里的 & 是字面量）}
+    function AccelOff(C: TControl): Boolean;
     function WriteEvents(C: TComponent; AForceClick: Boolean): TJSONArray;
     function WriteChildren(WC: TWinControl): TJSONArray;
     function WriteMenuItems(MI: TMenuItem): TJSONArray;
@@ -50,6 +52,8 @@ type
     function FindSideMenu(AForm: TCustomForm): TLWSideMenu;
     function StatusPanels(SB: TStatusBar): TJSONArray;
     function StatusInfo(SB: TStatusBar; AForm: TCustomForm): TJSONObject;
+    { 两级表头分组（TLWDBGrid.HeaderGroups）-> [{t:标题, a:起始可见列, n:跨度}] }
+    function HeaderGroupsJson(G: TLWDBGrid; AVisibleCols: Integer): TJSONArray;
     procedure WriteKindProps(C: TControl; const AKind: string; O: TJSONObject);
     procedure WriteKindPropsBody(C: TControl; const AKind: string; O: TJSONObject);
     function MakeBase(C: TControl; const AKind: string): TJSONObject;
@@ -305,6 +309,21 @@ begin
   Result := s;
 end;
 
+{ LCL 里「& 是加速键」这件事是分控件决定的：TLabel/TStaticText/TPanel/
+  TButton/TCheckBox/TSpeedButton… 都有 published 的 ShowAccelChar，默认 True；
+  显式设成 False 时 Caption 里的 & 就是字面量（"A && B" 原样显示）。
+  浏览器端默认按加速键解析，只有这里返回 True 才下发 acc=0 让它照字面画。 }
+function TLWWriter.AccelOff(C: TControl): Boolean;
+var
+  pi: PPropInfo;
+begin
+  Result := False;
+  if C = nil then Exit;
+  pi := GetPropInfo(C, 'ShowAccelChar');
+  if pi <> nil then
+    Result := GetOrdProp(C, pi) = 0;
+end;
+
 function TLWWriter.WriteEvents(C: TComponent; AForceClick: Boolean): TJSONArray;
 var
   PL: PPropList;
@@ -353,6 +372,12 @@ begin
   o.Add('h', C.Height);
   o.Add('align', AlignToStr(C.Align));
   o.Add('caption', CaptionOf(C));
+  { LCL 的加速键解析是"控件级"的：只有 ShowAccelChar=True（Label/StaticText/
+    按钮族/复选/单选/GroupBox/页签/菜单的默认值）才把 &X 画成下划线 X；
+    TPanel 默认是 False（extctrls.pp TCustomPanel.ShowAccelChar = False），
+    面板标题里的 & 就是字面量。这里只在"关掉"时才下发 acc:0，
+    其余情况省掉这个字段（默认值 = 解析），payload 不会变胖。 }
+  if AccelOff(C) then o.Add('acc', 0);
   o.Add('enabled', C.Enabled);
   o.Add('visible', C.Visible);
   { Hint 有值就下发，由浏览器端显示（Ext QuickTips）。
@@ -637,6 +662,54 @@ begin
   end;
 end;
 
+{ 两级表头分组：把 TLWDBGrid.HeaderGroups 的文本行折成前端结构。
+  每行格式 "标题|起-止"（起/止 = 可见列下标，0 起、含止；只写一个数字
+  等于该列独自成组）。写坏的行直接丢弃 —— 宁可少画一层表头，
+  也不能把分组盖到错误的列上。全部无效时返回 nil（前端当没有分组）。 }
+function TLWWriter.HeaderGroupsJson(G: TLWDBGrid; AVisibleCols: Integer): TJSONArray;
+var
+  i, p, q, a, b, tmp: Integer;
+  s, cap, rng, sa, sb: string;
+  o: TJSONObject;
+begin
+  Result := nil;
+  if (G = nil) or (AVisibleCols <= 0) or (G.HeaderGroups.Count = 0) then Exit;
+  for i := 0 to G.HeaderGroups.Count - 1 do
+  begin
+    s := Trim(G.HeaderGroups[i]);
+    if s = '' then Continue;
+    p := LastDelimiter('|', s);
+    if p <= 1 then Continue;
+    cap := Trim(Copy(s, 1, p - 1));
+    rng := Trim(Copy(s, p + 1, Length(s)));
+    if cap = '' then Continue;
+    q := Pos('-', rng);
+    if q > 0 then
+    begin
+      sa := Trim(Copy(rng, 1, q - 1));
+      sb := Trim(Copy(rng, q + 1, Length(rng)));
+    end
+    else
+    begin
+      sa := rng;
+      sb := rng;
+    end;
+    if (not TryStrToInt(sa, a)) or (not TryStrToInt(sb, b)) then Continue;
+    if a > b then
+    begin
+      tmp := a; a := b; b := tmp;
+    end;
+    if (a < 0) or (a >= AVisibleCols) then Continue;
+    if b >= AVisibleCols then b := AVisibleCols - 1;
+    if Result = nil then Result := TJSONArray.Create;
+    o := TJSONObject.Create;
+    o.Add('t', cap);
+    o.Add('a', a);
+    o.Add('n', b - a + 1);
+    Result.Add(o);
+  end;
+end;
+
 procedure TLWWriter.WriteDBGrid(G: TDBGrid; O: TJSONObject);
 var
   ds: TDataSet;
@@ -662,6 +735,7 @@ var
   pages: Integer;
   sumField: TField;
   visible: Boolean;
+  hg: TJSONArray;
 begin
   lwg := nil;
   if G is TLWDBGrid then lwg := TLWDBGrid(G);
@@ -740,6 +814,12 @@ begin
     end;
   end;
   O.Add('cols', cols);
+  { 两级表头：仅当业务代码写了 HeaderGroups 才下发，普通网格一个字节不多 }
+  if lwg <> nil then
+  begin
+    hg := HeaderGroupsJson(lwg, cols.Count);
+    if hg <> nil then O.Add('hg', hg);
+  end;
   O.Add('fields', fields);
   O.Add('colwidths', cw);
   O.Add('cedit', cedit);
@@ -1842,7 +1922,9 @@ begin
     if not it.Visible then Continue;
     o := TJSONObject.Create;
     o.Add('id', NodeId(it));
-    o.Add('caption', StringReplace(it.Caption, '&', '', [rfReplaceAll]));
+    { 原样下发（保留 & 助记符；分隔线是单独的 '-'）。TMenuItem 的 Caption
+      里 &X 由浏览器端 accText/accHtml 画成带下划线的 X，&& 转义成字面 &。 }
+    o.Add('caption', it.Caption);
     o.Add('enabled', it.Enabled);
     o.Add('checked', it.Checked);
     o.Add('sep', it.Caption = '-');
@@ -1899,7 +1981,9 @@ begin
     if not it.Visible then Continue;
     o := TJSONObject.Create;
     o.Add('id', NodeId(it));
-    o.Add('caption', StringReplace(it.Caption, '&', '', [rfReplaceAll]));
+    { 原样下发（保留 & 助记符；分隔线是单独的 '-'）。TMenuItem 的 Caption
+      里 &X 由浏览器端 accText/accHtml 画成带下划线的 X，&& 转义成字面 &。 }
+    o.Add('caption', it.Caption);
     o.Add('enabled', it.Enabled);
     o.Add('checked', it.Checked);
     o.Add('sep', it.Caption = '-');

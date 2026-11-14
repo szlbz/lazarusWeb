@@ -1185,7 +1185,9 @@ begin
   s := s + LineEnding + '<button type="button" class="lw-btn" @click="$store.lw.dialog.pick()">浏览…</button>';
   s := s + LineEnding + '</template>';
   s := s + LineEnding + '<button type="button" class="lw-btn" :class="b[''default''] ? ''lw-dlg-default'' : ''''"';
-  s := s + LineEnding + ' x-show="!($store.lw.dialog.kind === ''openfile'' && b[''default''] )" @click="$lwDlgAnswer(b)" x-text="b.text"></button>';
+  { 按钮文字走 $lwCap：LCL Caption 的 &X 加速键显示成下划线（如 rsmbOK 的"确定(&O)"），
+    而不是把 & 原样露出来；Alt+X 由 lw-alpine.js 的全局 keydown 触发 }
+  s := s + LineEnding + ' x-show="!($store.lw.dialog.kind === ''openfile'' && b[''default''] )" @click="$lwDlgAnswer(b)" x-html="$lwCap(b.text)"></button>';
   s := s + LineEnding + '</span>';
   s := s + LineEnding + '</template>';
   s := s + LineEnding + '</div>';

@@ -11,6 +11,12 @@
     grd.SummaryType := gsSum;    // gsNone / gsSum / gsAvg / gsCount
     grd.SummaryField := 'price'; // 汇总字段（须是数值列）
 
+  两级（分组）表头：
+    grd.HeaderGroups.Add('基本信息|0-1');   // 标题|起-止（可见列下标，0 起、含止）
+    grd.HeaderGroups.Add('成绩|2-4');
+    未写进任何分组的列自己占一格、上下贯通两行。分组按"可见列"编号
+    （Columns[i].Visible=False 的列不占号），所以隐藏列不影响书写。
+
   运行时状态（不 published，框架自己维护）：
     CurrentPage  当前页（1 起）；浏览器端分页条触发 OnPageChange 时改写
     FilterText   过滤关键字；触发 OnFilter 时改写（显示层过滤，
@@ -44,8 +50,10 @@ type
     FSummaryField: string;
     FCurrentPage: Integer;
     FFilterText: string;
+    FHeaderGroups: TStrings;
     FMatches: array of TBytes;   { 最近一次序列化的匹配行书签（TBookmark = TBytes）}
     function GetCurrentPage: Integer;
+    procedure SetHeaderGroups(AValue: TStrings);
   public
     constructor Create(AOwner: TComponent); override;
     destructor Destroy; override;
@@ -65,6 +73,9 @@ type
     property ShowFilter: Boolean read FShowFilter write FShowFilter;
     property SummaryType: TLWGridSummary read FSummaryType write FSummaryType default gsNone;
     property SummaryField: string read FSummaryField write FSummaryField;
+    { 两级表头：每行 '标题|起-止'，起/止是"可见列"下标（0 起、含止）。
+      Count=0（默认）时表头与普通 TDBGrid 完全一致 }
+    property HeaderGroups: TStrings read FHeaderGroups write SetHeaderGroups;
     { TDBGrid 的常规 published 属性原样继承（Options/Columns/DataSource...）}
   end;
 
@@ -76,13 +87,21 @@ begin
   FPageSize := 0;
   FCurrentPage := 1;
   FSummaryType := gsNone;
+  FHeaderGroups := TStringList.Create;
 end;
 
 destructor TLWDBGrid.Destroy;
 begin
   { TBytes 由引用计数自动回收，这里只需清引用 }
   FMatches := nil;
+  FreeAndNil(FHeaderGroups);
   inherited Destroy;
+end;
+
+procedure TLWDBGrid.SetHeaderGroups(AValue: TStrings);
+begin
+  if AValue = FHeaderGroups then Exit;
+  FHeaderGroups.Assign(AValue);
 end;
 
 procedure TLWDBGrid.MatchClear;
