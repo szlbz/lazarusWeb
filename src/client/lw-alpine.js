@@ -3657,32 +3657,69 @@ var LW = (function () {
         var W = sm.width || 260;
         var open = smOpenMap(f.name);
         var h = '';
-        (sm.items || []).forEach(function (g, gi) {
-            var subs = g.items || [];
-            if (g.sep) { h += '<div class="lw-sm-sep"></div>'; return; }
-            /* 顶层叶子：直接是可点的菜单行（没有分组外壳） */
+
+        /* 选中项所在的祖先分组必须展开 —— 否则点开深层菜单项后，
+           服务端 Checked 回来整块重渲时，那个分组又按默认折叠起来，
+           用户会看到「点了但高亮项消失了」。显式折叠过（open 里有记录）
+           的分组仍以用户的选择为准。 */
+        var openForce = {};
+        (function markChecked(items, path) {
+            (items || []).forEach(function (it, i) {
+                var p = (path === '') ? String(i) : path + '.' + i;
+                var subs = it.items || [];
+                if (subs.length) {
+                    markChecked(subs, p);
+                } else if (it.checked) {
+                    var segs = p.split('.');
+                    var acc = '';
+                    for (var k = 0; k < segs.length - 1; k++) {
+                        acc = (acc === '') ? segs[k] : acc + '.' + segs[k];
+                        openForce[acc] = true;
+                    }
+                }
+            });
+        })(sm.items || [], '');
+
+        /* 递归渲染：任意深度的 TMenuItem 都支持 —— 有子项 = 可折叠分组，
+           没有子项 = 可点的菜单行。缩进按层级累加（每层 12px）；
+           折叠状态按「层级路径」存 localStorage（0 / 0.2 / 0.2.1 …），
+           顶层路径就是老的下标（0、1…），旧缓存继续有效。 */
+        function smNode(it, depth, path) {
+            if (it.sep) return '<div class="lw-sm-sep"></div>';
+            var subs = it.items || [];
+            var pad = 14 + depth * 12;
             if (!subs.length) {
-                h += '<div class="lw-sm-item lw-sm-top' + (g.checked ? ' on' : '') +
-                    (g.enabled === false ? ' dis' : '') + '" data-mid="' + g.id + '">' +
-                    smIcon(g) + '<span class="lw-sm-t">' + accHtml(esc(g.caption || '')) + '</span></div>';
-                return;
-            }
-            var isOpen = (open[gi] === undefined) ?
-                (gi === 0 ? !!sm.firstopen : false) : !!open[gi];
-            h += '<div class="lw-sm-grp">' +
-                '<div class="lw-sm-grphead' + (isOpen ? ' open' : '') + '" data-gi="' + gi + '">' +
-                '<span class="lw-sm-arw">\u25B6</span>' +
-                '<span class="lw-sm-t">' + accHtml(esc(g.caption || '')) + '</span></div>' +
-                '<div class="lw-sm-items"' + (isOpen ? '' : ' style="display:none"') + '>';
-            subs.forEach(function (it) {
-                if (it.sep) { h += '<div class="lw-sm-sep"></div>'; return; }
-                h += '<div class="lw-sm-item' + (it.checked ? ' on' : '') +
-                    (it.enabled === false ? ' dis' : '') + '" data-mid="' + it.id + '">' +
+                return '<div class="lw-sm-item' + (depth === 0 ? ' lw-sm-top' : '') +
+                    (it.checked ? ' on' : '') + (it.enabled === false ? ' dis' : '') +
+                    '" data-mid="' + it.id + '" style="padding-left:' + pad + 'px">' +
                     smIcon(it) + '<span class="lw-sm-t">' + accHtml(esc(it.caption || '')) + '</span>' +
                     (it.shortcut ? '<i class="lw-sm-sc">' + esc(it.shortcut) + '</i>' : '') +
                     '</div>';
+            }
+            var isOpen;
+            if (open[path] !== undefined) {
+                isOpen = !!open[path];            /* 用户手动开合过：以用户为准 */
+            } else if (openForce[path]) {
+                isOpen = true;                    /* 里面有选中项：展开 */
+            } else {
+                /* 默认：第一组按 firstopen，其余顶层收起；子层默认展开 */
+                isOpen = (depth === 0) ? (path === '0' ? !!sm.firstopen : false) : true;
+            }
+            var inner = '';
+            subs.forEach(function (c, ci) {
+                inner += smNode(c, depth + 1, path + '.' + ci);
             });
-            h += '</div></div>';
+            return '<div class="lw-sm-grp' + (depth > 0 ? ' lw-sm-sub' : '') + '">' +
+                '<div class="lw-sm-grphead' + (isOpen ? ' open' : '') + '" data-key="' + path +
+                '" style="padding-left:' + pad + 'px">' +
+                '<span class="lw-sm-arw">\u25B6</span>' +
+                '<span class="lw-sm-t">' + accHtml(esc(it.caption || '')) + '</span></div>' +
+                '<div class="lw-sm-items"' + (isOpen ? '' : ' style="display:none"') + '>' +
+                inner + '</div></div>';
+        }
+
+        (sm.items || []).forEach(function (g, gi) {
+            h += smNode(g, 0, String(gi));
         });
 
         var el = document.createElement('div');
@@ -3696,12 +3733,13 @@ var LW = (function () {
 
         el.querySelectorAll('.lw-sm-grphead').forEach(function (gh) {
             gh.addEventListener('click', function () {
-                var gi = parseInt(gh.getAttribute('data-gi'), 10);
+                /* data-key 是层级路径（0 / 0.2 …），任意深度都能记住展开状态 */
+                var key = gh.getAttribute('data-key');
                 var box = gh.nextElementSibling;
                 var nowOpen = !gh.classList.contains('open');
                 gh.classList.toggle('open', nowOpen);
                 if (box) box.style.display = nowOpen ? '' : 'none';
-                smOpenSave(f.name, gi, nowOpen);
+                smOpenSave(f.name, key, nowOpen);
             });
         });
 

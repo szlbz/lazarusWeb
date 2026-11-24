@@ -1789,6 +1789,9 @@ html[data-lw-layout="mobile"] .lw-ud-dn::after { content: '\2212'; } /* − */
 }
 .lw-sm-body { flex: 1; overflow: auto; }
 .lw-sm-grp { border-bottom: 1px solid var(--lw-sm-sep); }
+/* 多层级菜单（TLWSideMenu 任意深度）：子分组不再画分隔线，层级靠缩进表达，
+   缩进由 JS 按深度写进 padding-left（每层 12px），这里只负责去掉多余边框 */
+.lw-sm-grp.lw-sm-sub { border-bottom: 0; }
 .lw-sm-grphead {
     display: flex;
     align-items: center;
