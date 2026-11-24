@@ -1425,7 +1425,7 @@ end;
 
 function TLWServer.ReqLang(const ARequest: TFPHTTPConnectionRequest): string;
 var
-  s: string;
+  s, raw: string;
 begin
   { 1) 显式 ?lwlang=en（点语言开关时带上来，最权威）}
   s := LWLangNormalize(QueryP(ARequest, 'lwlang', ''));
@@ -1433,8 +1433,12 @@ begin
   { 2) 反向代理/客户端自己带的头 }
   s := LWLangNormalize(ARequest.GetCustomHeader('X-LW-Lang'));
   if s <> '' then Exit(s);
-  { 3) 上次选的（Cookie）}
-  s := LWCookieValue(ARequest.GetCustomHeader('Cookie'), 'lwlang');
+  { 3) 上次选的（Cookie）。fcl-web 把 Cookie 头放进了 TRequest.Cookie，
+       不一定留在 CustomHeaders 里 —— 只读后者会永远拿到空串 }
+  raw := Trim(ARequest.Cookie);
+  if raw = '' then
+    raw := ARequest.GetCustomHeader('Cookie');
+  s := LWCookieValue(raw, 'lwlang');
   Result := LWLangNormalize(s);
 end;
 
@@ -1442,9 +1446,19 @@ procedure TLWServer.SetLangCookie(const ALang: string;
   var AResponse: TFPHTTPConnectionResponse);
 begin
   if ALang = '' then Exit;
-  { 一年有效；Path=/ 让插件代理前缀下也能带上 }
-  AResponse.CustomHeaders.Add('Set-Cookie: lwlang=' + ALang +
-    '; Path=/; Max-Age=31536000; SameSite=Lax');
+  { 一年有效；Path=/ 让插件代理前缀下也能带上。
+    必须走 Cookies（TCookie）：CustomHeaders.Add('Set-Cookie: lwlang=zh-CN')
+    会被 TStringList 按 '=' 拆成 Name='Set-Cookie: lwlang'、Value='zh-CN'，
+    实际发出 "Set-Cookie: lwlang: zh-CN"，浏览器不认 —— 语言 Cookie 以前
+    一直没生效，刷新后靠 ?lwlang= 或默认值兜着，不易察觉 }
+  with AResponse.Cookies.Add do
+  begin
+    Name := 'lwlang';
+    Value := ALang;
+    Path := '/';
+    MaxAge := 31536000;
+    SameSite := ssLax;
+  end;
 end;
 
 function TLWServer.ParseBody(var ARequest: TFPHTTPConnectionRequest): TJSONObject;

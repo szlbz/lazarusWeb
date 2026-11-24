@@ -47,9 +47,11 @@ type
               启动后弹服务端面板窗口（lwpanel），浏览器访问同一端口。
       命令行工具（tools\lwnew）默认 True，--gui 切到 False。 }
     Headless: Boolean;
-    { 工程模板：True = 插件模式（.lpr uses lwmodules 并调用 RegisterAllModules，
-      另生成 lwmodules.pas 空骨架）；False = 常规模式。
-      IDE 新建工程向导第三个选择框决定，tools\lwnew 用 --plugin 切换。 }
+    { 工程模板：True = 插件模式（多进程插件框架：宿主 exe + 插件 exe +
+      common 目录，模板见 lwnewplugin），False = 常规模式。
+      插件模式的宿主工程文件不由本单元生成 —— IDE 向导和 tools\lwnew
+      都改调 lwnewplugin（LWPluginHostSource / LWPluginExtras）。
+      IDE 新建工程向导第三框决定，tools\lwnew 用 --plugin 切换。 }
     Plugin: Boolean;
     { True = 服务(daemon)模式：生成可注册为 Windows 服务的完整宿主层
       （.lpr 带 DaemonApp 分流 + uDaemon.pas + uMapper.pas + lazarusWeb.ini），
@@ -78,8 +80,6 @@ const
 function LWDefaultProject(const AName: string): TLWNewProject;
 
 function LWProjectSource(const O: TLWNewProject): string;
-{ 插件模式的 lwmodules.pas 空骨架（常规模式不生成此文件） }
-function LWModulesSource(const O: TLWNewProject): string;
 function LWProjectInfo(const O: TLWNewProject): string;
 
 { 服务(daemon)模式额外文件的模板（O.Service=True 才生成）：
@@ -245,7 +245,7 @@ end;
 
 function LWProjectSource(const O: TLWNewProject): string;
 var
-  hint, apptype, regLine, head, body, regAll, frontReg: string;
+  hint, apptype, regLine, head, body, frontReg: string;
 begin
   { apptype / hint 与历史完全一致：GUI 档写 $APPTYPE GUI，nogui 写 CONSOLE
     （LWIsTemplateProject 的源码判据也靠这个，不能改）。服务模式叠加说明文字。 }
@@ -268,15 +268,11 @@ begin
       '    本工程为服务(daemon)模式：同一个 exe 既能前台运行（不带参数），' + LineEnding +
       '    也能 --install 注册成 Windows 服务（需管理员）。';
 
-  { 前台分支的窗体注册（普通/服务两模式共用，内容一字不改） }
+  { 前台分支的窗体注册（普通/服务两模式共用，内容一字不改）。
+    插件模式的宿主 .lpr 不由本函数生成，见 lwnewplugin.LWPluginHostSource }
   regLine :=
     '  { 注册窗体：类名去掉 T 就是浏览器里的窗体名（' + O.FormName + '） }' + LineEnding +
     '  TLWApp.Register(T' + O.FormName + ');' + LineEnding;
-  regAll := '';
-  if O.Plugin then
-    regAll :=
-      '  { 插件模式：注册所有插件模块（见 lwmodules.pas） }' + LineEnding +
-      '  RegisterAllModules;' + LineEnding;
 
   if O.Service then
   begin
@@ -284,18 +280,12 @@ begin
     frontReg :=
       '    { 注册窗体：类名去掉 T 就是浏览器里的窗体名（' + O.FormName + '） }' + LineEnding +
       '    TLWApp.Register(T' + O.FormName + ');' + LineEnding;
-    if O.Plugin then
-      frontReg := frontReg +
-        '    { 插件模式：注册所有插件模块（见 lwmodules.pas） }' + LineEnding +
-        '    RegisterAllModules;' + LineEnding;
     { ---- 服务(daemon)模式：uses 加 DaemonApp + 宿主单元 + Windows API ---- }
     head :=
       'uses' + LineEnding +
       '  {$IFDEF UNIX}cthreads,{$ENDIF}' + LineEnding +
-      '  Interfaces, Forms, DaemonApp, lwapp, ';
-    if O.Plugin then
-      head := head + 'lwmodules, ';
-    head := head + O.UnitName + ', ' + sLWDaemonUnitName + ', ' +
+      '  Interfaces, Forms, DaemonApp, lwapp, ' +
+      O.UnitName + ', ' + sLWDaemonUnitName + ', ' +
       sLWMapperUnitName +
       ' {$IFDEF MSWINDOWS}, SysUtils, Windows{$ENDIF};' + LineEnding;
 
@@ -356,15 +346,13 @@ begin
     head :=
       'uses' + LineEnding +
       '  {$IFDEF UNIX}cthreads,{$ENDIF}' + LineEnding +
-      '  Interfaces, Forms, lwapp, ';
-    if O.Plugin then
-      head := head + 'lwmodules, ';
-    head := head + O.UnitName + ';' + LineEnding;
+      '  Interfaces, Forms, lwapp, ' +
+      O.UnitName + ';' + LineEnding;
     body :=
       'begin' + LineEnding +
       '  Application.Initialize;' + LineEnding +
       '  Application.Title := ' + QuotedStr(O.Title) + ';' + LineEnding +
-      regLine + regAll +
+      regLine +
       '  { 想加更多窗体就继续注册，最后一个 --form=名字 可指定默认窗体 }' + LineEnding +
       '  TLWApp.Run;' + LineEnding +
       'end.' + LineEnding;
@@ -696,27 +684,6 @@ begin
     '; Windows 服务没有控制台，建议开文件日志（按 exe 目录解析）' + LineEnding +
     'log=@APPNAME@.log' + LineEnding;
   Result := LWServiceExpand(t, O);
-end;
-
-function LWModulesSource(const O: TLWNewProject): string;
-begin
-  Result :=
-    'unit lwmodules;' + LineEnding +
-    LineEnding +
-    '{$mode objfpc}{$H+}' + LineEnding +
-    LineEnding +
-    'interface' + LineEnding +
-    LineEnding +
-    'procedure RegisterAllModules;' + LineEnding +
-    LineEnding +
-    'implementation' + LineEnding +
-    LineEnding +
-    'procedure RegisterAllModules;' + LineEnding +
-    'begin' + LineEnding +
-    '  { 还没有插件模块；主窗体由 .lpr 里的 TLWApp.Register 注册，照常可用。 }' + LineEnding +
-    'end;' + LineEnding +
-    LineEnding +
-    'end.' + LineEnding;
 end;
 
 function LWProjectMacroValuesXml(const O: TLWNewProject): string;
@@ -1261,6 +1228,14 @@ var
 begin
   Result := False;
   AErr := '';
+  { 插件模式不是"一个工程"而是"一套框架"（宿主 exe + common + plugins\<名>\），
+    模板在 lwnewplugin（LWPluginGenerate / LWPluginExtras）。本函数只管单工程，
+    误用就直接拒绝，免得生成一个只有宿主、没有 common 的半成品。 }
+  if O.Plugin then
+  begin
+    AErr := '插件模式请调用 lwnewplugin.LWPluginGenerate（本函数只生成单个工程）';
+    Exit;
+  end;
   { program 名不能与框架单元（或主窗体单元）重名，否则 FPC 报
     "Duplicate identifier"。清单与判据见 LWProjectNameConflict。 }
   clash := LWProjectNameConflict(O.Name, O.UnitName);
@@ -1281,9 +1256,6 @@ begin
   if not WriteText(d + O.Name + '.lpi', LWProjectInfo(O), AErr) then Exit;
   if not WriteText(d + O.UnitName + '.pas', LWFormUnitSource(O), AErr) then Exit;
   if not WriteText(d + O.UnitName + '.lfm', LWFormResourceSource(O), AErr) then Exit;
-  { 插件模式额外写 lwmodules.pas 空骨架 }
-  if O.Plugin then
-    if not WriteText(d + 'lwmodules.pas', LWModulesSource(O), AErr) then Exit;
   { 服务(daemon)模式额外写守护层：uDaemon.pas / uMapper.pas / lazarusWeb.ini }
   if O.Service then
   begin

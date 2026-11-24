@@ -41,6 +41,29 @@ type
     调用方直接 Exit；False 表示路径不是 /p/ 前缀（调用方继续自己的路由） }
   TLWRouteHandled = (rrNotPlugin, rrDone, rrNoUpstream, rrUpstreamFail);
 
+  { 插件访问鉴权回调（用户权限）。/p/<名>/ 在代理之前调用：
+      AName     插件名（清单里的 name=）
+      ASid      请求带来的会话标识，可能为 ''（没登录 / cookie 还没落到 /p/ 下）
+      AUser     回填登录名，403 页面显示"你是谁"
+      AReason   回填拒绝原因（中文，直接显示在 403 页面上）
+    返回 True = 放行；False = 回 403，不代理。
+    没注册回调（nil）= 不鉴权，行为与旧版完全一致 —— 单机/内网工具不需要
+    用户体系的场合零改动、零开销。 }
+  TLWRouteAuthFunc = function(const AName, ASid: string;
+    out AUser, AReason: string): Boolean;
+
+{ 注册/取消插件访问鉴权。宿主在 Run 之前调用一次即可（nil = 关闭） }
+procedure LWRouteSetAuth(AFunc: TLWRouteAuthFunc);
+function LWRouteAuth: TLWRouteAuthFunc;
+
+const
+  { 通过鉴权后把会话标识落到这个 Cookie 上（Path 限定 /p/）：
+    iframe 的入口请求带 ?sid=，但页面里的子资源请求（/p/名/lw/...、
+    /lw/api/event 等）不会再带 query —— 只靠 URL 参数的话，鉴权只拦得住
+    第一次导航，后续请求一律"没有 sid"被拒或漏检。Cookie 由浏览器自动
+    附加到所有同源 /p/ 请求，正好补上这个缺口。 }
+  LW_ROUTE_SID_COOKIE = 'lwpsid';
+
 { 登记/查询插件。AUpstream 归一化为 'host:port'（剥 http:// 与尾斜杠） }
 procedure LWRouteSet(const AName, AUpstream: string);
 procedure LWRouteRemove(const AName: string);
@@ -78,9 +101,22 @@ type
 
 var
   GTable: TLWRouteTable = nil;
+  { 鉴权回调：nil = 不做用户权限判断（默认）。宿主注册一个函数即可让
+    所有 /p/ 请求先过它 —— 不用登录的工程完全不受影响 }
+  GRouteAuth: TLWRouteAuthFunc = nil;
 
 const
   LW_PLUGIN_PREFIX = '/p/';
+
+procedure LWRouteSetAuth(AFunc: TLWRouteAuthFunc);
+begin
+  GRouteAuth := AFunc;
+end;
+
+function LWRouteAuth: TLWRouteAuthFunc;
+begin
+  Result := GRouteAuth;
+end;
 
 function GetTable: TLWRouteTable;
 begin
@@ -100,6 +136,115 @@ begin
   if acc = '' then
     acc := Trim(ARequest.CustomHeaders.Values['Accept']);
   Result := Pos('text/html', LowerCase(acc)) > 0;
+end;
+
+{ Cookie 头里取一个键。fcl-web 的 TRequest.Cookies 属性在不同 FPC 版本上
+  行为不一致，这里直接解析原始头（与 lwhttp.LWCookieValue 同思路） }
+function RouteCookieValue(const ARaw, AName: string): string;
+var
+  rest, item, k, v: string;
+  p: Integer;
+begin
+  Result := '';
+  rest := ARaw;
+  while rest <> '' do
+  begin
+    p := Pos(';', rest);
+    if p > 0 then
+    begin
+      item := Trim(Copy(rest, 1, p - 1));
+      rest := Copy(rest, p + 1, MaxInt);
+    end
+    else
+    begin
+      item := Trim(rest);
+      rest := '';
+    end;
+    if item = '' then Continue;
+    p := Pos('=', item);
+    if p <= 0 then Continue;
+    k := Trim(Copy(item, 1, p - 1));
+    v := Trim(Copy(item, p + 1, MaxInt));
+    if SameText(k, AName) then Exit(v);
+  end;
+end;
+
+{ 原始 Cookie 头：fcl-web 把 "Cookie:" 映射成 TRequest.Cookie 属性，
+  不一定留在 CustomHeaders 里 —— 只读 CustomHeaders 会拿到空串，
+  表现就是"浏览器明明发了 cookie，服务端硬是看不见" }
+function RouteRawCookie(ARequest: TFPHTTPConnectionRequest): string;
+begin
+  Result := Trim(ARequest.Cookie);
+  if Result = '' then
+    Result := Trim(ARequest.GetCustomHeader('Cookie'));
+end;
+
+{ 本次请求的会话标识：?sid= > X-LW-Sid 头 > Cookie(lwpsid)。
+  三处都看的原因：
+    - ?sid=  宿主序列化 iframe HTML 时拼进 URL（首次导航靠它）；
+    - 头     API / 脚本调用自己带；
+    - cookie iframe 页面里的子资源请求（/p/名/lw/…、/lw/api/event）
+             由浏览器自动附加，是唯一能覆盖这些请求的通道。
+  cookie 名带 lwp 前缀且 Path=/p/，与宿主自身的 sid 传递（?sid=）互不干扰。 }
+function RouteReqSid(ARequest: TFPHTTPConnectionRequest): string;
+begin
+  Result := '';
+  if Assigned(ARequest.QueryFields) then
+    Result := Trim(ARequest.QueryFields.Values['sid']);
+  if Result = '' then
+    Result := Trim(ARequest.GetCustomHeader('X-LW-Sid'));
+  if Result = '' then
+    Result := RouteCookieValue(RouteRawCookie(ARequest), LW_ROUTE_SID_COOKIE);
+end;
+
+{ 403：鉴权回调拒绝。浏览器请求给人看的页面（说明是谁、为什么、怎么办），
+  程序调用给 JSON —— 与 502 页同样的分流逻辑 }
+procedure RouteForbidden(ARequest: TFPHTTPConnectionRequest;
+  AResponse: TFPHTTPConnectionResponse;
+  const AName, AUser, AReason: string);
+
+  function Esc(const S: string): string;
+  begin
+    Result := StringReplace(S, '&', '&amp;', [rfReplaceAll]);
+    Result := StringReplace(Result, '<', '&lt;', [rfReplaceAll]);
+    Result := StringReplace(Result, '>', '&gt;', [rfReplaceAll]);
+    Result := StringReplace(Result, '"', '&quot;', [rfReplaceAll]);
+  end;
+
+var
+  who: string;
+begin
+  AResponse.Code := 403;
+  AResponse.CodeText := 'Forbidden';
+  if AUser = '' then
+    who := '未登录（或会话已过期）'
+  else
+    who := '当前用户：' + AUser;
+
+  if WantsHTML(ARequest) then
+  begin
+    AResponse.ContentType := 'text/html; charset=utf-8';
+    AResponse.Content :=
+      '<!DOCTYPE html><html lang="' + LWLangGet + '"><head><meta charset="utf-8">' +
+      '<title>无权访问: ' + Esc(AName) + '</title></head><body ' +
+      'style="font-family:sans-serif;background:#1e1e1e;color:#ddd;' +
+      'margin:0;padding:48px 24px">' +
+      '<h2 style="color:#f6a623;margin:0 0 16px">无权访问插件「' + Esc(AName) + '」</h2>' +
+      '<p>' + Esc(AReason) + '</p>' +
+      '<p style="color:#aaa">' + Esc(who) + '</p>' +
+      '<p><a href="/" style="color:#6cf">返回工作台</a>' +
+      '　<span style="color:#666">用有权限的账号重新登录后再打开本插件</span></p>' +
+      '<p style="color:#777;font-size:13px">插件访问权限在插件清单 ' +
+      '<code>' + Esc(AName) + '.plugin.ini</code> 的 <code>roles=</code> 行配置；' +
+      '不写 roles= 表示所有已登录用户都可访问。</p>' +
+      '</body></html>';
+  end
+  else
+  begin
+    AResponse.ContentType := 'application/json; charset=utf-8';
+    AResponse.Content := '{"ok":false,"err":"forbidden","plugin":"' +
+      Esc(AName) + '","user":"' + Esc(AUser) + '"}';
+  end;
 end;
 
 { hop-by-hop 头：代理必须剥掉（RFC 7230 6.1）+ 由两端各自生成的头。
@@ -432,8 +577,8 @@ end;
 function LWRouteDispatch(ARequest: TFPHTTPConnectionRequest;
   AResponse: TFPHTTPConnectionResponse; const APath: string): TLWRouteHandled;
 var
-  rest, name, up, prefix: string;
-  slash: Integer;
+  rest, name, up, prefix, sid, auser, areason, qs: string;
+  slash, qp: Integer;
 begin
   Result := rrNotPlugin;
   if Copy(APath, 1, Length(LW_PLUGIN_PREFIX)) <> LW_PLUGIN_PREFIX then
@@ -488,14 +633,52 @@ begin
     Exit;
   end;
 
-  { /p/notes（无尾斜杠）补 301：页面内相对路径（BASE 推导）依赖尾斜杠 }
-  if (rest = '/') and (ARequest.URL <> '') and
-     (Copy(ARequest.URL, Length(ARequest.URL), 1) <> '/') and
-     (Pos('?', ARequest.URL) = 0) then
+  { 用户权限：/p/ 是插件唯一的对外门，鉴权必须在这里做 —— 只靠宿主菜单
+    隐藏不够，直接敲 URL、转发页面链接、iframe 里的子资源请求都会绕过 UI。
+    回调由宿主用 LWRouteSetAuth 注册；没注册就一律放行（旧行为） }
+  if Assigned(GRouteAuth) then
   begin
+    sid := RouteReqSid(ARequest);
+    auser := '';
+    areason := '';
+    if not GRouteAuth(name, sid, auser, areason) then
+    begin
+      LWLog('[route] 拒绝 /p/' + name + '/ sid=' + sid + '：' + areason);
+      RouteForbidden(ARequest, AResponse, name, auser, areason);
+      Result := rrDone;
+      Exit;
+    end;
+    { 放行后把 sid 落到 /p/ 下的 HttpOnly cookie：iframe 页面里的子资源
+      请求（相对路径、/lw/api/*、静态资源）不会带 query，只靠 URL 参数
+      鉴权只拦得住第一次导航。已经一致就不重复下发。
+      必须走 AResponse.Cookies（TCookie），不能 CustomHeaders.Add
+      'Set-Cookie: name=value' —— TStringList 以 '=' 作 NameValueSeparator，
+      会被拆成 Name='Set-Cookie: name'、Value='value'，发出去变成
+      "Set-Cookie: name: value"，浏览器直接忽略（lwhttp.SetLangCookie 同坑） }
+    if (sid <> '') and
+       (RouteCookieValue(RouteRawCookie(ARequest), LW_ROUTE_SID_COOKIE) <> sid) then
+      with AResponse.Cookies.Add do
+      begin
+        Name := LW_ROUTE_SID_COOKIE;
+        Value := sid;
+        Path := LW_PLUGIN_PREFIX;
+        HttpOnly := True;
+        SameSite := ssLax;
+      end;
+  end;
+
+  { /p/notes（无尾斜杠）补 301：页面内相对路径（BASE 推导）依赖尾斜杠。
+    原 query 一定要带上 —— 首次导航的 ?sid= 丢了就只能靠 cookie，
+    而这时浏览器手里还没有 cookie }
+  if (rest = '/') and (APath = LW_PLUGIN_PREFIX + name) then
+  begin
+    qs := '';
+    qp := Pos('?', ARequest.URL);
+    if qp > 0 then
+      qs := Copy(ARequest.URL, qp, MaxInt);
     AResponse.Code := 301;
     AResponse.CodeText := 'Moved Permanently';
-    AResponse.SetCustomHeader('Location', LW_PLUGIN_PREFIX + name + '/');
+    AResponse.SetCustomHeader('Location', LW_PLUGIN_PREFIX + name + '/' + qs);
     AResponse.Content := '';
     Result := rrDone;
     Exit;
