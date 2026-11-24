@@ -20,6 +20,9 @@ unit upluginproc;
       icon=<图标文件>         可选，相对清单目录，16x16 的 bmp/png，侧栏菜单图标
       exe=<相对清单目录>      缺省 = <清单名去 .plugin.ini>.exe
       port=<监听端口>        必填
+      roles=<角色清单>        可选，逗号分隔，如 roles=admin,analyst
+                             空/不写 = 所有已登录用户；admin 角色通配全部。
+                             判定在 upluginauth.LWAuthCanOpen，菜单与 /p/ 路由共用
 
   为什么要 .run 运行副本：
       Windows 会锁住正在运行的 exe，插件直接跑自己的 exe 时没法重新编译。
@@ -27,13 +30,19 @@ unit upluginproc;
       原始 exe 不被占用，改完源码直接重编；重编后再点菜单/热更新按钮，
       宿主停旧进程 → 重新复制 → 起新进程 → 页内 iframe 换新 URL，
       宿主本身不用重启，这就是插件热更新。
+
+  插件启动守卫（见 upluginguard）：
+      插件 exe 不能单独运行。宿主拉起时带三条参数（nonce / token / host exe 名），
+      插件 .lpr 第一句 PlugGuardCheck 校验：参数齐全 + nonce 未过期 + token 对得上
+      + 父进程就是宿主。任何一条不过就提示"请从主程序进入"并 Halt(3)。
+      所以手工双击 dashplug.exe 只会弹一个提示框，不会起服务、不会占端口。
 }
 {$mode objfpc}{$H+}
 
 interface
 
 uses
-  Classes, SysUtils, Process, Sockets, lwconfig, lwroute, lwrlog;
+  Classes, SysUtils, Process, Sockets, lwconfig, lwroute, lwrlog, upluginguard;
 
 type
   TPlugPlugin = class
@@ -42,6 +51,7 @@ type
     Title: string;        { 菜单显示名 }
     Group: string;        { 侧栏菜单分组，可用 / 表示多层级（如 数据看板/运营分析）；空 = 默认分组，'-' = 顶层直接一行 }
     Icon: string;         { 菜单图标文件（16x16 bmp/png），清单里的相对路径；空 = 无图标 }
+    Roles: string;        { 允许访问的角色，逗号分隔；空 = 所有已登录用户 }
     ExePath: string;      { 原始 exe（可随时重编） }
     IniPath: string;      { 原始 ini，同 exe 同名 }
     RunDir: string;       { .run 目录 }
@@ -168,7 +178,7 @@ end;
 function ParseManifest(const AFile: string): TPlugPlugin;
 var
   cfg: TLWConfig;
-  nm, title, grp, ic, exe, dir, base, fileName: string;
+  nm, title, grp, ic, exe, dir, base, fileName, roles: string;
   port: Integer;
 begin
   Result := nil;
@@ -196,6 +206,11 @@ begin
     dir := ExtractFileDir(AFile);
     title := Trim(cfg.Str(['title'], nm));
     grp := Trim(cfg.Str(['group'], ''));
+    { 访问权限：清单里写 roles=admin,analyst。不写 = 所有已登录用户都能开。
+      注意这里只负责"读出来"，判定统一在 upluginauth.LWAuthCanOpen ——
+      菜单过滤和 /p/ 路由鉴权必须用同一份逻辑，否则会出现"菜单看得见、
+      点开 403"或者更糟的"菜单看不见、手敲 URL 能进" }
+    roles := Trim(cfg.Str(['roles'], ''));
     exe := Trim(cfg.Str(['exe'], ''));
     if exe = '' then
       exe := base + '.exe';
@@ -222,6 +237,7 @@ begin
     Result.Name := nm;
     Result.Title := title;
     Result.Group := grp;
+    Result.Roles := roles;
     Result.Icon := ic;
     Result.ExePath := exe;
     Result.IniPath := ChangeFileExt(exe, '.ini');
@@ -355,6 +371,7 @@ begin
       old.Title := np.Title;
       old.Group := np.Group;
       old.Icon := np.Icon;
+      old.Roles := np.Roles;
       reRoute := (old.Port <> np.Port) or (not SameText(old.ExePath, np.ExePath));
       if reRoute then
       begin
@@ -443,6 +460,7 @@ end;
 function StartOne(p: TPlugPlugin): Boolean;
 var
   deadline: QWord;
+  nonce: string;
 begin
   Result := False;
   if p = nil then Exit;
@@ -470,6 +488,13 @@ begin
   try
     p.Proc.Executable := p.RunExe;
     p.Proc.Parameters.Add('--port=' + IntToStr(p.Port));
+    { 启动令牌：插件 exe 只认这套参数，单独双击会被 upluginguard 拦下。
+      nonce 每次拉起现取（带时间戳，2 分钟后作废），token = SHA1(secret|nonce)，
+      再附上宿主自己的 exe 名让插件核对父进程 —— 三条缺一条插件就不启动。 }
+    nonce := PlugGuardNewNonce;
+    p.Proc.Parameters.Add(PlugGuardNonceParam + nonce);
+    p.Proc.Parameters.Add(PlugGuardTokenParam + PlugGuardToken(nonce));
+    p.Proc.Parameters.Add(PlugGuardHostParam + ExtractFileName(ParamStr(0)));
     {$IFDEF MSWINDOWS}
     p.Proc.Options := p.Proc.Options + [poNoConsole];
     {$ENDIF}
@@ -498,7 +523,9 @@ begin
       end;
       if (p.Proc = nil) or (not p.Proc.Running) then
       begin
-        LWLog('[pluginsDemo] 插件进程启动后立即退出: ' + p.Name);
+        LWLog('[pluginsDemo] 插件进程启动后立即退出: ' + p.Name +
+          '（退出码 ' + IntToStr(p.Proc.ExitCode) + '；被启动守卫拦下时是 ' +
+          IntToStr(PlugGuardExitCode) + '，见插件目录 plugin-guard.log）');
         Exit;
       end;
       Sleep(100);

@@ -54,7 +54,7 @@
     <SearchPaths>
       <IncludeFiles Value="$(ProjOutDir)"/>
       <UnitOutputDirectory Value="lib/$(TargetCPU)-$(TargetOS)-nogui"/>
-      <OtherUnitFiles Value="../../../src/core"/>
+      <OtherUnitFiles Value="../../../src/core;../common"/>
     </SearchPaths>
     <Linking>
       <Options>

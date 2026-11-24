@@ -31,7 +31,8 @@ interface
 
 uses
   Classes, SysUtils, Forms, Controls, StdCtrls, ComCtrls, ExtCtrls, Menus, Graphics,
-  lwform, lwapp, lwweb, lwsidemenu, upluginproc;
+  lwbase, lwform, lwapp, lwweb, lwsidemenu, lwlogin, lwsession, upluginproc,
+  upluginauth;
 
 type
   TMainForm = class(TLWForm)
@@ -40,17 +41,22 @@ type
     btnRescan: TButton;
     btnHot: TButton;
     lblHot: TLabel;
+    lblUser: TLabel;
+    btnUser: TButton;
     pcMain: TPageControl;
     sbMain: TStatusBar;
     smMain: TLWSideMenu;
     procedure FormCreate(Sender: TObject);
+    procedure FormShow(Sender: TObject);
     procedure pcMainChange(Sender: TObject);
     procedure btnHotClick(Sender: TObject);
     procedure btnRescanClick(Sender: TObject);
+    procedure btnUserClick(Sender: TObject);
     procedure MenuItemClick(Sender: TObject);
   private
     FTabs: TStringList;      { 插件名 -> TTabSheet（重扫描后下标会变，按名找页） }
     FActiveName: string;     { 当前高亮的插件路由名 }
+    FMenuUser: string;       { 建菜单时的登录名：用户变了要按新角色重算 }
     procedure BuildMenu;
     procedure SyncChecked;
     procedure LoadMenuIcon(MI: TMenuItem; const AFile: string);
@@ -60,6 +66,8 @@ type
     procedure ReloadTab(AIndex: Integer);
     procedure RefreshTabs;
     procedure UpdateHotLabel;
+    procedure UpdateUserLabel;
+    procedure OpenFirstAllowed;
     procedure SetStatus(const AText: string);
   public
     destructor Destroy; override;
@@ -88,18 +96,52 @@ begin
     FTabs := TStringList.Create;
   FActiveName := '';
 
-  { 菜单完全由扫描结果生成：换插件目录不用改这里一行代码 }
+  { 菜单完全由扫描结果生成：换插件目录不用改这里一行代码。
+    但只列当前登录账号有权限的插件（判定统一在 upluginauth.LWAuthCanOpen）}
   BuildMenu;
   UpdateHotLabel;
+  UpdateUserLabel;
 
   if PlugCount = 0 then
   begin
     SetStatus('没有发现任何插件：检查 pluginsDemo\*\*.plugin.ini');
     Exit;
   end;
-  SetStatus(Format('已发现 %d 个插件进程，点左侧菜单在右侧打开', [PlugCount]));
-  { 默认打开第一个插件，避免首页空白 }
-  OpenPlugin(0);
+  { 默认打开第一个「有权限」的插件：既避免首页空白，也不至于一进来就 403 }
+  OpenFirstAllowed;
+end;
+
+{ 注销后换个账号重新登录，框架会复用同一个主窗体实例（不走 FormCreate），
+  身份变了就必须按新角色重建菜单、关掉越权页签 —— 否则 guest 登录进来
+  看到的还是上一个 admin 的菜单 }
+procedure TMainForm.FormShow(Sender: TObject);
+var
+  idx: Integer;
+begin
+  if LWAuthSessionUser <> FMenuUser then
+  begin
+    UpdateUserLabel;
+    BuildMenu;
+    RefreshTabs;
+    UpdateHotLabel;
+    idx := PlugIndexOf(FActiveName);
+    if (idx < 0) or (not LWAuthCanOpen(LWAuthSessionRoles, PlugGet(idx).Roles)) then
+      OpenFirstAllowed;
+  end;
+end;
+
+{ 打开第一个当前账号能打开的插件；一个都没有就只在状态栏说明 }
+procedure TMainForm.OpenFirstAllowed;
+var
+  i: Integer;
+begin
+  for i := 0 to PlugCount - 1 do
+    if LWAuthCanOpen(LWAuthSessionRoles, PlugGet(i).Roles) then
+    begin
+      OpenPlugin(i);
+      Exit;
+    end;
+  SetStatus('当前账号「' + LWAuthSessionUser + '」没有任何插件的访问权限');
 end;
 
 { ---------------- 侧栏菜单（TLWSideMenu，运行期按扫描结果建树） ----------------
@@ -110,13 +152,18 @@ end;
 
 procedure TMainForm.BuildMenu;
 var
-  i, k, idx: Integer;
+  i, k, idx, shown: Integer;
   p: TPlugPlugin;
   grp, mi: TMenuItem;
-  gpath, seg, key, parentKey: string;
+  gpath, seg, key, parentKey, roles: string;
   segs, map: TStringList;
 begin
   smMain.Items.Clear;
+  { 当前身份：菜单是会话级的（每个会话一棵 LCL 窗体树），所以这里读的是
+    本会话的角色，不会串到别的浏览器/别的账号 }
+  FMenuUser := LWAuthSessionUser;
+  roles := LWAuthSessionRoles;
+  shown := 0;
 
   { map：分组路径 -> TMenuItem。同一次建树里复用，避免逐项遍历查找；
     清单里 group=数据看板/运营分析 这样写就生成两级分组，任意层级都行 }
@@ -130,6 +177,11 @@ begin
     begin
       p := PlugGet(i);
       if p = nil then Continue;
+
+      { 权限过滤：没权限的插件根本不进菜单。
+        注意这只是"别让界面骗人"——真正拦住手敲 /p/报表/ 的是路由层的
+        LWAuthGuard（common\upluginauth.pas），两层都要有 }
+      if not LWAuthCanOpen(roles, p.Roles) then Continue;
 
       grp := nil;
       gpath := Trim(p.Group);
@@ -177,13 +229,19 @@ begin
         grp.Add(mi)
       else
         smMain.Items.Add(mi);
+      Inc(shown);
     end;
   finally
     segs.Free;
     map.Free;
   end;
 
-  smMain.HeaderCaption := Format('插件导航（%d）', [PlugCount]);
+  { 有插件被权限隐藏时把"共几个"也写出来：演示/排障时一眼能看出
+    是"没扫描到"还是"扫到了但当前账号无权" }
+  if shown < PlugCount then
+    smMain.HeaderCaption := Format('插件导航（%d / 共 %d）', [shown, PlugCount])
+  else
+    smMain.HeaderCaption := Format('插件导航（%d）', [shown]);
   SyncChecked;
 end;
 
@@ -247,6 +305,16 @@ var
 begin
   p := PlugGet(AIndex);
   if p = nil then Exit;
+
+  { UI 层二次校验：菜单已经过滤过，但 Tag 可能来自重建前的旧菜单、或
+    重扫描后下标被复用。这里挡住是体验问题（给句人话），越权请求本身
+    由路由层 403 兜底 —— 两层判定用同一个 LWAuthCanOpen }
+  if not LWAuthCanOpen(LWAuthSessionRoles, p.Roles) then
+  begin
+    SetStatus('没有权限打开「' + p.Title + '」：当前角色 ' +
+      LWAuthRoleText(LWAuthSessionRoles) + '，本插件需要 ' + LWAuthNeedText(p.Roles));
+    Exit;
+  end;
 
   { 插件 exe 在启动后被重新编译过：先热更新，再打开 }
   didHot := False;
@@ -318,10 +386,23 @@ end;
 function TMainForm.IframeHTML(AIndex: Integer): string;
 var
   p: TPlugPlugin;
+  S: TLWSessionBase;
+  sid: string;
 begin
   p := PlugGet(AIndex);
   if p = nil then Exit('');
-  Result := '<iframe src="' + PlugFrameURL(AIndex) + '" ' +
+  { iframe 的首次导航必须自己带上 sid：浏览器发这个请求时不会带宿主的
+    ?sid=（那是前端 JS 在 /lw/api/* 上用的），而 /p/ 路由要按会话鉴权。
+    放行后 lwroute 会把它落到 Path=/p/ 的 lwpsid cookie 上，之后的子资源
+    请求就自动带 cookie 了，不需要在插件页面里再做手脚。 }
+  sid := '';
+  S := LWCurrentSession;
+  if S is TLWSession then
+    sid := TLWSession(S).Sid;
+  Result := '<iframe src="' + PlugFrameURL(AIndex);
+  if sid <> '' then
+    Result := Result + '&sid=' + sid;
+  Result := Result + '" ' +
     'style="display:block;width:100%;height:100%;border:0;background:#ffffff" ' +
     'title="' + p.Title + '"></iframe>';
 end;
@@ -357,6 +438,10 @@ begin
   begin
     ts := TTabSheet(FTabs.Objects[i]);
     idx := PlugIndexOf(FTabs[i]);
+    { 插件没了，或者当前账号已无权访问（换了账号 / 清单改了 roles）：
+      页签一并关掉 —— 旧页签里的 iframe 还连着插件进程，留着就能继续用 }
+    if (idx >= 0) and (not LWAuthCanOpen(LWAuthSessionRoles, PlugGet(idx).Roles)) then
+      idx := -1;
     if idx < 0 then
     begin
       if pcMain.ActivePage = ts then
@@ -370,7 +455,8 @@ begin
     ts.Caption := p.Title;
   end;
 
-  if (FActiveName <> '') and (PlugIndexOf(FActiveName) < 0) then
+  { 页签被关掉（插件消失或身份变了）后别再把高亮指向它 }
+  if TabOfName(FActiveName) = nil then
     FActiveName := '';
   SyncChecked;
 end;
@@ -462,6 +548,47 @@ end;
 procedure TMainForm.SetStatus(const AText: string);
 begin
   sbMain.Panels[0].Text := AText;
+end;
+
+{ 顶栏身份：用户名（中文名）· 角色。角色直接决定菜单里能看到几项 }
+procedure TMainForm.UpdateUserLabel;
+var
+  u, r: string;
+begin
+  u := LWAuthSessionUser;
+  r := LWAuthSessionRoles;
+  if u = '' then
+    lblUser.Caption := '未登录'
+  else if r = '' then
+    lblUser.Caption := u + ' · 无角色'
+  else
+    lblUser.Caption := u + '（' + LWAuthDisplayOf(u) + '）· ' + LWAuthRoleText(r);
+end;
+
+{ 注销 / 切换用户：把会话退回未认证，再把登录窗体换回来。
+  这就是框架的注销路径（Authenticated=False + Hide/Show 窗体）——
+  lwdispatch 看到未认证会话只放行登录窗体上的控件，业务事件全部拒绝 }
+procedure TMainForm.btnUserClick(Sender: TObject);
+var
+  S: TLWSessionBase;
+  lf: TCustomForm;
+begin
+  S := LWCurrentSession;
+  if (S = nil) or (S.LoginForm = nil) then
+  begin
+    SetStatus('当前会话没有登录窗体（未启用登录），无法切换用户');
+    Exit;
+  end;
+  lf := S.LoginForm;
+  LWAuthSessionClear;
+  S.Authenticated := False;
+  { 清掉上一次输入的用户名/密码，别把上个账号的凭据留在页面上 }
+  if lf is TLWLoginForm then
+    TLWLoginForm(lf).DoReset(nil);
+  S.SessionHideForm(Self);
+  S.SessionShowForm(lf);
+  FMenuUser := '';      { 下次 FormShow 一定按新身份重建菜单 }
+  SetStatus('已注销：请用另一个账号登录（admin / analyst / guest，口令 123456）');
 end;
 
 end.

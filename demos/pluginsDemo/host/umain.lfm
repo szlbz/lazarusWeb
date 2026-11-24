@@ -7,6 +7,7 @@ object MainForm: TMainForm
   ClientHeight = 760
   ClientWidth = 1180
   OnCreate = FormCreate
+  OnShow = FormShow
   object pnlTop: TPanel
     Left = 0
     Top = 0
@@ -46,9 +47,25 @@ object MainForm: TMainForm
     object lblHot: TLabel
       Left = 654
       Top = 19
-      Width = 262
+      Width = 200
       Height = 22
       Caption = '插件 exe 未变化'
+    end
+    object lblUser: TLabel
+      Left = 866
+      Top = 19
+      Width = 200
+      Height = 22
+      Caption = '未登录'
+    end
+    object btnUser: TButton
+      Left = 1074
+      Top = 11
+      Width = 90
+      Height = 34
+      Caption = '切换用户'
+      TabOrder = 2
+      OnClick = btnUserClick
     end
   end
   object pcMain: TPageControl
