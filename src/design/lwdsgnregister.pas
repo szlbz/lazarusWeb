@@ -16,9 +16,11 @@
          "lazarusWeb project(nogui)"   LCLWidgetType=nogui 的控制台服务程序
                                        （部署档，只能 lazbuild --ws=nogui 编译）。
        第三框选工程模板（常规 / 插件）：插件模式生成一套**多进程插件框架**
-       （宿主 exe + common\upluginproc.pas + plugins\hello\ 示例插件，
+       （宿主 exe + ulogin.pas 登录窗 + common\ 下 upluginproc / upluginguard /
+       upluginauth / upluginidentity + plugins\hello\ 示例插件，
        另带 build-all.bat / stop-all.bat / README.md，模板见 lwnewplugin）；
-       宿主主窗体是侧栏菜单 TLWSideMenu + TPageControl 的插件工作台。
+       宿主主窗体是侧栏菜单 TLWSideMenu + TPageControl 的插件工作台，菜单按角色过滤，
+       插件页显示宿主签发的身份。
        主窗体直接就是 TLWForm，可以像普通窗体一样拖控件。
 
        落盘时机与 Lazarus 自带模板完全一致 —— 选完三个框后不建目录、不写文件：
@@ -482,7 +484,8 @@ begin
   else
     MainFile.SetSourceText(LWProjectSource(O));
 
-  { 插件模式的 common\upluginproc.pas、plugins\hello\ 一整套、build-all.bat
+  { 插件模式的 common\（upluginproc / upluginguard / upluginauth /
+    upluginidentity）、ulogin.pas、plugins\hello\ 一整套、build-all.bat
     等等都不是"工程文件"，由保存钩子 TLWProjectFinalizer 在落盘之后写 ——
     那时才知道用户选的目录和最终工程名（见 EnsureExtras）。
     服务模式的 uDaemon.pas / uMapper.pas / lazarusWeb.ini 仍走 CreateStartFiles
