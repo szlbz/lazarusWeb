@@ -294,6 +294,15 @@ function LWResolveRoot(const AHint: string; const APreferVer: string = ''): stri
   都找不到再从 root 向上逐级找 src/client，返回 '' 表示没有。 }
 function LWFindClientFile(const AName, ARoot: string): string;
 
+{ 当前请求携带的宿主签发身份（threadvar，在事件处理里读）。
+  只有经过宿主 /p/ 反代的请求才有；直连插件监听端口读不到。
+  这些值不经过校验，业务层应通过 demo 的 upluginidentity 这类单元
+  验签后再用，不要直接信任。 }
+function LWIdentityUser: string;
+function LWIdentityRoles: string;
+function LWIdentityToken: string;
+function LWIdentityTs: string;
+
 { 关停耗时追踪。设 LW_EXIT_TRACE=1 后，Stop / 面板收尾的每一步都往日志
   打一行"距开始多少毫秒"，用来定位"关窗/退出要等好几秒"到底卡在哪一环
   （mips64 这类慢机器上尤其需要实测，靠猜容易改错地方）。
@@ -305,6 +314,51 @@ implementation
 
 const
   LW_POLL_MS = 20000;
+  { 与 lwroute 的 LW_ROUTE_IDENTITY_*_HDR 同值。lwhttp 不能 uses lwroute
+    （lwroute 已经 uses lwhttp），所以这里各写一份字面量，改头名要两处同步 }
+  LW_ID_USER_HDR  = 'X-LW-User';
+  LW_ID_ROLES_HDR = 'X-LW-Roles';
+  LW_ID_TOKEN_HDR = 'X-LW-Identity-Token';
+  LW_ID_TS_HDR    = 'X-LW-Identity-Ts';
+
+threadvar
+  { 宿主在 /p/ 反代时签发的身份头（未验签）。业务事件与请求在同一线程，
+    所以线程变量能安全传到事件里。请求开头覆盖、finally 清空 —— 连接线程
+    会被复用，不清空就会把上一个用户的身份带给下一个请求 }
+  GReqIdUser: string;
+  GReqIdRoles: string;
+  GReqIdToken: string;
+  GReqIdTs: string;
+
+function ReqAnyHeader(ARequest: TFPHTTPConnectionRequest;
+  const AName: string): string;
+begin
+  { 3.2.2 把未映射头塞进 CustomHeaders，3.3.1 放进 Headers；
+    两处都查一遍，跟 LWReqHeader 的思路一致 }
+  Result := Trim(ARequest.GetCustomHeader(AName));
+  if Result = '' then
+    Result := Trim(ARequest.CustomHeaders.Values[AName]);
+end;
+
+function LWIdentityUser: string;
+begin
+  Result := GReqIdUser;
+end;
+
+function LWIdentityRoles: string;
+begin
+  Result := GReqIdRoles;
+end;
+
+function LWIdentityToken: string;
+begin
+  Result := GReqIdToken;
+end;
+
+function LWIdentityTs: string;
+begin
+  Result := GReqIdTs;
+end;
 
 { 状态行文本统一走 lwbase.LWHTTPStatusText（自带码表，3.2.2/3.3.1 一致） }
 
@@ -2213,6 +2267,11 @@ begin
     同一进程里中文会话与英文会话可以同时存在。空串 = 用进程默认。 }
   rl := ReqLang(ARequest);
   LWLangSetRequest(rl);
+  { 宿主签发的身份（未验签）落到线程变量，供本次请求的事件处理读取 }
+  GReqIdUser := ReqAnyHeader(ARequest, LW_ID_USER_HDR);
+  GReqIdRoles := ReqAnyHeader(ARequest, LW_ID_ROLES_HDR);
+  GReqIdToken := ReqAnyHeader(ARequest, LW_ID_TOKEN_HDR);
+  GReqIdTs := ReqAnyHeader(ARequest, LW_ID_TS_HDR);
   try
     try
       Route(ARequest, AResponse);
@@ -2238,6 +2297,10 @@ begin
     end;
   finally
     LWLangSetRequest('');
+    GReqIdUser := '';
+    GReqIdRoles := '';
+    GReqIdToken := '';
+    GReqIdTs := '';
   end;
 end;
 

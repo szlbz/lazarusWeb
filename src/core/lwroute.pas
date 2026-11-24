@@ -52,9 +52,32 @@ type
   TLWRouteAuthFunc = function(const AName, ASid: string;
     out AUser, AReason: string): Boolean;
 
+  { 身份注入回调。鉴权放行后调用，让宿主把"当前是谁"交给插件进程。
+     插件是独立进程、有自己的会话表，宿主会话里的 lwuser/lwroles 不会
+     自动过去；这里由宿主决定身份并签名，框架只负责把结果放进请求头。
+     ASid       同一个请求鉴权时用的会话标识
+     AUser      登录名；ARoles 逗号分隔的角色串
+     AToken     宿主对 user|roles|ts 的签名（算法由宿主与插件约定）
+     ATS        签名时间戳（秒），插件据此判过期
+     返回 False = 不注入任何头（未登录或宿主不想传），插件拿不到身份。
+     不注册（nil）= 插件完全看不到宿主身份，行为与改动前一致。 }
+  TLWRouteIdentityFunc = function(const ASid: string;
+    out AUser, ARoles, AToken, ATS: string): Boolean;
+
 { 注册/取消插件访问鉴权。宿主在 Run 之前调用一次即可（nil = 关闭） }
 procedure LWRouteSetAuth(AFunc: TLWRouteAuthFunc);
 function LWRouteAuth: TLWRouteAuthFunc;
+{ 注册/取消身份注入。宿主在 Run 之前调用一次即可（nil = 不传身份） }
+procedure LWRouteSetIdentity(AFunc: TLWRouteIdentityFunc);
+function LWRouteIdentity: TLWRouteIdentityFunc;
+
+const
+  { 注入到插件请求的头名。插件侧用同名常量读取，不要抄字面量。
+    签名头由宿主生成、插件校验；框架不参与密码学，也不解释内容。 }
+  LW_ROUTE_IDENTITY_USER_HDR  = 'X-LW-User';
+  LW_ROUTE_IDENTITY_ROLES_HDR = 'X-LW-Roles';
+  LW_ROUTE_IDENTITY_TOKEN_HDR = 'X-LW-Identity-Token';
+  LW_ROUTE_IDENTITY_TS_HDR    = 'X-LW-Identity-Ts';
 
 const
   { 通过鉴权后把会话标识落到这个 Cookie 上（Path 限定 /p/）：
@@ -104,6 +127,7 @@ var
   { 鉴权回调：nil = 不做用户权限判断（默认）。宿主注册一个函数即可让
     所有 /p/ 请求先过它 —— 不用登录的工程完全不受影响 }
   GRouteAuth: TLWRouteAuthFunc = nil;
+  GRouteIdentity: TLWRouteIdentityFunc = nil;
 
 const
   LW_PLUGIN_PREFIX = '/p/';
@@ -116,6 +140,16 @@ end;
 function LWRouteAuth: TLWRouteAuthFunc;
 begin
   Result := GRouteAuth;
+end;
+
+procedure LWRouteSetIdentity(AFunc: TLWRouteIdentityFunc);
+begin
+  GRouteIdentity := AFunc;
+end;
+
+function LWRouteIdentity: TLWRouteIdentityFunc;
+begin
+  Result := GRouteIdentity;
 end;
 
 function GetTable: TLWRouteTable;
@@ -461,9 +495,18 @@ end;
 { 反向代理：把 ARequest 原样转发到 http://AUpstream+AUpPath（含查询串），
   响应搬运回 AResponse。写法与 lwhyper.ProxyHTTP 同源：
   头/体透传、hop-by-hop 剥离、请求体原始字节不动（multipart 二进制安全）。 }
+function IsIdentityHeader(const AName: string): Boolean;
+begin
+  Result := SameText(AName, LW_ROUTE_IDENTITY_USER_HDR) or
+            SameText(AName, LW_ROUTE_IDENTITY_ROLES_HDR) or
+            SameText(AName, LW_ROUTE_IDENTITY_TOKEN_HDR) or
+            SameText(AName, LW_ROUTE_IDENTITY_TS_HDR);
+end;
+
 function ProxyTo(ARequest: TFPHTTPConnectionRequest;
   AResponse: TFPHTTPConnectionResponse;
-  const AUpstream, AUpPath, AForwardedPrefix: string): Boolean;
+  const AUpstream, AUpPath, AForwardedPrefix: string;
+  const AIdUser, AIdRoles, AIdToken, AIdTs: string): Boolean;
 var
   clt: TFPHTTPClient;
   body, ms: TMemoryStream;
@@ -494,6 +537,21 @@ begin
     end;
     clt.RequestHeaders.Values['X-Forwarded-For'] := ARequest.RemoteAddress;
     clt.RequestHeaders.Values['X-Forwarded-Prefix'] := AForwardedPrefix;
+
+    { 身份头一律由宿主签发：先删掉客户端自带的同名头，再写入宿主的值。
+      只"追加"等于给伪造开后门 —— 浏览器自己发一个 X-LW-User: admin
+      就能在插件里冒充管理员。没签发（AIdUser=''）时也会删干净，
+      插件读到空身份，而不是上一次请求残留的值 }
+    for i := clt.RequestHeaders.Count - 1 downto 0 do
+      if IsIdentityHeader(clt.RequestHeaders.Names[i]) then
+        clt.RequestHeaders.Delete(i);
+    if AIdUser <> '' then
+    begin
+      clt.RequestHeaders.Values[LW_ROUTE_IDENTITY_USER_HDR] := AIdUser;
+      clt.RequestHeaders.Values[LW_ROUTE_IDENTITY_ROLES_HDR] := AIdRoles;
+      clt.RequestHeaders.Values[LW_ROUTE_IDENTITY_TOKEN_HDR] := AIdToken;
+      clt.RequestHeaders.Values[LW_ROUTE_IDENTITY_TS_HDR] := AIdTs;
+    end;
 
     { 请求体透传（原始字节）。3.3.1 在 ContentBytes，3.2.2 在 Content }
     {$IF FPC_FULLVERSION >= 30301}
@@ -578,6 +636,7 @@ function LWRouteDispatch(ARequest: TFPHTTPConnectionRequest;
   AResponse: TFPHTTPConnectionResponse; const APath: string): TLWRouteHandled;
 var
   rest, name, up, prefix, sid, auser, areason, qs: string;
+  iduser, idroles, idtoken, idts: string;
   slash, qp: Integer;
 begin
   Result := rrNotPlugin;
@@ -636,9 +695,9 @@ begin
   { 用户权限：/p/ 是插件唯一的对外门，鉴权必须在这里做 —— 只靠宿主菜单
     隐藏不够，直接敲 URL、转发页面链接、iframe 里的子资源请求都会绕过 UI。
     回调由宿主用 LWRouteSetAuth 注册；没注册就一律放行（旧行为） }
+  sid := RouteReqSid(ARequest);
   if Assigned(GRouteAuth) then
   begin
-    sid := RouteReqSid(ARequest);
     auser := '';
     areason := '';
     if not GRouteAuth(name, sid, auser, areason) then
@@ -667,6 +726,16 @@ begin
       end;
   end;
 
+  { 身份注入：鉴权通过后让宿主签发身份，随这个请求带给插件进程。
+    和鉴权是两件事 —— 只注册 identity 不注册 auth 也行（只传身份不拦问）。
+    回调返回 False 或字段为空时，ProxyTo 会清掉同名头，插件读不到身份 }
+  iduser := '';
+  idroles := '';
+  idtoken := '';
+  idts := '';
+  if Assigned(GRouteIdentity) then
+    GRouteIdentity(sid, iduser, idroles, idtoken, idts);
+
   { /p/notes（无尾斜杠）补 301：页面内相对路径（BASE 推导）依赖尾斜杠。
     原 query 一定要带上 —— 首次导航的 ?sid= 丢了就只能靠 cookie，
     而这时浏览器手里还没有 cookie }
@@ -685,7 +754,8 @@ begin
   end;
 
   prefix := LW_PLUGIN_PREFIX + name + '/';
-  if ProxyTo(ARequest, AResponse, up, rest, prefix) then
+  if ProxyTo(ARequest, AResponse, up, rest, prefix,
+     iduser, idroles, idtoken, idts) then
     Result := rrDone
   else
   begin

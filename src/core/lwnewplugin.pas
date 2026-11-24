@@ -7,19 +7,26 @@
   与 lwnewproject 的分工：
     lwnewproject  单个工程（.lpr / .lpi / umain / build 脚本）：
                   常规模式、服务(daemon)模式都走它；
-    lwnewplugin   插件模式：宿主工程 + common\upluginproc.pas + plugins\<名>\
-                  插件工程 + build-all.bat / stop-all.bat / README.md。
+    lwnewplugin   插件模式：宿主工程 + common\（插件管理 / 启动守卫 / 用户权限 /
+                  身份验签）+ ulogin.pas + plugins\<名>\ 插件工程 +
+                  build-all.bat(.sh) / stop-all.bat(.sh) / README.md。
 
   生成的目录（<Name> = 工程名，<Dir> = 用户选的工程目录）：
 
     <Dir>\<Name>.lpr / .lpi        宿主：侧栏菜单 TLWSideMenu + TPageControl
-    <Dir>\umain.pas / .lfm         宿主主窗体（界面全在 lfm，无一条写死的菜单项）
+    <Dir>\umain.pas / .lfm         宿主主窗体（菜单按角色过滤 + 顶栏身份 + 切换用户）
+    <Dir>\ulogin.pas               宿主登录窗体（默认带图形验证码）
     <Dir>\common\upluginproc.pas    插件发现 / 路由注册 / 拉起 / 热更新（只宿主链接）
+    <Dir>\common\upluginguard.pas   插件启动守卫（宿主与插件都链接）
+    <Dir>\common\upluginauth.pas    用户/角色、菜单过滤、/p/ 403、身份签发（只宿主链接）
+    <Dir>\common\upluginidentity.pas 插件侧身份验签（只插件链接）
     <Dir>\plugins\hello\           示例插件（独立 exe、独立端口 <port>+1）
     <Dir>\<Name>.ini               宿主端口等配置
-    <Dir>\build-all.bat            先编插件、再编宿主
-    <Dir>\stop-all.bat             强杀宿主后清理残留插件进程
-    <Dir>\README.md                目录结构 + "再加一个插件"的步骤
+    <Dir>\build-all.bat            先编插件、再编宿主（Windows）
+    <Dir>\stop-all.bat             强杀宿主后清理残留插件进程（Windows）
+    <Dir>\build-all.sh             同上，Linux/macOS（LF 行尾）
+    <Dir>\stop-all.sh              同上，Linux/macOS（LF 行尾）
+    <Dir>\README.md                目录结构 + 权限说明 + "再加一个插件"的步骤
 
   布局约定（与 demos/pluginsDemo 的差别只在清单根目录）：
     宿主 exe 就在工程根目录，清单根目录 = <exe 目录>\plugins，
@@ -29,9 +36,10 @@
 
   为什么内嵌源码而不是引用 demos：
     设计期包（lwdesign）和命令行工具（tools\lwnew）都要能独立生成这套框架，
-    不能依赖仓库里 demos 目录的相对位置。内嵌的三份文本就是 pluginsDemo 里
-    验证过的那三份（upluginproc.pas / umain.pas / umain.lfm），只做了
-    与工程名有关的占位替换（%NAME% / %TITLE% / %TAG%）。
+    不能依赖仓库里 demos 目录的相对位置。内嵌的文本就是 pluginsDemo 里
+    验证过的那些（upluginproc / upluginguard / upluginauth / upluginidentity /
+    ulogin / umain.pas / umain.lfm），只做了与工程名有关的占位替换
+    （%NAME% / %TITLE% / %TAG%）。demo 改了这里要同步。
 }
 unit lwnewplugin;
 
@@ -69,6 +77,14 @@ function LWPluginCommonSource(const O: TLWNewProject): string;
 { common\upluginguard.pas 正文：插件启动守卫（令牌 + 父进程校验）。
   宿主与插件都链接它，所以两边必须一起重编 —— build-all.bat 已按顺序全编。 }
 function LWPluginGuardSource(const O: TLWNewProject): string;
+{ common\upluginauth.pas 正文：用户/角色与路由鉴权（只宿主链接）。
+  清单 roles= 的判定、菜单过滤、/p/ 403 与身份签发都在这里。 }
+function LWPluginAuthSource(const O: TLWNewProject): string;
+{ common\upluginidentity.pas 正文：插件侧身份验签（只插件链接）。
+  与 upluginauth 用同一个 secret，公式见单元头注释。 }
+function LWPluginIdentitySource(const O: TLWNewProject): string;
+{ ulogin.pas 正文：宿主登录窗体（TLWLoginForm 子类，默认带图形验证码）。 }
+function LWPluginLoginSource(const O: TLWNewProject): string;
 
 { 示例插件 plugins\hello\ 下的四个工程文件 + 清单 + ini }
 function LWPluginSampleLpr(const O: TLWNewProject): string;
@@ -85,10 +101,13 @@ function LWPluginHostIni(const O: TLWNewProject): string;
 { build-all.bat（先插件后宿主）/ stop-all.bat / README.md }
 function LWPluginBuildAllBatch(const O: TLWNewProject): string;
 function LWPluginStopAllBatch(const O: TLWNewProject; const ADir: string): string;
+function LWPluginBuildAllSh(const O: TLWNewProject): string;
+function LWPluginStopAllSh(const O: TLWNewProject): string;
 function LWPluginReadme(const O: TLWNewProject): string;
 
 { 把插件框架的"附加文件"写进 ADir（宿主工程文件不在这里写）：
-    common\upluginproc.pas / common\upluginguard.pas
+    common\upluginproc.pas / upluginguard.pas / upluginauth.pas / upluginidentity.pas
+    ulogin.pas
     plugins\hello\hello.lpr / .lpi / .ini / .plugin.ini / uform_hello.pas / .lfm
     <Name>.ini / build-all.bat / stop-all.bat / README.md
 
@@ -116,7 +135,7 @@ const
       %TAG%    日志前缀里的工程名（LWLog 里显示成 [工程名]）
     改动模板时记得两边同步：demo 是给框架开发者看的样本，这里是生成器。
     ------------------------------------------------------------------ }
-  cCommonLines: array[0..630] of string = (
+  cCommonLines: array[0..651] of string = (
     'unit upluginproc;',
     '{ %NAME% :: 进程级插件发现 / 路由 / 拉起 / 热更新（只有宿主链接本单元）',
     '',
@@ -137,9 +156,10 @@ const
     '      icon=<图标文件>         可选，相对清单目录，16x16 的 bmp/png，侧栏菜单图标',
     '      exe=<相对清单目录>      缺省 = <清单名去 .plugin.ini>.exe',
     '      port=<监听端口>        必填',
-    '      roles=<角色清单>        可选，逗号分隔（admin,analyst）；空/不写 =',
-    '                             所有已登录用户。判定在 lwroute 的鉴权回调里，',
-    '                             需要时照 demos\pluginsDemo 接一套登录 + 角色',
+    '      roles=<角色清单>        可选，逗号分隔，如 roles=admin,analyst',
+    '                             空/不写 = 所有已登录用户；admin 角色通配全部。',
+    '                             判定在 common\upluginauth.LWAuthCanOpen，菜单与',
+    '                             /p/ 路由共用同一份逻辑（模板已默认接好）',
     '',
     '  为什么要 plugins\.run 运行副本：',
     '      Windows 会锁住正在运行的 exe，插件直接跑自己的 exe 时没法重新编译。',
@@ -168,6 +188,7 @@ const
     '    Title: string;        { 菜单显示名 }',
     '    Group: string;        { 侧栏菜单分组，可用 / 表示多层级（如 数据看板/运营分析）；空 = 默认分组，''-'' = 顶层直接一行 }',
     '    Icon: string;         { 菜单图标文件（16x16 bmp/png），清单里的相对路径；空 = 无图标 }',
+    '    Roles: string;        { 允许访问的角色，逗号分隔；空 = 所有已登录用户 }',
     '    ExePath: string;      { 原始 exe（可随时重编） }',
     '    IniPath: string;      { 原始 ini，同 exe 同名 }',
     '    RunDir: string;       { plugins\.run 目录 }',
@@ -275,6 +296,11 @@ const
     '    finally',
     '      fd.Free;',
     '    end;',
+    '    {$IFDEF UNIX}',
+    '    { TFileStream 新建的 .run 副本只有 0644，Linux 下 TProcess 会',
+    '      Permission denied；显式补执行位，Windows 下无此问题 }',
+    '    FileSetAttr(Dst, &755);',
+    '    {$ENDIF}',
     '  finally',
     '    fs.Free;',
     '  end;',
@@ -295,7 +321,7 @@ const
     'function ParseManifest(const AFile: string): TPlugPlugin;',
     'var',
     '  cfg: TLWConfig;',
-    '  nm, title, grp, ic, exe, dir, base, fileName: string;',
+    '  nm, title, grp, ic, exe, dir, base, fileName, roles, alt: string;',
     '  port: Integer;',
     'begin',
     '  Result := nil;',
@@ -323,6 +349,11 @@ const
     '    dir := ExtractFileDir(AFile);',
     '    title := Trim(cfg.Str([''title''], nm));',
     '    grp := Trim(cfg.Str([''group''], ''''));',
+    '    { 访问权限：清单里写 roles=admin,analyst。不写 = 所有已登录用户都能开。',
+    '      这里只负责"读出来"，判定统一在 upluginauth.LWAuthCanOpen ——',
+    '      菜单过滤和 /p/ 路由鉴权必须用同一份逻辑，否则会出现"菜单看得见、',
+    '      点开 403"或者更糟的"菜单看不见、手敲 URL 能进" }',
+    '    roles := Trim(cfg.Str([''roles''], ''''));',
     '    exe := Trim(cfg.Str([''exe''], ''''));',
     '    if exe = '''' then',
     '      exe := base + ''.exe'';',
@@ -330,6 +361,13 @@ const
     '      exe := ExpandFileName(exe)',
     '    else',
     '      exe := ExpandFileName(IncludeTrailingPathDelimiter(dir) + exe);',
+    '    { Linux 下 FPC 产物没有 .exe 后缀：清单仍写 exe=xxx.exe，',
+    '      找不到时退到同目录的无后缀文件（Windows 下文件在，不走这里） }',
+    '    if (not FileExists(exe)) and (CompareText(ExtractFileExt(exe), ''.exe'') = 0) then',
+    '    begin',
+    '      alt := Copy(exe, 1, Length(exe) - 4);',
+    '      if FileExists(alt) then exe := alt;',
+    '    end;',
     '',
     '    ic := Trim(cfg.Str([''icon''], ''''));',
     '    if ic <> '''' then',
@@ -349,6 +387,7 @@ const
     '    Result.Name := nm;',
     '    Result.Title := title;',
     '    Result.Group := grp;',
+    '    Result.Roles := roles;',
     '    Result.Icon := ic;',
     '    Result.ExePath := exe;',
     '    Result.IniPath := ChangeFileExt(exe, ''.ini'');',
@@ -482,6 +521,7 @@ const
     '      old.Title := np.Title;',
     '      old.Group := np.Group;',
     '      old.Icon := np.Icon;',
+    '      old.Roles := np.Roles;',
     '      reRoute := (old.Port <> np.Port) or (not SameText(old.ExePath, np.ExePath));',
     '      if reRoute then',
     '      begin',
@@ -1097,9 +1137,625 @@ const
     'end.'
   );
 
-  cHostUnitLines: array[0..458] of string = (
+  cAuthLines: array[0..363] of string = (
+    'unit upluginauth;',
+    '{ %TAG% :: 用户与角色（宿主侧，插件不链接本单元）',
+    '',
+    '  和 upluginguard 的分工别混：',
+    '    upluginguard  管"这个 exe 能不能被拉起"（进程来源），与"谁在用"无关；',
+    '    本单元         管"这个登录用户能不能打开这个插件"（业务权限）。',
+    '',
+    '  演示账号（真实项目把 LWAuthLogin 换成查库/查接口即可，其它三个入口都不用动）：',
+    '',
+    '    admin   / 123456   角色 admin      全部插件',
+    '    analyst / 123456   角色 analyst    仪表盘 + 便签',
+    '    guest   / 123456   角色 guest      只有便签',
+    '',
+    '  插件清单声明需要哪些角色：',
+    '',
+    '    roles=admin,analyst     只给这两个角色',
+    '    roles=admin             只给管理员',
+    '    roles=                 （不写 / 留空）所有已登录用户都能打开',
+    '    admin 角色隐含全部权限（通配），清单里不用重复列 admin',
+    '',
+    '  判定只有一个实现（LWAuthCanOpen），三个入口共用，保证"看得见"和',
+    '  "打得开"永远一致：',
+    '    1. 登录   LWAuthLogin       校验口令，得到角色串',
+    '    2. 菜单   LWAuthCanOpen     决定侧栏里显不显示这一项',
+    '    3. 路由   LWAuthGuard       注册给 lwroute，/p/<名>/ 一律先判定，',
+    '                                无权限直接 403，不代理到插件进程',
+    '  只做 1、2 是不够的：菜单只是 UI，直接敲 URL 照样能进插件页面 ——',
+    '  所以 3 才是真正的强制点，1、2 只是让界面别骗人。',
+    '}',
+    '{$mode objfpc}{$H+}',
+    '',
+    'interface',
+    '',
+    'uses',
+    '  SysUtils, lwbase, lwhttp, lwapp, lwsession, lwroute, upluginproc;',
+    '',
+    'const',
+    '  { 会话变量名：登录名 / 角色串（逗号分隔）。放在会话上而不是全局变量 ——',
+    '    同一进程里多个浏览器/多页签是不同用户，全局变量会把 A 的身份带给 B }',
+    '  LWAuthUserVar  = ''lwuser'';',
+    '  LWAuthRolesVar = ''lwroles'';',
+    '',
+    '  { 演示账号口令（明文只为演示；真实项目不要落到源码里） }',
+    '  LWAuthDemoPass = ''123456'';',
+    '  { admin 通配：拥有任何插件，不必在每个清单里单独列出 }',
+    '  LWAuthAdminRole = ''admin'';',
+    '',
+    'type',
+    '  TLWAuthAccount = record',
+    '    User: string;',
+    '    Pass: string;',
+    '    Roles: string;',
+    '    Display: string;',
+    '  end;',
+    '',
+    'const',
+    '  LWAuthAccounts: array[0..2] of TLWAuthAccount = (',
+    '    (User: ''admin'';   Pass: ''123456''; Roles: ''admin'';',
+    '     Display: ''系统管理员''),',
+    '    (User: ''analyst''; Pass: ''123456''; Roles: ''analyst'';',
+    '     Display: ''数据分析员''),',
+    '    (User: ''guest'';   Pass: ''123456''; Roles: ''guest'';',
+    '     Display: ''访客''));',
+    '',
+    '{ 账号口令校验。True 时 ARoles/ADisplay 是账号的角色与中文名 }',
+    'function LWAuthLogin(const AUser, APass: string;',
+    '  out ARoles, ADisplay, AErr: string): Boolean;',
+    '{ 角色串里是否含某个角色（逗号分隔，忽略大小写与空格） }',
+    'function LWAuthHasRole(const ARoles, ARole: string): Boolean;',
+    '{ 当前角色能不能打开需要 ANeed 的插件。ANeed 空 = 所有已登录用户 }',
+    'function LWAuthCanOpen(const ARoles, ANeed: string): Boolean;',
+    '{ 角色串 -> 给人看的名字，''admin,analyst'' -> ''管理员、分析师'' }',
+    'function LWAuthRoleText(const ARoles: string): string;',
+    '{ 清单 roles= -> 提示语，'''' -> ''所有已登录用户'' }',
+    'function LWAuthNeedText(const ANeed: string): string;',
+    '{ 账号中文名（找不到就返回用户名本身） }',
+    'function LWAuthDisplayOf(const AUser: string): string;',
+    '',
+    '{ 当前请求线程所属会话的身份（事件处理里取；后台线程取到 ''''） }',
+    'function LWAuthSessionUser: string;',
+    'function LWAuthSessionRoles: string;',
+    'procedure LWAuthSessionSet(const AUser, ARoles: string);',
+    'procedure LWAuthSessionClear;',
+    '',
+    '{ sid -> 身份。会话不存在/未认证/没登录过都返回 False（AuthGuard 用） }',
+    'function LWAuthRolesOfSid(const ASid: string;',
+    '  out AUser, ARoles: string): Boolean;',
+    '',
+    '{ lwroute 鉴权回调：放行返回 True；否则 AReason 是给 403 页面看的中文原因 }',
+    'function LWAuthGuard(const AName, ASid: string;',
+    '  out AUser, AReason: string): Boolean;',
+    '{ lwroute 身份注入回调：给插件进程签发 user/roles/token/ts。',
+    '  签名公式与 common/upluginidentity.pas 里校验的必须一致 }',
+    'function LWAuthIdentity(const ASid: string;',
+    '  out AUser, ARoles, AToken, ATS: string): Boolean;',
+    '{ 在 TLWApp.Run 之前调用一次：把鉴权与身份注入都挂到路由上 }',
+    'procedure LWAuthRegister;',
+    '',
+    'implementation',
+    '',
+    'uses',
+    '  DateUtils, sha1, upluginguard;',
+    '',
+    'function LWAuthHasRole(const ARoles, ARole: string): Boolean;',
+    'var',
+    '  s: string;',
+    '  p: Integer;',
+    'begin',
+    '  Result := False;',
+    '  if (ARoles = '''') or (ARole = '''') then Exit;',
+    '  s := ARoles;',
+    '  while s <> '''' do',
+    '  begin',
+    '    p := Pos('','', s);',
+    '    if p > 0 then',
+    '    begin',
+    '      if SameText(Trim(Copy(s, 1, p - 1)), ARole) then Exit(True);',
+    '      s := Copy(s, p + 1, MaxInt);',
+    '    end',
+    '    else',
+    '    begin',
+    '      if SameText(Trim(s), ARole) then Exit(True);',
+    '      s := '''';',
+    '    end;',
+    '  end;',
+    'end;',
+    '',
+    'function LWAuthCanOpen(const ARoles, ANeed: string): Boolean;',
+    'var',
+    '  s: string;',
+    '  p: Integer;',
+    'begin',
+    '  { 清单没写 roles=：不算"限制"，只是"任何已登录用户" }',
+    '  if Trim(ANeed) = '''' then Exit(True);',
+    '  if Trim(ARoles) = '''' then Exit(False);',
+    '  { 管理员通配：加插件时不用回头改 admin 的角色串 }',
+    '  if LWAuthHasRole(ARoles, LWAuthAdminRole) then Exit(True);',
+    '  s := ANeed;',
+    '  while s <> '''' do',
+    '  begin',
+    '    p := Pos('','', s);',
+    '    if p > 0 then',
+    '    begin',
+    '      if LWAuthHasRole(ARoles, Trim(Copy(s, 1, p - 1))) then Exit(True);',
+    '      s := Copy(s, p + 1, MaxInt);',
+    '    end',
+    '    else',
+    '    begin',
+    '      if LWAuthHasRole(ARoles, Trim(s)) then Exit(True);',
+    '      s := '''';',
+    '    end;',
+    '  end;',
+    '  Result := False;',
+    'end;',
+    '',
+    'function LWAuthRoleName(const ARole: string): string;',
+    'begin',
+    '  if SameText(ARole, ''admin'') then',
+    '    Result := ''管理员''',
+    '  else if SameText(ARole, ''analyst'') then',
+    '    Result := ''分析师''',
+    '  else if SameText(ARole, ''guest'') then',
+    '    Result := ''访客''',
+    '  else',
+    '    Result := ARole;',
+    'end;',
+    '',
+    'function LWAuthRoleText(const ARoles: string): string;',
+    'var',
+    '  s: string;',
+    '  p: Integer;',
+    'begin',
+    '  Result := '''';',
+    '  s := ARoles;',
+    '  while s <> '''' do',
+    '  begin',
+    '    p := Pos('','', s);',
+    '    if p > 0 then',
+    '    begin',
+    '      if Trim(Copy(s, 1, p - 1)) <> '''' then',
+    '      begin',
+    '        if Result <> '''' then Result := Result + ''、'';',
+    '        Result := Result + LWAuthRoleName(Trim(Copy(s, 1, p - 1)));',
+    '      end;',
+    '      s := Copy(s, p + 1, MaxInt);',
+    '    end',
+    '    else',
+    '    begin',
+    '      if Trim(s) <> '''' then',
+    '      begin',
+    '        if Result <> '''' then Result := Result + ''、'';',
+    '        Result := Result + LWAuthRoleName(Trim(s));',
+    '      end;',
+    '      s := '''';',
+    '    end;',
+    '  end;',
+    'end;',
+    '',
+    'function LWAuthNeedText(const ANeed: string): string;',
+    'begin',
+    '  if Trim(ANeed) = '''' then',
+    '    Result := ''所有已登录用户''',
+    '  else',
+    '    Result := LWAuthRoleText(ANeed);',
+    'end;',
+    '',
+    'function LWAuthDisplayOf(const AUser: string): string;',
+    'var',
+    '  i: Integer;',
+    'begin',
+    '  for i := Low(LWAuthAccounts) to High(LWAuthAccounts) do',
+    '    if SameText(LWAuthAccounts[i].User, AUser) then',
+    '      Exit(LWAuthAccounts[i].Display);',
+    '  Result := AUser;',
+    'end;',
+    '',
+    'function LWAuthLogin(const AUser, APass: string;',
+    '  out ARoles, ADisplay, AErr: string): Boolean;',
+    'var',
+    '  i: Integer;',
+    'begin',
+    '  ARoles := '''';',
+    '  ADisplay := '''';',
+    '  AErr := '''';',
+    '  Result := False;',
+    '  if Trim(AUser) = '''' then',
+    '  begin',
+    '    AErr := ''请输入用户名'';',
+    '    Exit;',
+    '  end;',
+    '  for i := Low(LWAuthAccounts) to High(LWAuthAccounts) do',
+    '    if SameText(LWAuthAccounts[i].User, Trim(AUser)) then',
+    '    begin',
+    '      if LWAuthAccounts[i].Pass <> APass then',
+    '      begin',
+    '        AErr := ''用户名或密码错误'';',
+    '        Exit;',
+    '      end;',
+    '      ARoles := LWAuthAccounts[i].Roles;',
+    '      ADisplay := LWAuthAccounts[i].Display;',
+    '      Exit(True);',
+    '    end;',
+    '  { 不区分"用户不存在"和"口令错误"：别让人拿错误提示枚举账号 }',
+    '  AErr := ''用户名或密码错误'';',
+    'end;',
+    '',
+    'function LWAuthSessionUser: string;',
+    'var',
+    '  S: TLWSessionBase;',
+    'begin',
+    '  Result := '''';',
+    '  S := LWCurrentSession;',
+    '  if S <> nil then',
+    '    Result := S.SessionGetVar(LWAuthUserVar);',
+    'end;',
+    '',
+    'function LWAuthSessionRoles: string;',
+    'var',
+    '  S: TLWSessionBase;',
+    'begin',
+    '  Result := '''';',
+    '  S := LWCurrentSession;',
+    '  if S <> nil then',
+    '    Result := S.SessionGetVar(LWAuthRolesVar);',
+    'end;',
+    '',
+    'procedure LWAuthSessionSet(const AUser, ARoles: string);',
+    'var',
+    '  S: TLWSessionBase;',
+    'begin',
+    '  S := LWCurrentSession;',
+    '  if S = nil then Exit;',
+    '  S.SessionSetVar(LWAuthUserVar, AUser);',
+    '  S.SessionSetVar(LWAuthRolesVar, ARoles);',
+    'end;',
+    '',
+    'procedure LWAuthSessionClear;',
+    'begin',
+    '  LWAuthSessionSet('''', '''');',
+    'end;',
+    '',
+    'function LWAuthRolesOfSid(const ASid: string;',
+    '  out AUser, ARoles: string): Boolean;',
+    'var',
+    '  srv: TLWServer;',
+    '  s: TLWSession;',
+    'begin',
+    '  AUser := '''';',
+    '  ARoles := '''';',
+    '  Result := False;',
+    '  if Trim(ASid) = '''' then Exit;',
+    '  srv := TLWApp.Server;',
+    '  if srv = nil then Exit;',
+    '  { Find 返回时 RefCount+1：必须 Release，否则会话永远不回收 }',
+    '  s := srv.Store.Find(ASid);',
+    '  if s = nil then Exit;',
+    '  try',
+    '    { Authenticated 而不是"有用户变量"：注销后变量可能还留着旧值 }',
+    '    if not s.Authenticated then Exit;',
+    '    AUser := s.SessionGetVar(LWAuthUserVar);',
+    '    ARoles := s.SessionGetVar(LWAuthRolesVar);',
+    '    Result := AUser <> '''';',
+    '  finally',
+    '    srv.Store.Release(s);',
+    '  end;',
+    'end;',
+    '',
+    'function LWAuthGuard(const AName, ASid: string;',
+    '  out AUser, AReason: string): Boolean;',
+    'var',
+    '  roles: string;',
+    '  p: TPlugPlugin;',
+    'begin',
+    '  AUser := '''';',
+    '  AReason := '''';',
+    '  Result := False;',
+    '',
+    '  if not LWAuthRolesOfSid(ASid, AUser, roles) then',
+    '  begin',
+    '    AReason := ''未登录，或会话已过期。请回到工作台重新登录，再从侧栏打开本插件。'';',
+    '    Exit;',
+    '  end;',
+    '',
+    '  p := PlugByName(AName);',
+    '  if p = nil then',
+    '  begin',
+    '    { 路由存在但清单里没有：别当成"没限制"放过去 }',
+    '    AReason := ''插件「'' + AName + ''」不在清单里，宿主拒绝转发。'';',
+    '    Exit;',
+    '  end;',
+    '',
+    '  if not LWAuthCanOpen(roles, p.Roles) then',
+    '  begin',
+    '    AReason := ''当前账号（'' + AUser + ''，角色：'' + LWAuthRoleText(roles) +',
+    '      ''）没有该插件的访问权限。'';',
+    '    Exit;',
+    '  end;',
+    '',
+    '  Result := True;',
+    'end;',
+    '',
+    'function LWAuthIdentity(const ASid: string;',
+    '  out AUser, ARoles, AToken, ATS: string): Boolean;',
+    'begin',
+    '  AUser := '''';',
+    '  ARoles := '''';',
+    '  AToken := '''';',
+    '  ATS := '''';',
+    '  Result := LWAuthRolesOfSid(ASid, AUser, ARoles);',
+    '  if not Result then Exit;',
+    '  ATS := IntToStr(DateTimeToUnix(Now, False));',
+    '  { 与 upluginidentity.Checked 用同一个 secret、同一个拼接顺序。',
+    '    浏览器伪造 X-LW-User 时算不出这个 token，插件侧会直接拒掉 }',
+    '  AToken := LowerCase(SHA1Print(SHA1String(',
+    '    PlugGuardSecret + ''|'' + AUser + ''|'' + ARoles + ''|'' + ATS)));',
+    'end;',
+    '',
+    'procedure LWAuthRegister;',
+    'begin',
+    '  LWRouteSetAuth(@LWAuthGuard);',
+    '  LWRouteSetIdentity(@LWAuthIdentity);',
+    'end;',
+    '',
+    'end.'
+  );
+
+  cIdentityLines: array[0..103] of string = (
+    'unit upluginidentity;',
+    '{ %TAG% :: 插件侧身份读取（宿主签发 + 本地验签）',
+    '',
+    '  为什么要这个单元：宿主和登录状态都在宿主进程里，插件是独立 exe，',
+    '  有自己的会话表，看不到宿主的 lwuser/lwroles。宿主在 /p/ 反代时把',
+    '  身份写进请求头（lwroute 的 LWRouteSetIdentity），插件在这里读头、',
+    '  验签之后才认。',
+    '',
+    '  签名用 upluginguard 里同一个 secret，公式：',
+    '',
+    '      SHA1(secret + ''|'' + user + ''|'' + roles + ''|'' + ts)   小写十六进制',
+    '',
+    '  ts 是 Unix 秒，允许偏差 PlugIdentityMaxSkewSec = 60 秒，挡住截获旧头',
+    '  后的重放。secret 改了要宿主和插件一起重编（共用单元，改一处即可）。',
+    '',
+    '  直连插件监听端口（127.0.0.1:8882）时没有签名头，三个 getter 都返回',
+    '  空串 —— 这正好回答"这个请求是不是从宿主进来的"。浏览器自己伪造',
+    '  X-LW-User 头也没用：签名算不出来。 }',
+    '{$mode objfpc}{$H+}',
+    '',
+    'interface',
+    '',
+    'const',
+    '  PlugIdentityMaxSkewSec = 60;',
+    '',
+    '{ 验签通过才返回非空。业务代码要判断身份来源时先调 PlugIdentityValid }',
+    'function PlugIdentityValid: Boolean;',
+    'function PlugIdentityUser: string;',
+    'function PlugIdentityRoles: string;',
+    '{ 演示账号的中文名；没验过签返回"未识别（请从主程序进入）" }',
+    'function PlugIdentityDisplay: string;',
+    '',
+    'implementation',
+    '',
+    'uses',
+    '  SysUtils, DateUtils, sha1, lwhttp, upluginguard;',
+    '',
+    'function Checked(out AUser, ARoles: string): Boolean;',
+    'var',
+    '  token, ts, expect: string;',
+    '  t: Int64;',
+    'begin',
+    '  AUser := '''';',
+    '  ARoles := '''';',
+    '  Result := False;',
+    '  AUser := LWIdentityUser;',
+    '  ARoles := LWIdentityRoles;',
+    '  if (AUser = '''') or (ARoles = '''') then Exit;',
+    '  ts := LWIdentityTs;',
+    '  token := LowerCase(LWIdentityToken);',
+    '  if (ts = '''') or (token = '''') then Exit;',
+    '  t := StrToInt64Def(ts, 0);',
+    '  if t <= 0 then Exit;',
+    '  if Abs(DateTimeToUnix(Now, False) - t) > PlugIdentityMaxSkewSec then Exit;',
+    '  expect := LowerCase(SHA1Print(SHA1String(',
+    '    PlugGuardSecret + ''|'' + AUser + ''|'' + ARoles + ''|'' + ts)));',
+    '  Result := expect = token;',
+    '  if not Result then',
+    '  begin',
+    '    AUser := '''';',
+    '    ARoles := '''';',
+    '  end;',
+    'end;',
+    '',
+    'function PlugIdentityValid: Boolean;',
+    'var',
+    '  u, r: string;',
+    'begin',
+    '  Result := Checked(u, r);',
+    'end;',
+    '',
+    'function PlugIdentityUser: string;',
+    'var',
+    '  u, r: string;',
+    'begin',
+    '  if Checked(u, r) then',
+    '    Result := u',
+    '  else',
+    '    Result := '''';',
+    'end;',
+    '',
+    'function PlugIdentityRoles: string;',
+    'var',
+    '  u, r: string;',
+    'begin',
+    '  if Checked(u, r) then',
+    '    Result := r',
+    '  else',
+    '    Result := '''';',
+    'end;',
+    '',
+    'function PlugIdentityDisplay: string;',
+    'var',
+    '  u: string;',
+    'begin',
+    '  u := PlugIdentityUser;',
+    '  if u = '''' then Exit(''未识别（请从主程序进入）'');',
+    '  if SameText(u, ''admin'') then Exit(''系统管理员'');',
+    '  if SameText(u, ''analyst'') then Exit(''数据分析员'');',
+    '  if SameText(u, ''guest'') then Exit(''访客'');',
+    '  Result := u;',
+    'end;',
+    '',
+    'end.'
+  );
+
+  cLoginLines: array[0..138] of string = (
+    'unit ulogin;',
+    '{ %TAG% :: 登录窗体（用户权限的第一道门）',
+    '',
+    '  基类 TLWLoginForm 已经把「空白登录窗自动摆一套界面 + 图形验证码 + 提交',
+    '  校验 + 认证通过后换出主窗体」全做完了，这里只做三件事：',
+    '',
+    '    1. 挂 OnLogin：交给 upluginauth.LWAuthLogin 校验口令，成功后把',
+    '       「登录名 / 角色串」写进会话变量（后续菜单过滤和 /p/ 鉴权都读它）；',
+    '    2. 改文案：标题写演示账号与口令。口令引用 LWAuthDemoPass 常量而不是',
+    '       再抄一遍字面量 —— 之前把口令写死在文案里，账号表换了之后忘了同步，',
+    '       照着窗体上的提示输反而登不进去（这种错只有真人去点才会发现）；',
+    '    3. 验证码保持开启，只给自动化留一个显式开关（--no-captcha 或',
+    '       LW_LOGIN_NO_CAPTCHA=1）。普通启动永远是开着的，不会因为',
+    '       「忘了接事件」而静默失效。',
+    '}',
+    '{$mode objfpc}{$H+}',
+    '',
+    'interface',
+    '',
+    'uses',
+    '  Classes, SysUtils, Forms, Controls, StdCtrls, Graphics, lwbase, lwform,',
+    '  lwlogin, lwrlog, upluginauth;',
+    '',
+    'type',
+    '  TLoginForm = class(TLWLoginForm)',
+    '  private',
+    '    procedure DoAuth(Sender: TObject; const AUser, APass: string;',
+    '      var AOk: Boolean; var AErr: string);',
+    '    procedure ApplyCaptchaMode;',
+    '    procedure AddCaptchaHint;',
+    '  public',
+    '    procedure AfterConstruction; override;',
+    '  end;',
+    '',
+    '{ 是否显式关闭验证码。只认两种开关：',
+    '    宿主命令行  --no-captcha',
+    '    环境变量    LW_LOGIN_NO_CAPTCHA=1 / true / yes',
+    '  默认（双击、普通命令行启动）返回 False，即验证码开启。 }',
+    'function LoginCaptchaDisabled: Boolean;',
+    '',
+    'implementation',
+    '',
+    'function LoginCaptchaDisabled: Boolean;',
+    'var',
+    '  s: string;',
+    'begin',
+    '  if Application.HasOption(''no-captcha'') then',
+    '    Exit(True);',
+    '  { Windows 单元里也有个同名 3 参版本的 GetEnvironmentVariable，会盖掉',
+    '    SysUtils 的 1 参版本，所以这里写全限定名 }',
+    '  s := SysUtils.GetEnvironmentVariable(''LW_LOGIN_NO_CAPTCHA'');',
+    '  Result := (s = ''1'') or SameText(s, ''true'') or SameText(s, ''yes'');',
+    'end;',
+    '',
+    '{ AutoBuildUI 在 AfterConstruction 里跑（此时 lfm/OnCreate 都已结束），',
+    '  所以改文案、补提示必须在 inherited 之后做 }',
+    'procedure TLoginForm.AfterConstruction;',
+    'var',
+    '  c: TComponent;',
+    'begin',
+    '  inherited AfterConstruction;',
+    '  Caption := ''插件工作台 · 登录'';',
+    '',
+    '  c := FindComponent(''lblTitle'');',
+    '  if c is TLabel then',
+    '    TLabel(c).Caption := ''演示账号 admin / analyst / guest，口令 '' + LWAuthDemoPass;',
+    '',
+    '  ApplyCaptchaMode;',
+    '  if not LoginCaptchaDisabled then',
+    '    AddCaptchaHint;',
+    '',
+    '  OnLogin := @DoAuth;',
+    'end;',
+    '',
+    '{ 自动界面的坐标：标题 y=18、用户名 y=62，中间那条空隙只有 20px 上下 ——',
+    '  提示放进去会和"用户名"行挤在一起（实测会压到输入框上沿），所以放到',
+    '  按钮下面的留白处当脚注，用灰色小字，不抢视线。',
+    '  内容上仍要说明"图能点"，否则没人会想到点它换一张（基类只在失败时自动换） }',
+    'procedure TLoginForm.AddCaptchaHint;',
+    'var',
+    '  l: TLabel;',
+    'begin',
+    '  l := TLabel.Create(Self);',
+    '  { 先 Name 后 Caption：SetName 会把名字回填到文本上 }',
+    '  l.Name := ''lblCaptchaHint'';',
+    '  l.Parent := Self;',
+    '  l.SetBounds(24, 238, 340, 16);',
+    '  l.Caption := ''验证码不区分大小写，看不清可点图片换一张'';',
+    '  l.Font.Color := clGray;',
+    'end;',
+    '',
+    'procedure TLoginForm.ApplyCaptchaMode;',
+    'var',
+    '  c: TComponent;',
+    'begin',
+    '  if not LoginCaptchaDisabled then',
+    '  begin',
+    '    { 基类初值就是 True，这里显式写一次：表明验证码是「有意开着」的，',
+    '      将来基类改默认值时不会悄悄把这道门弄丢 }',
+    '    RequireCaptcha := True;',
+    '    LWLogFmt(''[%TAG%] 登录验证码：开启'', []);',
+    '    Exit;',
+    '  end;',
+    '',
+    '  { 关的时候是三重开关，少一个都进不去：',
+    '    1) RequireCaptcha=False 才是"不校验"；',
+    '    2) 藏掉输入框 —— 否则用户以为必须填；',
+    '    3) 藏掉图片本身。',
+    '    只做 2、3 而不做 1 的话，基类仍会拿空输入去比对，永远提示"验证码错误" }',
+    '  RequireCaptcha := False;',
+    '  LWLogFmt(''[%TAG%] 登录验证码：关闭（--no-captcha / LW_LOGIN_NO_CAPTCHA）'', []);',
+    '  c := FindComponent(''lblCode'');',
+    '  if c is TControl then TControl(c).Visible := False;',
+    '  c := FindComponent(''captcha1'');',
+    '  if c is TControl then TControl(c).Visible := False;',
+    '  c := FindComponent(''edCode'');',
+    '  if c is TControl then TControl(c).Visible := False;',
+    'end;',
+    '',
+    'procedure TLoginForm.DoAuth(Sender: TObject; const AUser, APass: string;',
+    '  var AOk: Boolean; var AErr: string);',
+    'var',
+    '  roles, disp: string;',
+    'begin',
+    '  AOk := LWAuthLogin(AUser, APass, roles, disp, AErr);',
+    '  if not AOk then',
+    '  begin',
+    '    { 错误提示里带点线索，省得演示时反复试密码 }',
+    '    if AErr = '''' then',
+    '      AErr := ''用户名或密码错误'';',
+    '    Exit;',
+    '  end;',
+    '  { 写会话变量：菜单过滤（LWAuthSessionRoles）和 /p/ 鉴权（LWAuthRolesForSid）',
+    '    都从这里取。写全局变量会把 A 用户的身份带给同一进程里的 B 用户 }',
+    '  LWAuthSessionSet(Trim(AUser), roles);',
+    '  LWLogFmt(''[%TAG%] 登录成功 user=%s roles=%s'', [Trim(AUser), roles]);',
+    'end;',
+    '',
+    'end.'
+  );
+
+  cHostUnitLines: array[0..586] of string = (
     'unit umain;',
-    '{ %NAME% :: 宿主（主程序 exe） —— lazarusWeb 插件框架',
+    '{ %TAG% :: 宿主（主程序 exe）',
     '',
     '  左边是 TLWSideMenu（框架的 LCL 侧栏菜单组件），右边是 TPageControl。',
     '  菜单项不是写死的 —— 由插件清单扫描结果动态生成：一个 *.plugin.ini 一项，',
@@ -1107,21 +1763,22 @@ const
     '',
     '      业务管理              <- 清单 group=业务管理',
     '        仪表盘              <- 清单 group=业务管理',
+    '        报表汇总            <- 清单 group=业务管理',
     '      系统管理              <- 清单 group=系统管理/数据维护 的第一段',
     '        数据维护            <- 第二段',
-    '          示例插件          <- title',
+    '          便签              <- title',
     '',
     '  点菜单 -> 在 PageControl 上新增一个 TTabSheet，页内放 TLWHTMLFrame，',
     '  里面是一个指向 /p/<插件名>/ 的 iframe —— 插件本身是独立 exe、独立端口，',
     '  由宿主用 lwroute 反向代理，所以页里显示的是插件进程真正的页面，',
     '  业务处理也全部发生在插件进程内。',
     '',
-    '  热更新：插件 exe 跑的是 .run 下的副本，原始 exe 随时可以重编。',
+    '  热更新：插件 exe 跑的是 plugins\.run 下的副本，原始 exe 随时可以重编。',
     '  重编后点菜单（或「热更新当前插件」），宿主停旧进程 -> 复制新 exe ->',
     '  起新进程 -> 页内 iframe 换 URL 重新加载，宿主自己不重启。',
     '',
-    '  「重新扫描插件」：不重启宿主也能让菜单跟着磁盘变 —— 新增 plugins\<名>\ 目录',
-    '  并放好清单/exe，点一下就注册路由、拉起进程、菜单多出一项；删掉目录再点一下，',
+    '  「重新扫描插件」：不重启宿主也能让菜单跟着磁盘变 —— 新增插件目录并放好',
+    '  清单/exe，点一下就注册路由、拉起进程、菜单多出一项；删掉目录再点一下，',
     '  菜单项消失、页签关闭、进程停掉、路由摘除。',
     '}',
     '{$mode objfpc}{$H+}',
@@ -1130,7 +1787,8 @@ const
     '',
     'uses',
     '  Classes, SysUtils, Forms, Controls, StdCtrls, ComCtrls, ExtCtrls, Menus, Graphics,',
-    '  lwform, lwapp, lwweb, lwsidemenu, upluginproc;',
+    '  lwbase, lwform, lwapp, lwweb, lwsidemenu, lwlogin, lwsession, upluginproc,',
+    '  upluginauth;',
     '',
     'type',
     '  TMainForm = class(TLWForm)',
@@ -1139,17 +1797,22 @@ const
     '    btnRescan: TButton;',
     '    btnHot: TButton;',
     '    lblHot: TLabel;',
+    '    lblUser: TLabel;',
+    '    btnUser: TButton;',
     '    pcMain: TPageControl;',
     '    sbMain: TStatusBar;',
     '    smMain: TLWSideMenu;',
     '    procedure FormCreate(Sender: TObject);',
+    '    procedure FormShow(Sender: TObject);',
     '    procedure pcMainChange(Sender: TObject);',
     '    procedure btnHotClick(Sender: TObject);',
     '    procedure btnRescanClick(Sender: TObject);',
+    '    procedure btnUserClick(Sender: TObject);',
     '    procedure MenuItemClick(Sender: TObject);',
     '  private',
     '    FTabs: TStringList;      { 插件名 -> TTabSheet（重扫描后下标会变，按名找页） }',
     '    FActiveName: string;     { 当前高亮的插件路由名 }',
+    '    FMenuUser: string;       { 建菜单时的登录名：用户变了要按新角色重算 }',
     '    procedure BuildMenu;',
     '    procedure SyncChecked;',
     '    procedure LoadMenuIcon(MI: TMenuItem; const AFile: string);',
@@ -1159,6 +1822,8 @@ const
     '    procedure ReloadTab(AIndex: Integer);',
     '    procedure RefreshTabs;',
     '    procedure UpdateHotLabel;',
+    '    procedure UpdateUserLabel;',
+    '    procedure OpenFirstAllowed;',
     '    procedure SetStatus(const AText: string);',
     '  public',
     '    destructor Destroy; override;',
@@ -1180,18 +1845,52 @@ const
     '    FTabs := TStringList.Create;',
     '  FActiveName := '''';',
     '',
-    '  { 菜单完全由扫描结果生成：换插件目录不用改这里一行代码 }',
+    '  { 菜单完全由扫描结果生成：换插件目录不用改这里一行代码。',
+    '    但只列当前登录账号有权限的插件（判定统一在 upluginauth.LWAuthCanOpen）}',
     '  BuildMenu;',
     '  UpdateHotLabel;',
+    '  UpdateUserLabel;',
     '',
     '  if PlugCount = 0 then',
     '  begin',
     '    SetStatus(''没有发现任何插件：检查 %NAME%\plugins\*\*.plugin.ini'');',
     '    Exit;',
     '  end;',
-    '  SetStatus(Format(''已发现 %d 个插件进程，点左侧菜单在右侧打开'', [PlugCount]));',
-    '  { 默认打开第一个插件，避免首页空白 }',
-    '  OpenPlugin(0);',
+    '  { 默认打开第一个「有权限」的插件：既避免首页空白，也不至于一进来就 403 }',
+    '  OpenFirstAllowed;',
+    'end;',
+    '',
+    '{ 注销后换个账号重新登录，框架会复用同一个主窗体实例（不走 FormCreate），',
+    '  身份变了就必须按新角色重建菜单、关掉越权页签 —— 否则 guest 登录进来',
+    '  看到的还是上一个 admin 的菜单 }',
+    'procedure TMainForm.FormShow(Sender: TObject);',
+    'var',
+    '  idx: Integer;',
+    'begin',
+    '  if LWAuthSessionUser <> FMenuUser then',
+    '  begin',
+    '    UpdateUserLabel;',
+    '    BuildMenu;',
+    '    RefreshTabs;',
+    '    UpdateHotLabel;',
+    '    idx := PlugIndexOf(FActiveName);',
+    '    if (idx < 0) or (not LWAuthCanOpen(LWAuthSessionRoles, PlugGet(idx).Roles)) then',
+    '      OpenFirstAllowed;',
+    '  end;',
+    'end;',
+    '',
+    '{ 打开第一个当前账号能打开的插件；一个都没有就只在状态栏说明 }',
+    'procedure TMainForm.OpenFirstAllowed;',
+    'var',
+    '  i: Integer;',
+    'begin',
+    '  for i := 0 to PlugCount - 1 do',
+    '    if LWAuthCanOpen(LWAuthSessionRoles, PlugGet(i).Roles) then',
+    '    begin',
+    '      OpenPlugin(i);',
+    '      Exit;',
+    '    end;',
+    '  SetStatus(''当前账号「'' + LWAuthSessionUser + ''」没有任何插件的访问权限'');',
     'end;',
     '',
     '{ ---------------- 侧栏菜单（TLWSideMenu，运行期按扫描结果建树） ----------------',
@@ -1202,13 +1901,18 @@ const
     '',
     'procedure TMainForm.BuildMenu;',
     'var',
-    '  i, k, idx: Integer;',
+    '  i, k, idx, shown: Integer;',
     '  p: TPlugPlugin;',
     '  grp, mi: TMenuItem;',
-    '  gpath, seg, key, parentKey: string;',
+    '  gpath, seg, key, parentKey, roles: string;',
     '  segs, map: TStringList;',
     'begin',
     '  smMain.Items.Clear;',
+    '  { 当前身份：菜单是会话级的（每个会话一棵 LCL 窗体树），所以这里读的是',
+    '    本会话的角色，不会串到别的浏览器/别的账号 }',
+    '  FMenuUser := LWAuthSessionUser;',
+    '  roles := LWAuthSessionRoles;',
+    '  shown := 0;',
     '',
     '  { map：分组路径 -> TMenuItem。同一次建树里复用，避免逐项遍历查找；',
     '    清单里 group=数据看板/运营分析 这样写就生成两级分组，任意层级都行 }',
@@ -1222,6 +1926,11 @@ const
     '    begin',
     '      p := PlugGet(i);',
     '      if p = nil then Continue;',
+    '',
+    '      { 权限过滤：没权限的插件根本不进菜单。',
+    '        注意这只是"别让界面骗人"——真正拦住手敲 /p/报表/ 的是路由层的',
+    '        LWAuthGuard（common\upluginauth.pas），两层都要有 }',
+    '      if not LWAuthCanOpen(roles, p.Roles) then Continue;',
     '',
     '      grp := nil;',
     '      gpath := Trim(p.Group);',
@@ -1269,13 +1978,19 @@ const
     '        grp.Add(mi)',
     '      else',
     '        smMain.Items.Add(mi);',
+    '      Inc(shown);',
     '    end;',
     '  finally',
     '    segs.Free;',
     '    map.Free;',
     '  end;',
     '',
-    '  smMain.HeaderCaption := Format(''插件导航（%d）'', [PlugCount]);',
+    '  { 有插件被权限隐藏时把"共几个"也写出来：演示/排障时一眼能看出',
+    '    是"没扫描到"还是"扫到了但当前账号无权" }',
+    '  if shown < PlugCount then',
+    '    smMain.HeaderCaption := Format(''插件导航（%d / 共 %d）'', [shown, PlugCount])',
+    '  else',
+    '    smMain.HeaderCaption := Format(''插件导航（%d）'', [shown]);',
     '  SyncChecked;',
     'end;',
     '',
@@ -1339,6 +2054,16 @@ const
     'begin',
     '  p := PlugGet(AIndex);',
     '  if p = nil then Exit;',
+    '',
+    '  { UI 层二次校验：菜单已经过滤过，但 Tag 可能来自重建前的旧菜单、或',
+    '    重扫描后下标被复用。这里挡住是体验问题（给句人话），越权请求本身',
+    '    由路由层 403 兜底 —— 两层判定用同一个 LWAuthCanOpen }',
+    '  if not LWAuthCanOpen(LWAuthSessionRoles, p.Roles) then',
+    '  begin',
+    '    SetStatus(''没有权限打开「'' + p.Title + ''」：当前角色 '' +',
+    '      LWAuthRoleText(LWAuthSessionRoles) + ''，本插件需要 '' + LWAuthNeedText(p.Roles));',
+    '    Exit;',
+    '  end;',
     '',
     '  { 插件 exe 在启动后被重新编译过：先热更新，再打开 }',
     '  didHot := False;',
@@ -1410,10 +2135,23 @@ const
     'function TMainForm.IframeHTML(AIndex: Integer): string;',
     'var',
     '  p: TPlugPlugin;',
+    '  S: TLWSessionBase;',
+    '  sid: string;',
     'begin',
     '  p := PlugGet(AIndex);',
     '  if p = nil then Exit('''');',
-    '  Result := ''<iframe src="'' + PlugFrameURL(AIndex) + ''" '' +',
+    '  { iframe 的首次导航必须自己带上 sid：浏览器发这个请求时不会带宿主的',
+    '    ?sid=（那是前端 JS 在 /lw/api/* 上用的），而 /p/ 路由要按会话鉴权。',
+    '    放行后 lwroute 会把它落到 Path=/p/ 的 lwpsid cookie 上，之后的子资源',
+    '    请求就自动带 cookie 了，不需要在插件页面里再做手脚。 }',
+    '  sid := '''';',
+    '  S := LWCurrentSession;',
+    '  if S is TLWSession then',
+    '    sid := TLWSession(S).Sid;',
+    '  Result := ''<iframe src="'' + PlugFrameURL(AIndex);',
+    '  if sid <> '''' then',
+    '    Result := Result + ''&sid='' + sid;',
+    '  Result := Result + ''" '' +',
     '    ''style="display:block;width:100%;height:100%;border:0;background:#ffffff" '' +',
     '    ''title="'' + p.Title + ''"></iframe>'';',
     'end;',
@@ -1449,6 +2187,10 @@ const
     '  begin',
     '    ts := TTabSheet(FTabs.Objects[i]);',
     '    idx := PlugIndexOf(FTabs[i]);',
+    '    { 插件没了，或者当前账号已无权访问（换了账号 / 清单改了 roles）：',
+    '      页签一并关掉 —— 旧页签里的 iframe 还连着插件进程，留着就能继续用 }',
+    '    if (idx >= 0) and (not LWAuthCanOpen(LWAuthSessionRoles, PlugGet(idx).Roles)) then',
+    '      idx := -1;',
     '    if idx < 0 then',
     '    begin',
     '      if pcMain.ActivePage = ts then',
@@ -1462,7 +2204,8 @@ const
     '    ts.Caption := p.Title;',
     '  end;',
     '',
-    '  if (FActiveName <> '''') and (PlugIndexOf(FActiveName) < 0) then',
+    '  { 页签被关掉（插件消失或身份变了）后别再把高亮指向它 }',
+    '  if TabOfName(FActiveName) = nil then',
     '    FActiveName := '''';',
     '  SyncChecked;',
     'end;',
@@ -1556,10 +2299,51 @@ const
     '  sbMain.Panels[0].Text := AText;',
     'end;',
     '',
+    '{ 顶栏身份：用户名（中文名）· 角色。角色直接决定菜单里能看到几项 }',
+    'procedure TMainForm.UpdateUserLabel;',
+    'var',
+    '  u, r: string;',
+    'begin',
+    '  u := LWAuthSessionUser;',
+    '  r := LWAuthSessionRoles;',
+    '  if u = '''' then',
+    '    lblUser.Caption := ''未登录''',
+    '  else if r = '''' then',
+    '    lblUser.Caption := u + '' · 无角色''',
+    '  else',
+    '    lblUser.Caption := u + ''（'' + LWAuthDisplayOf(u) + ''）· '' + LWAuthRoleText(r);',
+    'end;',
+    '',
+    '{ 注销 / 切换用户：把会话退回未认证，再把登录窗体换回来。',
+    '  这就是框架的注销路径（Authenticated=False + Hide/Show 窗体）——',
+    '  lwdispatch 看到未认证会话只放行登录窗体上的控件，业务事件全部拒绝 }',
+    'procedure TMainForm.btnUserClick(Sender: TObject);',
+    'var',
+    '  S: TLWSessionBase;',
+    '  lf: TCustomForm;',
+    'begin',
+    '  S := LWCurrentSession;',
+    '  if (S = nil) or (S.LoginForm = nil) then',
+    '  begin',
+    '    SetStatus(''当前会话没有登录窗体（未启用登录），无法切换用户'');',
+    '    Exit;',
+    '  end;',
+    '  lf := S.LoginForm;',
+    '  LWAuthSessionClear;',
+    '  S.Authenticated := False;',
+    '  { 清掉上一次输入的用户名/密码，别把上个账号的凭据留在页面上 }',
+    '  if lf is TLWLoginForm then',
+    '    TLWLoginForm(lf).DoReset(nil);',
+    '  S.SessionHideForm(Self);',
+    '  S.SessionShowForm(lf);',
+    '  FMenuUser := '''';      { 下次 FormShow 一定按新身份重建菜单 }',
+    '  SetStatus(''已注销：请用另一个账号登录（admin / analyst / guest，口令 '' + LWAuthDemoPass + ''）'');',
+    'end;',
+    '',
     'end.'
   );
 
-  cHostLfmLines: array[0..80] of string = (
+  cHostLfmLines: array[0..97] of string = (
     'object MainForm: TMainForm',
     '  Left = 160',
     '  Top = 80',
@@ -1569,6 +2353,7 @@ const
     '  ClientHeight = 760',
     '  ClientWidth = 1180',
     '  OnCreate = FormCreate',
+    '  OnShow = FormShow',
     '  object pnlTop: TPanel',
     '    Left = 0',
     '    Top = 0',
@@ -1608,9 +2393,25 @@ const
     '    object lblHot: TLabel',
     '      Left = 654',
     '      Top = 19',
-    '      Width = 262',
+    '      Width = 200',
     '      Height = 22',
     '      Caption = ''插件 exe 未变化''',
+    '    end',
+    '    object lblUser: TLabel',
+    '      Left = 866',
+    '      Top = 19',
+    '      Width = 200',
+    '      Height = 22',
+    '      Caption = ''未登录''',
+    '    end',
+    '    object btnUser: TButton',
+    '      Left = 1074',
+    '      Top = 11',
+    '      Width = 90',
+    '      Height = 34',
+    '      Caption = ''切换用户''',
+    '      TabOrder = 2',
+    '      OnClick = btnUserClick',
     '    end',
     '  end',
     '  object pcMain: TPageControl',
@@ -1645,28 +2446,30 @@ const
 
   { 示例插件的 .pas / .lfm 原文。生成到 plugins\hello\ 下的那两个文件
     就是它们的落地版本 —— 复制整个目录改个名就是一个新插件。 }
-  cSampleUnitLines: array[0..60] of string = (
+  cSampleUnitLines: array[0..71] of string = (
     'unit uform_hello;',
-    '{ plugins\hello :: 示例插件的页面（独立 exe）',
+    '{ %NAME%\plugins\hello :: 示例插件的页面（独立 exe）',
     '',
     '  这是插件进程自己的完整页面：没有宿主、没有别的插件。',
     '  宿主用 /p/hello/ 反向代理过来，浏览器里看到的就是这一页。',
     '',
     '  界面全在 uform_hello.lfm 里（可以像普通 LCL 窗体一样拖控件）；',
-    '  本单元只有两个事件：FormCreate 取进程号，btnHelloClick 累加点击次数。',
-    '  进程号是故意显示的 —— 热更新之后它会变，说明真的换了新进程。',
+    '  事件在下面：FormCreate 取进程号，btnHelloClick 累加点击次数，',
+    '  AfterConstruction 通过 common/upluginidentity.pas 读取宿主签发的身份。',
+    '  进程号与身份都是故意显示的 —— 热更新后 pid 会变，直连插件端口时身份会变成"未识别"。',
     '}',
     '{$mode objfpc}{$H+}',
     '',
     'interface',
     '',
     'uses',
-    '  Classes, SysUtils, Forms, Controls, StdCtrls, lwform;',
+    '  Classes, SysUtils, Forms, Controls, StdCtrls, lwform, upluginidentity;',
     '',
     'type',
     '  THelloForm = class(TLWForm)',
     '    lblTitle: TLabel;',
     '    lblSub: TLabel;',
+    '    lblIdentity: TLabel;',
     '    lblPidCap: TLabel;',
     '    lblPid: TLabel;',
     '    btnHello: TButton;',
@@ -1677,6 +2480,7 @@ const
     '  private',
     '    FCount: Integer;',
     '  public',
+    '    procedure AfterConstruction; override;',
     '  end;',
     '',
     'var',
@@ -1686,6 +2490,13 @@ const
     '',
     '{$R *.lfm}',
     '',
+    'procedure THelloForm.AfterConstruction;',
+    'begin',
+    '  inherited AfterConstruction;',
+    '  { 宿主反代时写身份头，这里验签后才认；直连插件端口显示"未识别" }',
+    '  lblIdentity.Caption := ''当前用户：'' + PlugIdentityDisplay;',
+    'end;',
+    '',
     'procedure THelloForm.FormCreate(Sender: TObject);',
     'begin',
     '  FCount := 0;',
@@ -1693,7 +2504,7 @@ const
     '  lblPid.Caption := IntToStr(GetProcessID) + '' （plugins\hello\hello.exe）'';',
     '  lblCount.Caption := ''还没有点过'';',
     '  memoLog.Lines.Add(FormatDateTime(''hh:nn:ss'', Now) +',
-    '    ''  插件进程启动，pid='' + IntToStr(GetProcessID));',
+    '    ''  插件进程启动，pid='' + IntToStr(GetProcessID) + ''，'' + PlugIdentityDisplay);',
     'end;',
     '',
     'procedure THelloForm.btnHelloClick(Sender: TObject);',
@@ -1703,13 +2514,14 @@ const
     '  lblCount.Caption := ''已点 '' + IntToStr(FCount) +',
     '    '' 次（计数在插件进程的内存里，重启进程会归零）'';',
     '  memoLog.Lines.Add(FormatDateTime(''hh:nn:ss'', Now) +',
-    '    ''  第 '' + IntToStr(FCount) + '' 次点击，本进程 pid='' + IntToStr(GetProcessID));',
+    '    ''  第 '' + IntToStr(FCount) + '' 次点击，'' + PlugIdentityDisplay +',
+    '    ''，本进程 pid='' + IntToStr(GetProcessID));',
     'end;',
     '',
     'end.'
   );
 
-  cSampleLfmLines: array[0..64] of string = (
+  cSampleLfmLines: array[0..73] of string = (
     'object HelloForm: THelloForm',
     '  Left = 240',
     '  Top = 120',
@@ -1736,23 +2548,32 @@ const
     '    Height = 18',
     '    Caption = ''本页由 plugins\hello\hello.exe 自己渲染，宿主只负责页签与 /p/hello/ 代理。''',
     '  end',
+    '  object lblIdentity: TLabel',
+    '    Left = 20',
+    '    Top = 70',
+    '    Width = 660',
+    '    Height = 18',
+    '    Caption = ''当前用户：未识别（请从主程序进入）''',
+    '    Font.Color = clNavy',
+    '    ParentFont = False',
+    '  end',
     '  object lblPidCap: TLabel',
     '    Left = 20',
-    '    Top = 82',
+    '    Top = 98',
     '    Width = 120',
     '    Height = 18',
     '    Caption = ''插件进程 pid''',
     '  end',
     '  object lblPid: TLabel',
     '    Left = 126',
-    '    Top = 82',
+    '    Top = 98',
     '    Width = 520',
     '    Height = 18',
     '    Caption = ''-''',
     '  end',
     '  object btnHello: TButton',
     '    Left = 20',
-    '    Top = 112',
+    '    Top = 128',
     '    Width = 150',
     '    Height = 34',
     '    Caption = ''打个招呼''',
@@ -1761,16 +2582,16 @@ const
     '  end',
     '  object lblCount: TLabel',
     '    Left = 186',
-    '    Top = 122',
+    '    Top = 138',
     '    Width = 500',
     '    Height = 18',
     '    Caption = ''还没有点过''',
     '  end',
     '  object memoLog: TMemo',
     '    Left = 20',
-    '    Top = 164',
+    '    Top = 180',
     '    Width = 680',
-    '    Height = 270',
+    '    Height = 250',
     '    ScrollBars = ssAutoVertical',
     '    TabOrder = 1',
     '  end',
@@ -1829,6 +2650,21 @@ begin
   Result := ExpandTemplate(LinesText(cGuardLines), O);
 end;
 
+function LWPluginAuthSource(const O: TLWNewProject): string;
+begin
+  Result := ExpandTemplate(LinesText(cAuthLines), O);
+end;
+
+function LWPluginIdentitySource(const O: TLWNewProject): string;
+begin
+  Result := ExpandTemplate(LinesText(cIdentityLines), O);
+end;
+
+function LWPluginLoginSource(const O: TLWNewProject): string;
+begin
+  Result := ExpandTemplate(LinesText(cLoginLines), O);
+end;
+
 function LWPluginHostUnitSource(const O: TLWNewProject): string;
 begin
   Result := ExpandTemplate(LinesText(cHostUnitLines), O);
@@ -1874,21 +2710,28 @@ begin
     LineEnding +
     '  新增插件 = 建一个 plugins\<名>\ 目录（清单 + 插件工程），不用改本文件。' + LineEnding +
     '  插件热更新：改完插件源码重编 -> 宿主里点「热更新当前插件」。' + LineEnding +
-    '  用户权限（可选）：清单写 roles=，lpr 里 TLWApp.SetLogin(TLoginForm) +' + LineEnding +
-    '  LWAuthRegister —— 照 demos\pluginsDemo 抄一套登录 + 角色/路由鉴权即可。' + LineEnding +
+    '  用户权限：模板默认带登录 + 角色鉴权 —— common\upluginauth.pas 判定 roles=' + LineEnding +
+    '  （菜单过滤 / /p/ 403 / 身份签发），ulogin.pas 是登录窗体，插件侧用' + LineEnding +
+    '  common\upluginidentity.pas 验签显示当前用户。不需要登录就把 SetLogin 与' + LineEnding +
+    '  LWAuthRegister 两行删掉；只删菜单过滤、不删路由鉴权会留下越权访问。' + LineEnding +
     '}' + LineEnding +
     '{$mode objfpc}{$H+}' + LineEnding +
     apptype + LineEnding +
     LineEnding +
     'uses' + LineEnding +
     '  {$IFDEF UNIX}cthreads,{$ENDIF}' + LineEnding +
-    '  Interfaces, Forms, lwapp, upluginproc, umain;' + LineEnding +
+    '  Interfaces, Forms, lwapp, upluginproc, upluginauth, ulogin, umain;' + LineEnding +
     LineEnding +
     'begin' + LineEnding +
     '  Application.Initialize;' + LineEnding +
     '  Application.Title := ' + QuotedStr(O.Title) + ';' + LineEnding +
     '  { 类名去掉 T 就是浏览器里的窗体名（' + O.FormName + '） }' + LineEnding +
     '  TLWApp.Register(T' + O.FormName + ');' + LineEnding +
+    '  { 两道门：1) 新会话先显示 ulogin（默认带图形验证码）；' + LineEnding +
+    '    2) LWAuthRegister 把角色鉴权与身份签发挂到 /p/ 反代上。' + LineEnding +
+    '    只做 1 的话菜单藏了但手敲 URL 照样能进 —— 2 才是真正的强制点。 }' + LineEnding +
+    '  TLWApp.SetLogin(TLoginForm);' + LineEnding +
+    '  LWAuthRegister;' + LineEnding +
     '  { 发现 -> 注册路由 -> 拉起进程，必须都在 TLWApp.Run 之前完成：' + LineEnding +
     '    Run 之后才注册的路由，第一次访问就会 502。 }' + LineEnding +
     '  PlugDiscover;' + LineEnding +
@@ -2007,17 +2850,22 @@ begin
     + '    btnRescan: TButton;' + LE
     + '    btnHot: TButton;' + LE
     + '    lblHot: TLabel;' + LE
+    + '    lblUser: TLabel;' + LE
+    + '    btnUser: TButton;' + LE
     + '    pcMain: TPageControl;' + LE
     + '    sbMain: TStatusBar;' + LE
     + '    smMain: TLWSideMenu;' + LE
     + '    procedure FormCreate(Sender: TObject);' + LE
+    + '    procedure FormShow(Sender: TObject);' + LE
     + '    procedure pcMainChange(Sender: TObject);' + LE
     + '    procedure btnHotClick(Sender: TObject);' + LE
     + '    procedure btnRescanClick(Sender: TObject);' + LE
+    + '    procedure btnUserClick(Sender: TObject);' + LE
     + '    procedure MenuItemClick(Sender: TObject);' + LE
     + '  private' + LE
     + '    FTabs: TStringList;' + LE
     + '    FActiveName: string;' + LE
+    + '    FMenuUser: string;' + LE
     + '    procedure BuildMenu;' + LE
     + '    procedure SyncChecked;' + LE
     + '    procedure LoadMenuIcon(MI: TMenuItem; const AFile: string);' + LE
@@ -2027,6 +2875,8 @@ begin
     + '    procedure ReloadTab(AIndex: Integer);' + LE
     + '    procedure RefreshTabs;' + LE
     + '    procedure UpdateHotLabel;' + LE
+    + '    procedure UpdateUserLabel;' + LE
+    + '    procedure OpenFirstAllowed;' + LE
     + '    procedure SetStatus(const AText: string);' + LE
     + '  public' + LE
     + '    destructor Destroy; override;' + LE
@@ -2173,12 +3023,12 @@ function LWPluginSampleUnit(const O: TLWNewProject): string;
 begin
   { 按行数组拼装：生成出来的是一份完整 .pas，引号 / 中文 / 缩进都在数组里
     原样保留，拼装代码不用再跟 Pascal 字符串转义较劲 }
-  Result := LinesText(cSampleUnitLines);
+  Result := ExpandTemplate(LinesText(cSampleUnitLines), O);
 end;
 
 function LWPluginSampleResource(const O: TLWNewProject): string;
 begin
-  Result := LinesText(cSampleLfmLines);
+  Result := ExpandTemplate(LinesText(cSampleLfmLines), O);
 end;
 
 function LWPluginSampleManifest(const O: TLWNewProject): string;
@@ -2194,9 +3044,9 @@ begin
     '; exe   = 插件 exe，相对本清单目录；缺省 = <清单名>.exe' + LineEnding +
     '; port  = 插件监听端口，必须与 hello.ini 里的 port 一致' + LineEnding +
     '; roles = 可选，允许访问的角色（逗号分隔，如 roles=admin,analyst）。' + LineEnding +
-    ';         不写 = 所有已登录用户。要在宿主里做"谁能打开哪个插件"，参照' + LineEnding +
-    ';         demos\pluginsDemo 的 common\upluginauth.pas + host\ulogin.pas：' + LineEnding +
-    ';         lpr 里 TLWApp.SetLogin + LWAuthRegister，之后本行才起作用' + LineEnding +
+    ';         不写 = 所有已登录用户；admin 通配。模板已默认启用登录与角色鉴权：' + LineEnding +
+    ';         判定在 ..\..\common\upluginauth.pas，登录在宿主 ulogin.pas，' + LineEnding +
+    ';         插件侧身份在 ..\..\common\upluginidentity.pas，菜单与 /p/ 路由同判定' + LineEnding +
     'name=' + sLWPluginSampleName + LineEnding +
     'title=示例插件' + LineEnding +
     'exe=' + sLWPluginSampleName + '.exe' + LineEnding +
@@ -2290,6 +3140,83 @@ begin
     'echo ' + O.Name + ' processes stopped.' + #13#10;
 end;
 
+{ Linux 版构建脚本。行尾必须写死 LF（#10）—— 用 LineEnding 在 Windows
+  上生成 CRLF，bash 会把每行末尾的 ^M 当命令的一部分，直接报错。 }
+function LWPluginBuildAllSh(const O: TLWNewProject): string;
+var
+  wsArg: string;
+begin
+  if O.Headless then
+    wsArg := '--ws=nogui '
+  else
+    wsArg := '';
+  Result :=
+    '#!/usr/bin/env bash' + #10 +
+    '# generated by the lazarusWeb project wizard (plugin framework)' + #10 +
+    '# builds the sample plugin first, then the host exe' + #10 +
+    '# Linux: FPC emits suffix-less exe; upluginproc falls back from exe=xxx.exe' + #10 +
+    '# set LAZBUILD=/path/to/lazbuild to override the tool' + #10 +
+    'set -e' + #10 +
+    #10 +
+    'HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"' + #10 +
+    'LAZBUILD="${LAZBUILD:-lazbuild}"' + #10 +
+    #10 +
+    'if ! command -v "$LAZBUILD" >/dev/null 2>&1; then' + #10 +
+    '  echo "lazbuild not found: $LAZBUILD" >&2' + #10 +
+    '  echo "Install Lazarus or set LAZBUILD=/path/to/lazbuild" >&2' + #10 +
+    '  exit 1' + #10 +
+    'fi' + #10 +
+    #10 +
+    'echo "[1/2] plugin: ' + sLWPluginPluginsDir + '/' + sLWPluginSampleName + '/' +
+      sLWPluginSampleName + '.lpi"' + #10 +
+    '"$LAZBUILD" -B ' + sLWPluginPluginsDir + '/' + sLWPluginSampleName + '/' +
+      sLWPluginSampleName + '.lpi "$@"' + #10 +
+    'echo "[2/2] host: ' + O.Name + '.lpi"' + #10 +
+    '"$LAZBUILD" -B ' + wsArg + O.Name + '.lpi "$@"' + #10 +
+    'echo' + #10 +
+    'echo "run:  $HERE/' + O.Name + '"' + #10 +
+    'echo "open: http://127.0.0.1:' + IntToStr(O.Port) + '/"' + #10 +
+    'echo "note: one folder per plugin under ' + sLWPluginPluginsDir +
+      '/ then click rescan"' + #10;
+end;
+
+{ Linux 版清理脚本：按 /proc/<pid>/exe 的真实路径过滤，避免误杀别的项目。
+  同样是 LF 行尾；宿主/插件名来自工程配置。 }
+function LWPluginStopAllSh(const O: TLWNewProject): string;
+begin
+  Result :=
+    '#!/usr/bin/env bash' + #10 +
+    '# generated by the lazarusWeb project wizard (plugin framework)' + #10 +
+    '# Stop ' + O.Name + ' host + plugin processes left behind by a hard kill.' + #10 +
+    '# Filtered by executable path so other projects are untouched.' + #10 +
+    'set -u' + #10 +
+    #10 +
+    'HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"' + #10 +
+    'NAMES=" ' + O.Name + ' ' + sLWPluginSampleName + ' "' + #10 +
+    'KILLED=0' + #10 +
+    #10 +
+    'for d in /proc/[0-9]*; do' + #10 +
+    '  [ -r "$d/exe" ] || continue' + #10 +
+    '  pid="${d#/proc/}"' + #10 +
+    '  [ "$pid" = "$$" ] && continue' + #10 +
+    '  exe="$(readlink "$d/exe" 2>/dev/null)" || continue' + #10 +
+    '  case "$exe" in' + #10 +
+    '    "$HERE"/*) ;;' + #10 +
+    '    *) continue ;;' + #10 +
+    '  esac' + #10 +
+    '  base="${exe##*/}"' + #10 +
+    '  base="${base% (deleted)}"' + #10 +
+    '  case "$NAMES" in' + #10 +
+    '    *" $base "*) ;;' + #10 +
+    '    *) continue ;;' + #10 +
+    '  esac' + #10 +
+    '  if kill -0 "$pid" 2>/dev/null && kill -9 "$pid" 2>/dev/null; then' + #10 +
+    '    KILLED=$((KILLED + 1))' + #10 +
+    '  fi' + #10 +
+    'done' + #10 +
+    'echo "' + O.Name + ' processes stopped ($KILLED)."' + #10;
+end;
+
 function LWPluginReadme(const O: TLWNewProject): string;
 begin
   Result :=
@@ -2305,15 +3232,18 @@ begin
     '```' + LineEnding +
     O.Name + '\' + LineEnding +
     '  ' + O.Name + '.lpr / .lpi          宿主：菜单 + 页签 + 代理 + 插件进程管理' + LineEnding +
-    '  umain.pas / .lfm               宿主主窗体（界面全在 lfm 里）' + LineEnding +
+    '  umain.pas / .lfm               宿主主窗体（菜单按角色过滤 + 顶栏身份 + 切换用户）' + LineEnding +
+    '  ulogin.pas                     宿主登录窗体（TLWLoginForm，默认带图形验证码）' + LineEnding +
     '  ' + O.Name + '.ini                宿主端口等配置' + LineEnding +
     '  common\upluginproc.pas         插件发现 / 路由 / 拉起 / 热更新（只宿主链接）' + LineEnding +
     '  common\upluginguard.pas        插件启动守卫：令牌 + 父进程校验（宿主和插件都链接）' + LineEnding +
+    '  common\upluginauth.pas         用户/角色、菜单过滤、/p/ 403、身份签发（只宿主链接）' + LineEnding +
+    '  common\upluginidentity.pas     插件侧身份验签与读取（只插件链接）' + LineEnding +
     '  plugins\' + sLWPluginSampleName + '\                 示例插件（独立 exe，端口 ' +
       IntToStr(LWPluginSamplePort(O)) + '）' + LineEnding +
     '  plugins\.run\                 运行期自动生成：插件 exe/ini 副本（不要提交）' + LineEnding +
-    '  build-all.bat                  先编插件、再编宿主' + LineEnding +
-    '  stop-all.bat                   强杀宿主后清理残留插件进程' + LineEnding +
+    '  build-all.bat / build-all.sh   先编插件、再编宿主（.sh 是 Linux/macOS 版）' + LineEnding +
+    '  stop-all.bat / stop-all.sh     强杀宿主后清理残留插件进程（同上）' + LineEnding +
     '```' + LineEnding +
     LineEnding +
     '清单根目录 = 宿主 exe 所在目录下的 `plugins\`，宿主扫描 `plugins\*\*.plugin.ini`。' + LineEnding +
@@ -2328,11 +3258,35 @@ begin
     O.Name + '.exe' + LineEnding +
     '```' + LineEnding +
     LineEnding +
+    'Linux/macOS 用 `bash build-all.sh`（需要 Lazarus 的 `lazbuild` 在 PATH 上；' + LineEnding +
+    '也可用 `LAZBUILD=/path/to/lazbuild bash build-all.sh` 指定）。FPC 在 Linux 上' + LineEnding +
+    '生成的 exe 没有 `.exe` 后缀，清单里照写 `exe=xxx.exe` 即可 —— ' + LineEnding +
+    '`upluginproc.pas` 会自动退回无后缀文件，并给 `plugins\.run\` 里的运行副本补执行位。' + LineEnding +
+    '清理残留进程用 `bash stop-all.sh`（按 exe 真实路径过滤，不误杀别的项目）。' + LineEnding +
+    '脚本本身是 LF 行尾；从 Windows 拷到 Linux 不用转 CRLF。' + LineEnding +
+    LineEnding +
     '改过 `common\upluginguard.pas`（启动守卫/口令）要**两边都重编**：宿主与插件都链接它，' + LineEnding +
     '只编一边会出现「令牌对不上，插件起不来」。' + LineEnding +
     LineEnding +
-    '浏览器打开 <http://127.0.0.1:' + IntToStr(O.Port) + '/>，左侧「插件 → 示例插件」' + LineEnding +
-    '点开就是插件进程自己渲染的页面。' + LineEnding +
+    '浏览器打开 <http://127.0.0.1:' + IntToStr(O.Port) + '/>，先登录再点左侧「插件 → 示例插件」，' + LineEnding +
+    '点开就是插件进程自己渲染的页面（顶栏显示当前用户，右侧显示宿主签发的身份）。' + LineEnding +
+    LineEnding +
+    '## 用户权限（模板默认开启）' + LineEnding +
+    LineEnding +
+    '演示账号：`admin` / `analyst` / `guest`，口令 `123456`（见 `common\upluginauth.pas` 的' + LineEnding +
+    '`LWAuthAccounts` 与 `LWAuthDemoPass`）。' + LineEnding +
+    LineEnding +
+    '- 登录：`ulogin.pas` 挂 `LWAuthLogin`，角色写进会话变量；验证码默认开，' + LineEnding +
+    '  自动化可传 `--no-captcha` 或设 `LW_LOGIN_NO_CAPTCHA=1` 关掉。' + LineEnding +
+    '- 菜单：`umain.pas` 用 `LWAuthCanOpen` 按清单 `roles=` 过滤，只列有权限的插件。' + LineEnding +
+    '- 路由：`LWAuthRegister` 把 `LWAuthGuard` 挂到 `lwroute`，直接敲 `/p/<名>/` 也先鉴权，' + LineEnding +
+    '  没权限回 403，不会代理到插件进程 —— 这是强制点，菜单过滤只是别让界面骗人。' + LineEnding +
+    '- 身份：放行后签发 `X-LW-User / X-LW-Roles / X-LW-Identity-Ts / X-LW-Identity-Token`，' + LineEnding +
+    '  插件用 `upluginidentity` 验签后才显示"当前用户"；直连插件端口显示"未识别"。' + LineEnding +
+    LineEnding +
+    '加新账号改 `LWAuthAccounts`；接自有账号体系时只换 `LWAuthLogin`，其余三处不用动。' + LineEnding +
+    '不需要登录就删宿主 `.lpr` 里的 `TLWApp.SetLogin` 与 `LWAuthRegister` 两行；' + LineEnding +
+    '只删菜单过滤、不删路由鉴权会留下越权访问。' + LineEnding +
     LineEnding +
     '## 清单格式（plugins\<名>\<名>.plugin.ini）' + LineEnding +
     LineEnding +
@@ -2343,6 +3297,7 @@ begin
     'icon=..\..\icons\hello.bmp ; 可选：16x16 bmp/png' + LineEnding +
     'exe=hello.exe         ; 相对清单目录' + LineEnding +
     'port=' + IntToStr(LWPluginSamplePort(O)) + '                ; 与 hello.ini 的 port 一致' + LineEnding +
+    'roles=admin,analyst   ; 可选：允许的角色；不写 = 所有已登录用户，admin 通配' + LineEnding +
     '```' + LineEnding +
     LineEnding +
     '## 再加一个插件' + LineEnding +
@@ -2351,7 +3306,7 @@ begin
     '2. 文件改名：`orders.lpr` / `orders.lpi` / `orders.ini` / `orders.plugin.ini`，' + LineEnding +
     '   窗体单元按需改（`uform_orders.pas/.lfm`）；' + LineEnding +
     '   （`.lpi` 的 OtherUnitFiles 里有 `..\..\common`，新插件的 .lpi 也要留着；' + LineEnding +
-    '   守卫单元 `upluginguard` 就从那里编进来）' + LineEnding +
+    '   `upluginguard` 与 `upluginidentity` 都从那里编进来）' + LineEnding +
     '3. 清单里改 `name=orders`、`title=订单`、`port=<换一个空闲端口>`，' + LineEnding +
     '   `orders.ini` 里的 port 同步；' + LineEnding +
     '4. `build-all.bat` 现在只编示例插件 —— 手动 `lazbuild -B plugins\orders\orders.lpi`，' + LineEnding +
@@ -2410,7 +3365,9 @@ begin
     '- `plugins\.run\` 是运行副本，随时可删（下次启动重新复制）。' + LineEnding +
     '- 启动守卫只在插件**启动那一刻**校验；插件起来之后宿主退出，插件进程仍会继续跑' + LineEnding +
     '  （「拉起即信任」）。宿主正常退出会 Terminate 子进程，强杀才需要 stop-all.bat。' + LineEnding +
-    '- `plugin-guard.log` 是运行期产物，不要提交。' + LineEnding;
+    '- `plugin-guard.log` 是运行期产物，不要提交。' + LineEnding +
+    '- 身份头带 60 秒时间戳与签名，能挡伪造与旧头重放；同一台机器上被抓包的**新鲜**请求' + LineEnding +
+    '  仍可重放，敏感系统要上 HTTPS + 短会话，别把这条当加密通道。' + LineEnding;
 end;
 
 { ---------------- 写盘 ---------------- }
@@ -2474,10 +3431,15 @@ begin
   pdir := sLWPluginPluginsDir + PathDelim + sLWPluginSampleName;
   sdir := sLWPluginCommonDir;
 
-  { common\：宿主链接的插件管理单元 + 宿主与插件共用的启动守卫。
-    生成一次就够，之后用户自己改（改守卫/口令要连插件一起重编） }
+  { common\：宿主链接的插件管理 / 权限单元 + 宿主与插件共用的启动守卫 / 身份验签。
+    生成一次就够，之后用户自己改（改守卫/口令或身份公式要连插件一起重编） }
   if not Put(sdir + PathDelim + 'upluginproc.pas', LWPluginCommonSource(O)) then Exit;
   if not Put(sdir + PathDelim + 'upluginguard.pas', LWPluginGuardSource(O)) then Exit;
+  if not Put(sdir + PathDelim + 'upluginauth.pas', LWPluginAuthSource(O)) then Exit;
+  if not Put(sdir + PathDelim + 'upluginidentity.pas', LWPluginIdentitySource(O)) then Exit;
+
+  { 宿主根目录的登录窗体：.lpr 里 TLWApp.SetLogin(TLoginForm) 会用到 }
+  if not Put('ulogin.pas', LWPluginLoginSource(O)) then Exit;
 
   { plugins\hello\：清单 + 插件工程（.lpr/.lpi/窗体/ini） }
   if not Put(pdir + PathDelim + sLWPluginSampleName + '.plugin.ini',
@@ -2497,6 +3459,9 @@ begin
   if not Put(O.Name + '.ini', LWPluginHostIni(O)) then Exit;
   if not Put('build-all.bat', LWPluginBuildAllBatch(O)) then Exit;
   if not Put('stop-all.bat', LWPluginStopAllBatch(O, ADir)) then Exit;
+  { Linux 版：LF 行尾，bash build-all.sh / bash stop-all.sh 可直接跑 }
+  if not Put('build-all.sh', LWPluginBuildAllSh(O)) then Exit;
+  if not Put('stop-all.sh', LWPluginStopAllSh(O)) then Exit;
   if not Put('README.md', LWPluginReadme(O)) then Exit;
 
   Result := True;
