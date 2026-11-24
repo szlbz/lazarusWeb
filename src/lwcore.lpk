@@ -7,7 +7,7 @@
     <License Value="LGPL"/>
     <Description Value="lazarusWeb 核心：TLWForm / 上传控件 / 下载令牌 / 工程模板（不依赖任何 widgetset）"/>
     <Version Major="1" Minor="0"/>
-    <Files Count="11">
+    <Files Count="12">
       <Item1>
         <Filename Value="core/lwbase.pas"/>
         <UnitName Value="lwbase"/>
@@ -52,6 +52,10 @@
         <Filename Value="core/lwtreecols.pas"/>
         <UnitName Value="lwtreecols"/>
       </Item11>
+      <Item12>
+        <Filename Value="core/lwnewplugin.pas"/>
+        <UnitName Value="lwnewplugin"/>
+      </Item12>
     </Files>
     <CompatibilityMode Value="True"/>
     <RequiredPkgs Count="3">
