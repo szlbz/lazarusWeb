@@ -7,6 +7,7 @@
     <CompilerOptions>
       <Version Value="11"/>
       <SearchPaths>
+        <OtherUnitFiles Value="..\..\tools"/>
         <UnitOutputDirectory Value="../../lib/$(TargetCPU)-$(TargetOS)-$(LCLWidgetType)"/>
       </SearchPaths>
       <Linking>
@@ -18,10 +19,10 @@
         <CustomOptions Value=""/>
       </Other>
     </CompilerOptions>
-    <Description Value="[构建] 必须以目标 IDE 的 widgetset（本机 win32）编译：lazbuild design/lwdesign.lpk，不要加 --ws=nogui。本包依赖 lwcore + lwserver + lwvst；lwvst 是 GUI 专属的 VirtualTreeView 支持包（lclextensions_package / laz.virtualtreeview_package 只有 include/&lt;widgetset>，没有 nogui 版本）。无头/Linux 部署链路只走 lwcore + lwserver，不引用 lwvst，因此仍可用 --ws=nogui 编译。lazarusWeb 设计期：一个新建工程向导（lazarusWeb，File/新建/项目）、Tools 菜单「生成 lazarusWeb 窗体模板」（当前单元 LFM，选窗口/平面模式）、New Form 模板（TLWForm/TLWLoginForm 由向导生成，不进组件面板）、组件面板（TLWDBGrid/TLWChart/TLWGauge/TLWColorPicker/TLWHTMLFrame/TLWPDFFrame/TLWDBNavigator/TLWFileUpload/TLWCamera/TLWSideMenu/TLWReport/TLWDBTreeView/TLWDBVirtualTreeView）"/>
+    <Description Value="[构建] 必须以目标 IDE 的 widgetset（本机 win32）编译：lazbuild design/lwdesign.lpk，不要加 --ws=nogui。本包依赖 lwcore + lwserver + lwvst；lwvst 是 GUI 专属的 VirtualTreeView 支持包（lclextensions_package / laz.virtualtreeview_package 只有 include/&lt;widgetset>，没有 nogui 版本）。无头/Linux 部署链路只走 lwcore + lwserver，不引用 lwvst，因此仍可用 --ws=nogui 编译。lazarusWeb 设计期：一个新建工程向导（lazarusWeb，File/新建/项目）、Tools 菜单「生成 lazarusWeb 窗体模板」（当前单元 LFM，选窗口/平面模式）、Tools 菜单「将 Lazarus 工程转换为 lazarusWeb…」（内嵌 ulwconvertgui + lwconvert_core，不启动外部 exe）、New Form 模板（TLWForm/TLWLoginForm 由向导生成，不进组件面板）、组件面板（TLWDBGrid/TLWChart/TLWGauge/TLWColorPicker/TLWHTMLFrame/TLWPDFFrame/TLWDBNavigator/TLWFileUpload/TLWCamera/TLWSideMenu/TLWReport/TLWDBTreeView/TLWDBVirtualTreeView）"/>
     <License Value="LGPL"/>
     <Version Major="1"/>
-    <Files Count="17">
+    <Files Count="21">
       <Item1>
         <Filename Value="lwdsgnregister.pas"/>
         <HasRegisterProc Value="True"/>
@@ -92,6 +93,23 @@
         <Filename Value="icons/TLWDBVirtualTreeView.png"/>
         <Type Value="Binary"/>
       </Item17>
+      <Item18>
+        <Filename Value="lwdsgnconvert.pas"/>
+        <HasRegisterProc Value="True"/>
+        <UnitName Value="lwdsgnconvert"/>
+      </Item18>
+      <Item19>
+        <Filename Value="..\..\tools\lwconvert_core.pas"/>
+        <UnitName Value="lwconvert_core"/>
+      </Item19>
+      <Item20>
+        <Filename Value="..\..\tools\ulwconvertgui.pas"/>
+        <UnitName Value="ulwconvertgui"/>
+      </Item20>
+      <Item21>
+        <Filename Value="..\..\tools\ulwconvertgui.lfm"/>
+        <Type Value="Form"/>
+      </Item21>
     </Files>
     <CompatibilityMode Value="True"/>
     <RequiredPkgs Count="5">

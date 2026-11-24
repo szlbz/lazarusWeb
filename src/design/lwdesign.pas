@@ -8,7 +8,8 @@ unit lwdesign;
 interface
 
 uses
-  lwdsgnregister, lwdsgntplgen, lwdsgntplcore, LazarusPackageIntf;
+  lwdsgnregister, lwdsgntplgen, lwdsgntplcore, lwdsgnconvert, lwconvert_core, 
+  ulwconvertgui, LazarusPackageIntf;
 
 implementation
 
@@ -16,6 +17,7 @@ procedure Register;
 begin
   RegisterUnit('lwdsgnregister', @lwdsgnregister.Register);
   RegisterUnit('lwdsgntplgen', @lwdsgntplgen.Register);
+  RegisterUnit('lwdsgnconvert', @lwdsgnconvert.Register);
 end;
 
 initialization
