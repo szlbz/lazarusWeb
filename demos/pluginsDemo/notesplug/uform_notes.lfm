@@ -1,0 +1,95 @@
+object NotesForm: TNotesForm
+  Left = 260
+  Top = 140
+  Width = 780
+  Height = 540
+  Caption = '便签（独立插件进程）'
+  ClientHeight = 540
+  ClientWidth = 780
+  object lblTitle: TLabel
+    Left = 20
+    Top = 18
+    Width = 380
+    Height = 26
+    Caption = '便签 — 独立插件进程（exe + lfm）'
+    Font.Height = -16
+    Font.Style = [fsBold]
+    ParentFont = False
+  end
+  object lblSub: TLabel
+    Left = 20
+    Top = 46
+    Width = 720
+    Height = 18
+    Caption = '保存后写入插件 exe 同目录的数据文件；宿主热更新重启本进程后数据仍在。'
+  end
+  object lblTitleCap: TLabel
+    Left = 20
+    Top = 84
+    Width = 60
+    Height = 18
+    Caption = '标题'
+  end
+  object edTitle: TEdit
+    Left = 96
+    Top = 80
+    Width = 640
+    Height = 28
+    TabOrder = 0
+  end
+  object lblTextCap: TLabel
+    Left = 20
+    Top = 122
+    Width = 60
+    Height = 18
+    Caption = '内容'
+  end
+  object memoText: TMemo
+    Left = 96
+    Top = 118
+    Width = 640
+    Height = 130
+    ScrollBars = ssAutoVertical
+    TabOrder = 1
+  end
+  object btnSave: TButton
+    Left = 96
+    Top = 262
+    Width = 112
+    Height = 32
+    Caption = '保存'
+    TabOrder = 2
+    OnClick = btnSaveClick
+  end
+  object btnClear: TButton
+    Left = 228
+    Top = 262
+    Width = 112
+    Height = 32
+    Caption = '清空输入'
+    TabOrder = 3
+    OnClick = btnClearClick
+  end
+  object lblStatus: TLabel
+    Left = 360
+    Top = 270
+    Width = 340
+    Height = 18
+    Caption = '等待操作'
+  end
+  object lblListCap: TLabel
+    Left = 20
+    Top = 310
+    Width = 60
+    Height = 18
+    Caption = '已保存'
+  end
+  object lstNotes: TListBox
+    Left = 96
+    Top = 306
+    Width = 640
+    Height = 200
+    ItemHeight = 20
+    TabOrder = 4
+  end
+end

@@ -1,0 +1,134 @@
+object DashboardForm: TDashboardForm
+  Left = 240
+  Top = 120
+  Width = 780
+  Height = 540
+  Caption = '仪表盘（独立插件进程）'
+  ClientHeight = 540
+  ClientWidth = 780
+  object lblTitle: TLabel
+    Left = 20
+    Top = 18
+    Width = 460
+    Height = 26
+    Caption = '仪表盘 — 独立插件进程（exe + lfm）'
+    Font.Height = -16
+    Font.Style = [fsBold]
+    ParentFont = False
+  end
+  object lblSub: TLabel
+    Left = 20
+    Top = 46
+    Width = 700
+    Height = 18
+    Caption = '本页由 dashplug.exe 自己渲染，宿主只负责页签与 /p/dash/ 代理。'
+  end
+  object pnlModule: TPanel
+    Left = 20
+    Top = 78
+    Width = 230
+    Height = 90
+    BevelOuter = bvNone
+    TabOrder = 0
+    object lblModuleCap: TLabel
+      Left = 14
+      Top = 12
+      Width = 120
+      Height = 18
+      Caption = '当前插件窗体'
+    end
+    object lblModuleValue: TLabel
+      Left = 14
+      Top = 38
+      Width = 190
+      Height = 32
+      Caption = '-'
+      Font.Height = -20
+      Font.Style = [fsBold]
+      ParentFont = False
+    end
+  end
+  object pnlHits: TPanel
+    Left = 270
+    Top = 78
+    Width = 230
+    Height = 90
+    BevelOuter = bvNone
+    TabOrder = 1
+    object lblHitsCap: TLabel
+      Left = 14
+      Top = 12
+      Width = 150
+      Height = 18
+      Caption = '本页刷新次数'
+    end
+    object lblHitsValue: TLabel
+      Left = 14
+      Top = 38
+      Width = 190
+      Height = 32
+      Caption = '-'
+      Font.Height = -20
+      Font.Style = [fsBold]
+      ParentFont = False
+    end
+  end
+  object pnlUptime: TPanel
+    Left = 520
+    Top = 78
+    Width = 230
+    Height = 90
+    BevelOuter = bvNone
+    TabOrder = 2
+    object lblUptimeCap: TLabel
+      Left = 14
+      Top = 12
+      Width = 150
+      Height = 18
+      Caption = '进程运行时长'
+    end
+    object lblUptimeValue: TLabel
+      Left = 14
+      Top = 38
+      Width = 190
+      Height = 32
+      Caption = '-'
+      Font.Height = -20
+      Font.Style = [fsBold]
+      ParentFont = False
+    end
+  end
+  object barHealth: TProgressBar
+    Left = 20
+    Top = 188
+    Width = 730
+    Height = 18
+    Min = 0
+    Max = 100
+    TabOrder = 3
+  end
+  object btnRefresh: TButton
+    Left = 20
+    Top = 220
+    Width = 140
+    Height = 32
+    Caption = '刷新指标'
+    TabOrder = 4
+    OnClick = btnRefreshClick
+  end
+  object lblStatus: TLabel
+    Left = 180
+    Top = 228
+    Width = 260
+    Height = 18
+    Caption = '等待刷新'
+  end
+  object memoLog: TMemo
+    Left = 20
+    Top = 268
+    Width = 730
+    Height = 240
+    ScrollBars = ssAutoVertical
+    TabOrder = 5
+  end
+end

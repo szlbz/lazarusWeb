@@ -1,0 +1,127 @@
+object ReportsForm: TReportsForm
+  Left = 280
+  Top = 160
+  Width = 780
+  Height = 540
+  Caption = '报表汇总（独立插件进程）'
+  ClientHeight = 540
+  ClientWidth = 780
+  object lblTitle: TLabel
+    Left = 20
+    Top = 18
+    Width = 460
+    Height = 26
+    Caption = '报表汇总 — 独立插件进程（exe + lfm）'
+    Font.Height = -16
+    Font.Style = [fsBold]
+    ParentFont = False
+  end
+  object lblSub: TLabel
+    Left = 20
+    Top = 46
+    Width = 700
+    Height = 18
+    Caption = '数据与计算都归 reportsplug.exe；宿主只负责菜单、页签与代理。'
+  end
+  object pnlRevenue: TPanel
+    Left = 20
+    Top = 78
+    Width = 230
+    Height = 90
+    BevelOuter = bvNone
+    TabOrder = 0
+    object lblRevenueCap: TLabel
+      Left = 14
+      Top = 12
+      Width = 120
+      Height = 18
+      Caption = '累计收入'
+    end
+    object lblRevenueValue: TLabel
+      Left = 14
+      Top = 38
+      Width = 190
+      Height = 32
+      Caption = '-'
+      Font.Height = -20
+      Font.Style = [fsBold]
+      ParentFont = False
+    end
+  end
+  object pnlCost: TPanel
+    Left = 270
+    Top = 78
+    Width = 230
+    Height = 90
+    BevelOuter = bvNone
+    TabOrder = 1
+    object lblCostCap: TLabel
+      Left = 14
+      Top = 12
+      Width = 120
+      Height = 18
+      Caption = '累计成本'
+    end
+    object lblCostValue: TLabel
+      Left = 14
+      Top = 38
+      Width = 190
+      Height = 32
+      Caption = '-'
+      Font.Height = -20
+      Font.Style = [fsBold]
+      ParentFont = False
+    end
+  end
+  object pnlProfit: TPanel
+    Left = 520
+    Top = 78
+    Width = 230
+    Height = 90
+    BevelOuter = bvNone
+    TabOrder = 2
+    object lblProfitCap: TLabel
+      Left = 14
+      Top = 12
+      Width = 120
+      Height = 18
+      Caption = '累计毛利'
+    end
+    object lblProfitValue: TLabel
+      Left = 14
+      Top = 38
+      Width = 190
+      Height = 32
+      Caption = '-'
+      Font.Height = -20
+      Font.Style = [fsBold]
+      ParentFont = False
+    end
+  end
+  object btnReload: TButton
+    Left = 20
+    Top = 188
+    Width = 140
+    Height = 32
+    Caption = '重新汇总'
+    TabOrder = 3
+    OnClick = btnReloadClick
+  end
+  object lblStatus: TLabel
+    Left = 180
+    Top = 196
+    Width = 260
+    Height = 18
+    Caption = '等待汇总'
+  end
+  object memoRows: TMemo
+    Left = 20
+    Top = 236
+    Width = 730
+    Height = 270
+    ScrollBars = ssAutoVertical
+    Font.Name = 'Consolas'
+    ParentFont = False
+    TabOrder = 4
+  end
+end
