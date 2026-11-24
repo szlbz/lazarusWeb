@@ -23,6 +23,16 @@ object ReportsForm: TReportsForm
     Height = 18
     Caption = '数据与计算都归 reportsplug.exe；宿主只负责菜单、页签与代理。'
   end
+  object lblIdentity: TLabel
+    Left = 500
+    Top = 18
+    Width = 260
+    Height = 26
+    Caption = '当前用户：未识别（请从主程序进入）'
+    Font.Color = 255
+    Font.Height = -12
+    ParentFont = False
+  end
   object pnlRevenue: TPanel
     Left = 20
     Top = 78

@@ -3,6 +3,9 @@ unit uform_reports;
 
   只读汇总：区域收入/成本/毛利。数据与计算都在插件进程内，
   宿主不知道报表结构，只把 /p/reports/ 代理进来。
+
+  右上角显示"当前用户"：宿主在 /p/ 反代时签发身份头，本进程用
+  common/upluginidentity.pas 验签后读取。直连本 exe 端口看不到身份。
 }
 {$mode objfpc}{$H+}
 
@@ -10,12 +13,13 @@ interface
 
 uses
   Classes, SysUtils, Forms, Controls, StdCtrls, ExtCtrls,
-  lwform, lwapp;
+  lwform, lwapp, upluginidentity;
 
 type
   TReportsForm = class(TLWForm)
     lblTitle: TLabel;
     lblSub: TLabel;
+    lblIdentity: TLabel;
     pnlRevenue: TPanel;
     lblRevenueCap: TLabel;
     lblRevenueValue: TLabel;
@@ -84,6 +88,8 @@ begin
   inherited AfterConstruction;
   if csDesigning in ComponentState then Exit;
   FLoadCount := 0;
+  { 身份来自宿主反代时签发的头，验签失败会显示"未识别" }
+  lblIdentity.Caption := '当前用户：' + PlugIdentityDisplay;
   Reload;
 end;
 
@@ -119,7 +125,8 @@ begin
     memoRows.Lines.EndUpdate;
   end;
 
-  lblStatus.Caption := '第 ' + IntToStr(FLoadCount) + ' 次汇总';
+  lblStatus.Caption := '第 ' + IntToStr(FLoadCount) + ' 次汇总（' +
+    PlugIdentityDisplay + '）';
 end;
 
 end.

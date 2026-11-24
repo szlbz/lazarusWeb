@@ -89,10 +89,17 @@ function LWAuthRolesOfSid(const ASid: string;
 { lwroute 鉴权回调：放行返回 True；否则 AReason 是给 403 页面看的中文原因 }
 function LWAuthGuard(const AName, ASid: string;
   out AUser, AReason: string): Boolean;
-{ 在 TLWApp.Run 之前调用一次：把 LWAuthGuard 挂到路由上 }
+{ lwroute 身份注入回调：给插件进程签发 user/roles/token/ts。
+  签名公式与 common/upluginidentity.pas 里校验的必须一致 }
+function LWAuthIdentity(const ASid: string;
+  out AUser, ARoles, AToken, ATS: string): Boolean;
+{ 在 TLWApp.Run 之前调用一次：把鉴权与身份注入都挂到路由上 }
 procedure LWAuthRegister;
 
 implementation
+
+uses
+  DateUtils, sha1, upluginguard;
 
 function LWAuthHasRole(const ARoles, ARole: string): Boolean;
 var
@@ -332,9 +339,26 @@ begin
   Result := True;
 end;
 
+function LWAuthIdentity(const ASid: string;
+  out AUser, ARoles, AToken, ATS: string): Boolean;
+begin
+  AUser := '';
+  ARoles := '';
+  AToken := '';
+  ATS := '';
+  Result := LWAuthRolesOfSid(ASid, AUser, ARoles);
+  if not Result then Exit;
+  ATS := IntToStr(DateTimeToUnix(Now, False));
+  { 与 upluginidentity.Checked 用同一个 secret、同一个拼接顺序。
+    浏览器伪造 X-LW-User 时算不出这个 token，插件侧会直接拒掉 }
+  AToken := LowerCase(SHA1Print(SHA1String(
+    PlugGuardSecret + '|' + AUser + '|' + ARoles + '|' + ATS)));
+end;
+
 procedure LWAuthRegister;
 begin
   LWRouteSetAuth(@LWAuthGuard);
+  LWRouteSetIdentity(@LWAuthIdentity);
 end;
 
 end.

@@ -36,7 +36,8 @@ demos/pluginsDemo/
     uform_reports.pas/.lfm
   icons/                     侧栏菜单图标（16x16 bmp，清单里 icon= 引用）
   .run/                      运行期自动生成：插件 exe/ini 副本（不要提交）
-  stop-all.bat               强杀宿主后清理残留插件进程
+  build.bat / build.sh       Windows / Linux 构建脚本（先插件后宿主）
+  stop-all.bat / stop-all.sh Windows / Linux 清理残留进程脚本
 ```
 
 宿主 exe 在 `host\` 下，所以清单根目录 = `host\` 的父目录（`pluginsDemo\`）。
@@ -121,8 +122,14 @@ lazbuild demos\pluginsDemo\host\pluginsdemo.lpi
 demos\pluginsDemo\host\pluginsdemo.exe
 ```
 
+Linux/macOS 用 `bash build.sh`（或 `chmod +x build.sh` 后直接执行）；
+`lazbuild` 不在 PATH 上时先设 `LAZBUILD=/path/to/lazbuild`。FPC 在 Linux 上
+生成的插件 exe 没有 `.exe` 后缀，清单里照写 `exe=xxx.exe` 即可 ——
+`common\upluginproc.pas` 会自动退到无后缀文件，并给 `.run/` 里的运行副本补执行位。
+清理残留进程用 `bash stop-all.sh`（按 exe 真实路径过滤，不误杀别的 demo）。
+
 **改了 `common\upluginguard.pas`（守卫/口令）要全部重编**：宿主和三个插件都链接它，
-只重编一边会出现「令牌对不上，插件起不来」。`build.bat` 已经按顺序全编。
+只重编一边会出现「令牌对不上，插件起不来」。`build.bat` / `build.sh` 已经按顺序全编。
 
 浏览器打开 <http://127.0.0.1:8878/>，**先看到登录页**：admin / analyst / guest
 （口令见 `common\upluginauth.pas` 的 `LWAuthDemoPass`）。登录后默认打开当前账号
@@ -280,14 +287,39 @@ set LW_CAPTCHA_DEBUG=1
 **复用同一个主窗体实例**，所以 `TMainForm.FormShow` 里比对登录名，变了就按新
 角色重建菜单、关掉越权页签（否则 guest 登录进来看到的是上一个 admin 的菜单）。
 
+### 插件怎么知道"当前是谁"（身份注入）
+
+权限判定在宿主，但插件是独立进程、有自己的会话表，宿主会话里的 `lwuser`
+不会自动过去。宿主在 `/p/<名>/` 反代时把身份签发到请求头，插件验签后读取：
+
+| 请求头 | 内容 |
+| --- | --- |
+| `X-LW-User` | 登录名 |
+| `X-LW-Roles` | 逗号分隔的角色串 |
+| `X-LW-Identity-Ts` | 签发时刻（Unix 秒），60 秒有效 |
+| `X-LW-Identity-Token` | `SHA1(secret + '|' + user + '|' + roles + '|' + ts)` |
+
+- **框架侧**：`lwroute.LWRouteSetIdentity` 注册回调（不注册就没有头，行为与旧版
+  一致）。`ProxyTo` **先删掉客户端自带的同名头，再写宿主签发的头** —— 只追加的
+  话，浏览器自己发一个 `X-LW-User: admin` 就能冒充。`lwhttp.HandleRequest` 把四个
+  头落到线程变量，业务事件里能读到，请求结束清空。
+- **宿主侧**：`common/upluginauth.pas` 的 `LWAuthIdentity` 从会话取 user/roles 并
+  签名；`LWAuthRegister` 一次挂上鉴权与身份两个回调。签名复用 `upluginguard` 的
+  secret，两边共用同一个单元，改 secret 要宿主和插件一起重编。
+- **插件侧**：`common/upluginidentity.pas` 验签后暴露 `PlugIdentityUser/Roles/
+  Display`。便签页右上角显示「当前用户：…」，保存时把身份带进状态栏。直连插件
+  端口时没有签名头，显示「未识别」；浏览器伪造头算不出 token，也会被拒。
+
 ### 边界
 
 - 插件进程监听 `127.0.0.1:<port>`，**绕过宿主直连端口没有用户权限**。本机上有
   权限跑程序的人可以直接访问。要做到进程级隔离，只能给插件也加登录、或把端口
   改成命名管道/ACL 受限的句柄；
+- 身份头有 60 秒时效，挡的是随手伪造与旧头重放；能在插件端口上抓包的本机进程
+  仍可在窗口内重放。secret 也在 exe 里，不是密码学强认证；
 - `lwpsid` 是会话标识，不是令牌：会话过期即失效，但它本身可被同机进程读到；
-- 框架侧改的是 `lwroute`（新增可选回调，未注册时行为与旧版一致），**插件代码
-  完全不用改** —— 权限判断发生在宿主的代理层。
+- 框架侧改的是 `lwroute` / `lwhttp`（新增可选回调，未注册时行为与旧版一致），
+  **权限判定仍全在宿主代理层**；身份注入是可选的一层，插件不读就没有影响。
 
 ## 热更新
 

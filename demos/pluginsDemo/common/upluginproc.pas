@@ -158,6 +158,11 @@ begin
     finally
       fd.Free;
     end;
+    {$IFDEF UNIX}
+    { TFileStream 新建的 .run 副本只有 0644，Linux 下 TProcess 会
+      Permission denied；显式补执行位，Windows 下无此问题 }
+    FileSetAttr(Dst, &755);
+    {$ENDIF}
   finally
     fs.Free;
   end;
@@ -178,7 +183,7 @@ end;
 function ParseManifest(const AFile: string): TPlugPlugin;
 var
   cfg: TLWConfig;
-  nm, title, grp, ic, exe, dir, base, fileName, roles: string;
+  nm, title, grp, ic, exe, dir, base, fileName, roles, alt: string;
   port: Integer;
 begin
   Result := nil;
@@ -218,6 +223,13 @@ begin
       exe := ExpandFileName(exe)
     else
       exe := ExpandFileName(IncludeTrailingPathDelimiter(dir) + exe);
+    { Linux 下 FPC 产物没有 .exe 后缀：清单仍写 exe=xxx.exe，
+      找不到时退到同目录的无后缀文件（Windows 下文件在，不走这里） }
+    if (not FileExists(exe)) and (CompareText(ExtractFileExt(exe), '.exe') = 0) then
+    begin
+      alt := Copy(exe, 1, Length(exe) - 4);
+      if FileExists(alt) then exe := alt;
+    end;
 
     ic := Trim(cfg.Str(['icon'], ''));
     if ic <> '' then

@@ -4,6 +4,9 @@ unit uform_notes;
   业务全部在插件进程内完成。数据落盘到 exe 同目录的 notesplug.notes.txt，
   所以宿主热更新（重启本进程）之后，已保存的便签仍然存在 —— 这是热更新
   演示里最直观的一项：代码换了、进程重启了，业务数据没丢。
+
+  右上角显示"当前用户"：宿主在 /p/ 反代时签发身份头，本进程用
+  common/upluginidentity.pas 验签后读取。直连本 exe 端口看不到身份。
 }
 {$mode objfpc}{$H+}
 
@@ -11,12 +14,13 @@ interface
 
 uses
   Classes, SysUtils, Forms, Controls, StdCtrls,
-  lwform, lwapp;
+  lwform, lwapp, upluginidentity;
 
 type
   TNotesForm = class(TLWForm)
     lblTitle: TLabel;
     lblSub: TLabel;
+    lblIdentity: TLabel;
     lblTitleCap: TLabel;
     edTitle: TEdit;
     lblTextCap: TLabel;
@@ -89,6 +93,8 @@ begin
   lblStatus.Caption := '等待操作（已载入 ' + IntToStr(GNotes.Count) + ' 条）';
   edTitle.Text := '';
   memoText.Lines.Clear;
+  { 身份来自宿主反代时签发的头，验签失败会显示"未识别" }
+  lblIdentity.Caption := '当前用户：' + PlugIdentityDisplay;
 end;
 
 procedure TNotesForm.SyncList;
@@ -118,7 +124,8 @@ begin
   GNotes.Add(t);
   SaveNotes;
   SyncList;
-  lblStatus.Caption := '已保存「' + t + '」，共 ' + IntToStr(GNotes.Count) + ' 条';
+  lblStatus.Caption := '已保存「' + t + '」，共 ' + IntToStr(GNotes.Count) +
+    ' 条（' + PlugIdentityDisplay + '）';
   edTitle.Text := '';
   memoText.Lines.Clear;
 end;
