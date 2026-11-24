@@ -15,8 +15,10 @@
                                        启动后弹服务端面板窗口，调试最方便）；
          "lazarusWeb project(nogui)"   LCLWidgetType=nogui 的控制台服务程序
                                        （部署档，只能 lazbuild --ws=nogui 编译）。
-       第三框选工程模板（常规 / 插件）：插件模式按插件工程生成 .lpr
-       （uses lwmodules + RegisterAllModules，另生成 lwmodules.pas 空骨架）。
+       第三框选工程模板（常规 / 插件）：插件模式生成一套**多进程插件框架**
+       （宿主 exe + common\upluginproc.pas + plugins\hello\ 示例插件，
+       另带 build-all.bat / stop-all.bat / README.md，模板见 lwnewplugin）；
+       宿主主窗体是侧栏菜单 TLWSideMenu + TPageControl 的插件工作台。
        主窗体直接就是 TLWForm，可以像普通窗体一样拖控件。
 
        落盘时机与 Lazarus 自带模板完全一致 —— 选完三个框后不建目录、不写文件：
@@ -75,7 +77,7 @@ uses
   Classes, SysUtils, TypInfo, Forms, Controls, Dialogs, StdCtrls, LCLType,
   LResources, ProjectIntf, LazIDEIntf, FormEditingIntf, IDEIntf, CompOptsIntf,
   LazFileUtils, PackageIntf, ExtCtrls,
-  lwbase, lwform, lwfileupload, lwcamera, lwnewproject, lwlogin, lwcaptcha,
+  lwbase, lwform, lwfileupload, lwcamera, lwnewproject, lwnewplugin, lwlogin, lwcaptcha,
   { 下面这些来自 lwserver / lwcore / lwvst 包：注册进 IDE 后，带自定义控件的
     窗体才能在设计器里打开（不然读 lfm 报 "unknown class TLWDBGrid"），
     同时也进组件面板，Object Inspector 能直接编辑它们的新属性。
@@ -109,7 +111,8 @@ const
   sLWChooseTplCaption = 'lazarusWeb 新建工程（3/3）';
   sLWChooseTplMsg     = '请选择工程模板：' + LineEnding +
     '  常规模式：普通 lazarusWeb 工程；' + LineEnding +
-    '  插件模式：按插件工程生成 .lpr（uses lwmodules + RegisterAllModules）。';
+    '  插件模式：生成插件框架（宿主 exe + 插件 exe + common 目录），' + LineEnding +
+    '            左侧菜单 / 右侧页签，插件是独立进程、可热更新。';
   sLWTplNormalName = '常规模式';
   sLWTplPluginName = '插件模式';
   sLWCancelName    = '取消';
@@ -161,11 +164,12 @@ type
     { True = nogui 档（.lpr 写 $APPTYPE CONSOLE、.lpi 需要 LCLWidgetType=nogui）；
       False = 默认 widgetset 档（$APPTYPE GUI，IDE 里 F9 直接跑） }
     FHeadless: Boolean;
-    { True = 插件模式（.lpr uses lwmodules + RegisterAllModules） }
+    { True = 插件模式（多进程插件框架：宿主 exe + common + plugins\<名>\，
+      宿主主窗体是侧栏菜单 + PageControl 的插件工作台） }
     FPlugin: Boolean;
     { 把一篇已经写好的文本作为工程文件加进去（含编辑器页，保证 Ctrl+S 会落盘）。
-      用于插件模式的 lwmodules.pas、服务模式的 uDaemon.pas / uMapper.pas /
-      lazarusWeb.ini。失败只记日志，不打断新建流程。 }
+      用于服务模式的 uDaemon.pas / uMapper.pas / lazarusWeb.ini。
+      失败只记日志，不打断新建流程。 }
     procedure AddExtraFile(const AFile, ASource: string);
   public
     constructor Create; override;
@@ -195,6 +199,9 @@ type
       模板源码（IDE 拼的那份只是占位，见 Initialized） }
     FUnitName: string;
     FFormName: string;
+    { True = 插件模式的宿主主窗体（侧栏菜单 + PageControl + 状态栏），
+      界面比常规模板复杂得多，lfm 与 .pas 都换成 lwnewplugin 里的模板 }
+    FPlugin: Boolean;
   public
     constructor Create; override;
     function GetInterfaceUsesSection: string; override;
@@ -206,6 +213,7 @@ type
     function Initialized(NewFile: TLazProjectFile): TModalResult; override;
     property Title: string read FTitle write FTitle;
     property Headless: Boolean read FHeadless write FHeadless;
+    property Plugin: Boolean read FPlugin write FPlugin;
   end;
 
   { ---------------------------------------------------------------
@@ -325,8 +333,11 @@ type
   { ---------------------------------------------------------------
     向导内部用的"附加文本文件"描述符
     ---------------------------------------------------------------
-    新建工程除了主窗体，还要带几个纯文本文件：插件模式的 lwmodules.pas，
-    服务(daemon)模式的 uDaemon.pas / uMapper.pas / lazarusWeb.ini。
+    新建工程除了主窗体，还要带几个纯文本文件：服务(daemon)模式的
+    uDaemon.pas / uMapper.pas / lazarusWeb.ini。
+    （插件模式的 common\ / plugins\ 一整套不是工程单元，由保存钩子直接写盘，
+    见 TLWProjectFinalizer.EnsureExtras —— 它们是独立子工程，不该混进宿主的
+    工程检查器。）
 
     **不能**用 CreateProjectFile + SetSourceText 塞它们 —— 那样建出来的只是
     一个"没有编辑器页的工程文件"，而 IDE 保存虚拟工程时，写盘的循环是这样的
@@ -460,20 +471,32 @@ begin
   { Title 不设：保持基类的默认值（等价于标准模板的 'project1'），
     保存时 IDE 会按用户定的工程名自动改掉（TitleIsDefault 认这个默认值）。 }
 
+  { 插件模式：注册的是插件框架的宿主 .lpr（发现/路由/拉起后 TLWApp.Run），
+    其中 TLWApp.Register 判据与常规模板一致，保存钩子的识别不受影响 }
   MainFile := AProject.CreateProjectFile(O.Name + '.lpr');
   MainFile.IsPartOfProject := True;
   AProject.AddFile(MainFile, False);
   AProject.MainFileID := 0;
-  MainFile.SetSourceText(LWProjectSource(O));
+  if FPlugin then
+    MainFile.SetSourceText(LWPluginHostSource(O))
+  else
+    MainFile.SetSourceText(LWProjectSource(O));
 
-  { 插件模式的 lwmodules.pas、服务模式的 uDaemon.pas / uMapper.pas /
-    lazarusWeb.ini 都不在这里建 —— 见 CreateStartFiles 与 TLWExtraFileDesc 的
-    注释：没有编辑器页的工程文件 IDE 不会写盘，必须走 DoNewEditorFile。 }
+  { 插件模式的 common\upluginproc.pas、plugins\hello\ 一整套、build-all.bat
+    等等都不是"工程文件"，由保存钩子 TLWProjectFinalizer 在落盘之后写 ——
+    那时才知道用户选的目录和最终工程名（见 EnsureExtras）。
+    服务模式的 uDaemon.pas / uMapper.pas / lazarusWeb.ini 仍走 CreateStartFiles
+    + DoNewEditorFile：它们是本工程的单元，必须跟着 Ctrl+S 落盘。 }
 
   CO := AProject.LazCompilerOptions;
   CO.TargetFilename := O.Name;
   CO.TargetFilenameApplyConventions := True;
   CO.UnitOutputDirectory := 'lib' + PathDelim + '$(TargetCPU)-$(TargetOS)';
+  { 插件模式的宿主 .lpr 要 uses upluginproc，那个单元在 common\ 下（由保存
+    钩子写盘，落盘后就在工程目录里）。这条搜索路径交给 IDE 自己写进 .lpi，
+    比保存后再去改 XML 可靠：IDE 内存与文件始终一致，F9 立刻能编。 }
+  if FPlugin then
+    CO.OtherUnitFiles := sLWPluginCommonDir;
   { 服务程序：nogui 档要控制台子系统（日志直接进 stdout）；GUI 档要 Windows
     GUI 子系统，否则会跟一个黑窗口 —— 与模板 .lpr 里的 $APPTYPE 一致 }
   CO.Win32GraphicApp := not O.Headless;
@@ -502,18 +525,18 @@ begin
     标准的 LCL Form 描述符，这里换成 lazarusWeb 的主窗体描述符）。 }
   LWMainFormDescriptor.Title := O.Title;
   LWMainFormDescriptor.Headless := FHeadless;
+  { 插件模式的宿主窗体是"侧栏菜单 + PageControl"工作台，模板换一份 }
+  LWMainFormDescriptor.Plugin := FPlugin;
   Result := LazarusIDE.DoNewEditorFile(LWMainFormDescriptor, '', '',
     [nfIsPartOfProject, nfOpenInEditor, nfCreateDefaultSrc]);
   if Result = mrCancel then
     Result := mrOk;
 
-  { 附加文件：插件模式的 lwmodules.pas；服务(daemon)模式的 uDaemon.pas /
-    uMapper.pas / lazarusWeb.ini。
+  { 附加文件：服务(daemon)模式的 uDaemon.pas / uMapper.pas / lazarusWeb.ini。
     全部走 DoNewEditorFile 并把整篇源码直接给它 —— 编辑器页与工程文件一次
     到位，内容在内存里就已经是最终版本，用户 Ctrl+S 时 IDE 按普通源文件写盘。
-    （为什么不能用 CreateProjectFile + SetSourceText，见 TLWExtraFileDesc） }
-  if O.Plugin then
-    AddExtraFile('lwmodules.pas', LWModulesSource(O));
+    （为什么不能用 CreateProjectFile + SetSourceText，见 TLWExtraFileDesc）
+    插件模式的 common\/plugins\/脚本不是本工程单元，由保存钩子写盘。 }
   if O.Service then
   begin
     AddExtraFile(sLWDaemonUnitName + '.pas', LWServiceDaemonSource(O));
@@ -577,11 +600,18 @@ begin
     lwcore）—— 填已有的直接依赖，AddProjectDependencies 不会有任何提示框 }
   RequiredPackages := 'lwserver';
   FTitle := LWDefaultProject(sLWDefaultProjectName).Title;
+  FPlugin := False;
 end;
 
 function TLWMainFormFileDesc.GetInterfaceUsesSection: string;
 begin
-  Result := 'Classes, SysUtils, Forms, Controls, Graphics, Dialogs, StdCtrls, lwform';
+  if FPlugin then
+    { 宿主窗体：侧栏菜单（lwsidemenu）+ 页签 + TLWHTMLFrame 容器（lwweb 里）
+      + 插件管理单元（common\upluginproc，由 .lpi 的 OtherUnitFiles 提供） }
+    Result := 'Classes, SysUtils, Forms, Controls, StdCtrls, ComCtrls, ExtCtrls, ' +
+      'Menus, Graphics, lwform, lwapp, lwweb, lwsidemenu, upluginproc'
+  else
+    Result := 'Classes, SysUtils, Forms, Controls, Graphics, Dialogs, StdCtrls, lwform';
 end;
 
 { 下面三段只是"占位"：IDE 拼出源码后立刻调 Initialized，把整篇换成模板原文。
@@ -594,6 +624,14 @@ const
 begin
   FUnitName := SourceName;
   FFormName := ResourceName;
+  if FPlugin then
+  begin
+    { 插件模式的宿主窗体控件多得多，占位声明与 umain.lfm 一致
+      （漏一个字段，设计器打开就会报错） }
+    Result := LWPluginHostClassDecl(LWDefaultProject(sLWDefaultProjectName),
+      ResourceName);
+    Exit;
+  end;
   Result :=
      'type' + LE
     + '  T' + ResourceName + ' = class(TLWForm)' + LE
@@ -625,11 +663,16 @@ var
   O: TLWNewProject;
 begin
   { 模板 lfm 原文，窗体名用 IDE 给的那个（通常 MainForm，冲突时会是
-    MainForm1 —— 类名 T<窗体名>、.lpr 里的 TMainForm 都由它派生） }
+    MainForm1 —— 类名 T<窗体名>、.lpr 里的 TMainForm 都由它派生）。
+    插件模式换成插件工作台那份 lfm：侧栏菜单 + 顶栏按钮 + 页签 + 状态栏，
+    一条菜单项都没有（菜单在运行期按插件清单生成）。 }
   O := LWDefaultProject(sLWDefaultProjectName);
   O.FormName := ResourceName;
   O.Title := FTitle;
-  Result := LWFormResourceSource(O);
+  if FPlugin then
+    Result := LWPluginHostResourceSource(O)
+  else
+    Result := LWFormResourceSource(O);
 end;
 
 function TLWMainFormFileDesc.Initialized(NewFile: TLazProjectFile): TModalResult;
@@ -640,14 +683,18 @@ begin
   if (FUnitName = '') or (FFormName = '') then Exit;
   { IDE 已经按基类默认版式拼了一份源码，还自动美化过一遍。这里整篇换成
     模板原文：与命令行 tools\lwnew 生成的 umain.pas 逐字节一致 ——
-    注释、排版、事件方法体一处不差，两条生成路径只认 lwnewproject 这一份
-    模板。本方法在打开编辑器 / 建设计器之前调用，换掉的就是最终内容。 }
+    注释、排版、事件方法体一处不差，两条生成路径只认同一份模板
+    （常规模式 lwnewproject，插件模式 lwnewplugin）。
+    本方法在打开编辑器 / 建设计器之前调用，换掉的就是最终内容。 }
   O := LWDefaultProject(sLWDefaultProjectName);
   O.UnitName := FUnitName;
   O.FormName := FFormName;
   O.Title := FTitle;
   O.Headless := FHeadless;
-  NewFile.SetSourceText(LWFormUnitSource(O));
+  if FPlugin then
+    NewFile.SetSourceText(LWPluginHostUnitSource(O))
+  else
+    NewFile.SetSourceText(LWFormUnitSource(O));
 end;
 
 { ================= TLWFormFileDesc ================= }
@@ -1048,6 +1095,16 @@ begin
   Result := Pos('WantDaemonApp', P.MainFile.GetSourceText) > 0;
 end;
 
+{ 判断工程是不是插件模式（多进程插件框架）：宿主 .lpr 里会调 PlugLaunchAll
+  （只有 lwnewplugin.LWPluginHostSource 生成这一行）。
+  保存钩子据此写 common\ + plugins\<示例>\ 一整套，而不是单工程的 build.bat。 }
+function LWIsPluginProject(P: TLazProject): Boolean;
+begin
+  Result := False;
+  if (P = nil) or (P.MainFile = nil) then Exit;
+  Result := Pos('PlugLaunchAll', P.MainFile.GetSourceText) > 0;
+end;
+
 { 找框架的 src/client 目录 —— 不写死任何盘符或安装路径。
 
   主路径：工程"需要的软件包"里那个 **lwserver**（工程检查器里能看到的那个），
@@ -1221,7 +1278,7 @@ var
   hd: Boolean;
   clash: string;
   inserted: Boolean;
-  srcClient, err, how, missing: string;
+  srcClient, err, how, missing, perr: string;
   copied: Integer;
 begin
   Result := True;   { 默认"处理完了"，下面任何早退都不再重试 }
@@ -1265,10 +1322,28 @@ begin
       '请用 文件 → 工程另存为 换个名字（例如 ' + O.Name + '2）再编译。',
       mtWarning, [mbOK], 0);
   end;
-  if not FileExistsUTF8(dir + 'build.bat') then
-    WriteRawText(dir + 'build.bat', LWBuildBatch(O));
-  if not FileExistsUTF8(dir + 'build.sh') then
-    WriteRawText(dir + 'build.sh', LWBuildShell(O));
+  { 插件模式是"一套框架"而不是一个工程：common\upluginproc.pas、
+    plugins\hello\ 整个插件工程、宿主 ini、build-all.bat / stop-all.bat /
+    README.md 都不是本工程的单元，IDE 不会管，在这里补写。
+    单工程模式仍是 build.bat / build.sh。
+    两者都只补缺失的文件：本钩子每次保存都会跑，覆盖会吃掉用户的改动。 }
+  if LWIsPluginProject(P) then
+  begin
+    O.Plugin := True;
+    perr := '';
+    if LWPluginExtras(O, dir, perr, False) then
+      LwWizardLog(Format('  plugin extras: %s + %s%s',
+        [sLWPluginCommonDir, sLWPluginPluginsDir, PathDelim + sLWPluginSampleName]))
+    else
+      LwWizardLog('  plugin extras: ' + perr);
+  end
+  else
+  begin
+    if not FileExistsUTF8(dir + 'build.bat') then
+      WriteRawText(dir + 'build.bat', LWBuildBatch(O));
+    if not FileExistsUTF8(dir + 'build.sh') then
+      WriteRawText(dir + 'build.sh', LWBuildShell(O));
+  end;
 
   { 客户端静态资源：运行期按 <exe 目录>/lw/<文件名> 找（扁平部署），
     exe 就在工程目录里，所以拷到 <工程目录>/lw/。
@@ -1511,13 +1586,14 @@ begin
   LWMainFormDescriptor := TLWMainFormFileDesc.Create;
   RegisterProjectFileDescriptor(LWMainFormDescriptor);
 
-  { 2c. 附加文本文件（lwmodules.pas / uDaemon.pas / uMapper.pas /
-      lazarusWeb.ini）共用的描述符。必须走 DoNewEditorFile 才拿得到编辑器页，
-      IDE 保存工程时才会写它 —— 见 TLWExtraFileDesc 的类注释。 }
+  { 2c. 附加文本文件（uDaemon.pas / uMapper.pas / lazarusWeb.ini）共用的
+      描述符。必须走 DoNewEditorFile 才拿得到编辑器页，IDE 保存工程时才会
+      写它 —— 见 TLWExtraFileDesc 的类注释。 }
   LWExtraDescriptor := TLWExtraFileDesc.Create;
   RegisterProjectFileDescriptor(LWExtraDescriptor);
 
-  { 2c. 保存钩子：工程落盘之后补 build.bat / build.sh 与 nogui 档的
+  { 2d. 保存钩子：工程落盘之后补 build.bat / build.sh（插件模式补
+      build-all.bat + common/ + plugins/）与 nogui 档的
       widgetset 宏 —— 这两样 IDE 的工程模型写不出来，只能等 .lpi 有了
       目录再补。两个钩子都**只启动一个定时器**，绝不在保存事务里干活：
         SaveEditorFile：每个单元写盘后触发
