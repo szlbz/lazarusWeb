@@ -1,0 +1,2797 @@
+# lazarusweb —— lazarusWeb English translation
+# 由 tools/i18n/build_po.py 从 tools/i18n/en/*.tsv 生成
+# 空 msgstr = 沿用中文原文
+msgid ""
+msgstr ""
+"Project-Id-Version: lazarusWeb\n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=UTF-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+"Language: en\n"
+"X-Generator: lazarusWeb build_po.py\n"
+
+
+#: src/core/lwnewproject.pas
+msgid "\" 与单元"
+msgstr "\" and unit "
+
+#: src/core/lwroute.pas
+msgid "\"（主框架 ini 里加 plugin."
+msgstr "\" (add plugin. to the host ini"
+
+#: demos/menu_html/uMenuHtml.pas
+msgid "%d,2026-11-09 09:15~10:00,超声探伤,3,%s"
+msgstr "%d,2026-11-09 09:15~10:00,Ultrasonic testing,3,%s"
+
+#: demos/db/uDbMain.pas
+msgid "%s / %s · 更新于 %s"
+msgstr "%s / %s · updated %s"
+
+#: demos/dbaware/uReport.pas
+msgid "%s · %d 行 · 纸张 %s%s"
+msgstr "%s · %d rows · paper %s%s"
+
+#: src/core/lwsession.pas
+msgid "(等待浏览器关闭)"
+msgstr "(waiting for the browser to close)"
+
+#: src/core/lwhttp.pas
+msgid "/   <- 手机/平板用这个地址"
+msgstr "/   <- use this address on phones/tablets"
+
+#: demos/procdemo/modules/umod_dashboard.pas
+msgid "1) 本窗体的控件全部由插件代码创建，没有 .lfm；"
+msgstr "1) Every control on this form is created in code; there is no .lfm;"
+
+#: demos/procdemo/host/uhost.pas
+msgid "1) 每个插件是独立的 lazarusWeb 服务 exe（自己监听 127.0.0.1 上的端口）；"
+msgstr "1) Each plugin is a standalone lazarusWeb server exe (it listens on its own 127.0.0.1 port);"
+
+#: demos/procdemo/modules/umod_dashboard.pas
+msgid "2) 事件仍由框架派发 —— 点\"刷新指标\"看服务端计数与日志；"
+msgstr "2) Events are still dispatched by the framework - click \"Refresh metrics\" to watch the server-side counters and the log;"
+
+#: demos/procdemo/host/uhost.pas
+msgid "2) 宿主 ini 里登记：plugin.notes=127.0.0.1:8871 / plugin.dash=127.0.0.1:8872"
+msgstr "2) Registered in the host ini: plugin.notes=127.0.0.1:8871 / plugin.dash=127.0.0.1:8872"
+
+#: demos/procdemo/modules/umod_dashboard.pas
+msgid "3) /lw/ajax/dashboard_stats 由本插件注册；"
+msgstr "3) /lw/ajax/dashboard_stats is registered by this plugin;"
+
+#: demos/procdemo/host/uhost.pas
+msgid "3) 浏览器请求 /p/notes/... 时，宿主的 lwroute 剥掉前缀转发给插件进程；"
+msgstr "3) When the browser requests /p/notes/..., the host's lwroute strips the prefix and forwards to the plugin process;"
+
+#: demos/procdemo/modules/umod_dashboard.pas
+msgid "4) 三个插件页的导航一致：「打开便签页」「打开报表页」「返回首页」，"
+msgstr "4) All three plugin pages share the same navigation: \"Open notes\", \"Open reports\", \"Back to home\","
+
+#: demos/procdemo/host/uhost.pas
+msgid "4) 插件页面里的 API 调用按页面路径自动带上 /p/notes/ 前缀，代理后原样回插件；"
+msgstr "4) API calls inside the plugin page automatically carry the /p/notes/ prefix and reach the plugin unchanged after proxying;"
+
+#: src/core/lwhttp.pas
+msgid "404 下载链接无效或已过期"
+msgstr "404 the download link is invalid or has expired"
+
+#: src/core/lwhttp.pas
+msgid "404 查看链接无效或已过期"
+msgstr "404 the view link is invalid or has expired"
+
+#: demos/procdemo/host/uhost.pas
+msgid "5) 推送走长轮询（经代理），WebSocket 暂不透传 —— 前端自动回退，功能无损失。"
+msgstr "5) Push uses long polling (through the proxy); WebSocket is not tunnelled yet — the client falls back automatically with no loss of functionality."
+
+#: src/core/lwhttp.pas
+msgid "500 无法打开文件"
+msgstr "500 cannot open file"
+
+#: demos/procdemo/host/uhost.pas
+msgid "6) 职责划分：插件只负责业务 —— lw.js 等框架静态资源由宿主直出，"
+msgstr "6) Separation of duties: plugins handle business only — framework assets such as lw.js are served by the host,"
+
+#: src/core/lwroute.pas
+msgid "=host:port 后重启）"
+msgstr "=host:port and restart)"
+
+#: demos/gallery/ugallery.pas
+msgid "@chip(稳定,"
+msgstr "@chip(Stable,"
+
+#: demos/gallery/ugallery.pas
+msgid "@chip(良好,"
+msgstr "@chip(Good,"
+
+#: demos/gallery/ugallery.pas
+msgid "@chip(警告,"
+msgstr "@chip(Warning,"
+
+#: demos/gallery/ugallery.pas
+msgid "@chip(通过,"
+msgstr "@chip(Pass,"
+
+#: demos/gallery/ugallery.pas
+msgid "@chip(阻塞,"
+msgstr "@chip(Blocked,"
+
+#: demos/dbaware/uReport.pas
+msgid "CSV 导出失败"
+msgstr "CSV export failed"
+
+#: demos/dbaware/uReport.pas
+msgid "CSV 导出失败："
+msgstr "CSV export failed: "
+
+#: demos/dialogs/udialogs.lfm
+msgid "CSV 文件|*.csv|文本文件|*.txt|所有文件|*.*"
+msgstr "CSV files|*.csv|Text files|*.txt|All files|*.*"
+
+#: src/core/lwhttp.pas
+msgid "Client    : alpine（Alpine.js %s，无需 ext 目录）   (切换: /?client=ext)"
+msgstr "Client    : alpine (Alpine.js %s, no ext directory needed)   (switch: /?client=ext)"
+
+#: src/core/lwhttp.pas
+msgid "Client    : alpine（Alpine.js %s，自动探测优先）   (切换: /?client=ext)"
+msgstr "Client    : alpine (Alpine.js %s, auto-detected)   (switch: /?client=ext)"
+
+#: src/core/lwhttp.pas
+msgid "Client    : ext（Ext JS）   (切换: /?client=alpine)"
+msgstr "Client    : ext (Ext JS)   (switch: /?client=alpine)"
+
+#: src/core/lwhttp.pas
+msgid "Client    : ext（Ext JS，自动探测：未找到 alpine.min.js）   (切换: /?client=alpine)"
+msgstr "Client    : ext (Ext JS, auto-detected: alpine.min.js not found)   (switch: /?client=alpine)"
+
+#: src/core/lwhyper.pas
+msgid "Ctrl+C 退出（worker 一并停止）"
+msgstr "Ctrl+C to quit (workers stop too)"
+
+#: demos/accel/uAccel.pas
+msgid "D 状态(&S)：就绪"
+msgstr "Status(&S): ready"
+
+#: demos/dbaware/uAwareMain.lfm
+msgid "DB 感知控件 —— 左边点一行，右边所有控件都跟着走"
+msgstr "Data-aware controls — click a row on the left and every control on the right follows"
+
+#: src/core/lwsession.pas
+msgid "Dialog[%d]: 浏览器未响应，按取消处理"
+msgstr "Dialog[%d]: browser did not respond, treating as cancel"
+
+#: demos/gallery/ugallery - 副本.pas
+msgid "Dlg.ShowMessage 返回"
+msgstr "Dlg.ShowMessage returned"
+
+#: demos/accel/uAccel.pas
+msgid "E 面板(&P)"
+msgstr "Panel E(&P)"
+
+#: demos/dbaware/uReport.pas
+msgid "Excel 导出失败"
+msgstr "Excel export failed"
+
+#: demos/dbaware/uReport.pas
+msgid "Excel 导出失败："
+msgstr "Excel export failed: "
+
+#: src/core/lwhttp.pas
+msgid "Ext       : %s  (版本 %s)"
+msgstr "  Ext       : %s  (version %s)"
+
+#: src/core/lwhttp.pas
+msgid "Ext       : %s  (配置文件 extdir)"
+msgstr "  Ext       : %s  (config extdir)"
+
+#: src/core/lwhttp.pas
+msgid "Ext dirs  :%s   (切换: /?ext=<版本>)"
+msgstr "  Ext dirs  :%s   (switch: /?ext=<version>)"
+
+#: demos/accel/uAccel.pas
+msgid "F 分组(&G)"
+msgstr "Group F(&G)"
+
+#: src/core/lwpanel.pas
+msgid "FPC/LCL 窗体 -> Ext JS 的 Web 化框架"
+msgstr "FPC/LCL forms -> Ext JS, web-enabled framework"
+
+#: demos/accel/uAccel.pas
+msgid "G 颜色(&C)"
+msgstr "Color G(&C)"
+
+#: demos/accel/uAccel.pas
+msgid "H 语言(&L)"
+msgstr "Language H(&L)"
+
+#: demos/dbaware/uAwareMain.lfm
+msgid "HTML 展示"
+msgstr "HTML view"
+
+#: demos/gallery/ugallery.lfm
+msgid "HTML 源码（改完点应用）："
+msgstr "HTML source (edit, then click Apply):"
+
+#: demos/accel/uAccel.pas
+msgid "I 面板(&Q)"
+msgstr "Panel I(&Q)"
+
+#: demos/gallery/ugallery.lfm
+msgid "InputBox 输入"
+msgstr "InputBox input"
+
+#: demos/accel/uAccel.pas
+msgid "L1 & 原样"
+msgstr "L1 & literal"
+
+#: demos/accel/uAccel.pas
+msgid "L2 && 两个"
+msgstr "L2 && two"
+
+#: demos/multi/uAbout.lfm
+msgid "Lazarus 桌面程序的 Web 化运行时。"
+msgstr "A web runtime for Lazarus desktop applications."
+
+#: demos/hello/uHello.lfm
+msgid "Lazarus 窗体，直接跑在浏览器里"
+msgstr "Lazarus forms, running directly in the browser"
+
+#: src/core/lwhttp.pas
+msgid "Login      : %s（未认证会话先显示登录窗体）"
+msgstr "  Login      : %s (unauthenticated sessions see the login form first)"
+
+#: demos/gallery/ugallery.lfm
+msgid "MessageDlg / InputBox / Execute 的返回值会回传给服务端代码，业务逻辑写法与桌面程序完全相同。"
+msgstr "Return values of MessageDlg / InputBox / Execute are sent back to the server code, so business logic is written exactly as in a desktop program."
+
+#: demos/gallery/ugallery.lfm
+msgid "MessageDlg 警告"
+msgstr "MessageDlg warning"
+
+#: demos/gallery/ugallery - 副本.pas
+msgid "MessageDlg 询问"
+msgstr "MessageDlg question"
+
+#: demos/dialogs/udialogs.pas
+msgid "MessageDlg 返回"
+msgstr "MessageDlg returned"
+
+#: demos/dialogs/udialogs.pas
+msgid "MessageDlg 返回 mrNo（用户选了\"否\"）"
+msgstr "MessageDlg returned mrNo (the user chose \"No\")"
+
+#: demos/dialogs/udialogs.pas
+msgid "MessageDlg 返回 mrYes（用户选了\"是\"）"
+msgstr "MessageDlg returned mrYes (the user chose \"Yes\")"
+
+#: demos/gallery/ugallery - 副本.pas
+msgid "Misc.动态按钮 OnClick ="
+msgstr "Misc. dynamic button OnClick ="
+
+#: demos/gallery/ugallery.lfm
+msgid "OpenDialog 文件"
+msgstr "OpenDialog file"
+
+#: demos/dbaware/uAwareMain.lfm
+msgid "PDF 展示"
+msgstr "PDF view"
+
+#: demos/dbaware/uAwareMain.lfm
+msgid "PDF 文件|*.pdf"
+msgstr "PDF files|*.pdf"
+
+#: demos/dialogs/udialogs.pas
+msgid "QuestionDlg 返回"
+msgstr "QuestionDlg returned"
+
+#: demos/dialogs/udialogs.pas
+msgid "QuestionDlg 返回 mrNo（放弃）"
+msgstr "QuestionDlg returned mrNo (discard)"
+
+#: demos/dialogs/udialogs.pas
+msgid "QuestionDlg 返回 mrYes（保存）"
+msgstr "QuestionDlg returned mrYes (save)"
+
+#: demos/db/uDbMain.lfm
+msgid "SQL 日志"
+msgstr "SQL log"
+
+#: demos/dialogs/udialogs.lfm
+msgid "ShowMessage 之类的对话框，弹在浏览器里"
+msgstr "Dialogs such as ShowMessage pop up in the browser"
+
+#: demos/dialogs/udialogs.pas
+msgid "ShowMessage 返回（用户已关闭）"
+msgstr "ShowMessage returned (the user closed it)"
+
+#: src/core/lwsession.pas
+msgid "ShowModal 超时:"
+msgstr "ShowModal timed out: "
+
+#: demos/gallery/ugallery.lfm
+msgid "ShowToast 轻提示"
+msgstr "ShowToast light notification"
+
+#: demos/dbaware/uAwareMain.lfm
+msgid "ShowToast（轻提示，浏览器右上角弹出几秒消失）"
+msgstr "ShowToast (a light notification in the top-right corner that fades after a few seconds)"
+
+#: demos/gallery/ugallery.lfm
+msgid "TBitBtn OK：Kind = bkOK，Hint 同样生效"
+msgstr "TBitBtn OK: Kind = bkOK, Hint works too"
+
+#: demos/gallery/ugallery.lfm
+msgid "TBitBtn 的 Kind 会映射成浏览器端的图标按钮；TSpeedButton 用 GroupIndex 实现单选工具组。鼠标停在上面两个按钮上可看到 LCL 的 Hint。"
+msgstr "TBitBtn's Kind maps to an icon button in the browser; TSpeedButton uses GroupIndex for a radio-style tool group. Hover the two buttons above to see LCL Hints."
+
+#: demos/gallery/ugallery.lfm
+msgid "TButton 普通按钮"
+msgstr "TButton plain button"
+
+#: demos/gallery/ugallery.lfm
+msgid "TButton 的 Hint：鼠标停一下就会弹出这条提示"
+msgstr "TButton Hint: hover for a moment and this tip appears"
+
+#: demos/gallery/ugallery.lfm
+msgid "TCheckBox 我已阅读并同意"
+msgstr "TCheckBox I have read and agree"
+
+#: demos/gallery/ugallery.lfm
+msgid "TCheckGroup 复选组"
+msgstr "TCheckGroup check group"
+
+#: demos/dbaware/uAwareMain.lfm
+msgid "TDBCheckBox（上架）"
+msgstr "TDBCheckBox (listed)"
+
+#: demos/gallery/ugallery.lfm
+msgid "TDBComboBox（code 演示）："
+msgstr "TDBComboBox (code demo):"
+
+#: demos/dbaware/uAwareMain.lfm
+msgid "TDBComboBox（标签）"
+msgstr "TDBComboBox (tag)"
+
+#: demos/dbaware/uAwareMain.lfm
+msgid "TDBEdit（单价）"
+msgstr "TDBEdit (unit price)"
+
+#: demos/dbaware/uAwareMain.lfm
+msgid "TDBEdit（名称）"
+msgstr "TDBEdit (name)"
+
+#: demos/dbaware/uAwareMain.lfm
+msgid "TDBEdit（库存）"
+msgstr "TDBEdit (stock)"
+
+#: demos/dbaware/uAwareMain.lfm
+msgid "TDBListBox（标签，选中即改字段）"
+msgstr "TDBListBox (tag — selecting writes the field)"
+
+#: demos/dbaware/uAwareMain.lfm
+msgid "TDBLookupComboBox（外键：分类）"
+msgstr "TDBLookupComboBox (foreign key: category)"
+
+#: demos/dbaware/uAwareMain.lfm
+msgid "TDBLookupListBox（外键：分类）"
+msgstr "TDBLookupListBox (foreign key: category)"
+
+#: demos/gallery/ugallery.lfm
+msgid "TDBMemo（name 演示）："
+msgstr "TDBMemo (name demo):"
+
+#: demos/dbaware/uAwareMain.lfm
+msgid "TDBMemo（备注）"
+msgstr "TDBMemo (notes)"
+
+#: demos/dbaware/uAwareMain.lfm
+msgid "TDBRadioGroup（状态）"
+msgstr "TDBRadioGroup (status)"
+
+#: demos/dbaware/uAwareMain.lfm
+msgid "TDBText（只读）"
+msgstr "TDBText (read-only)"
+
+#: demos/gallery/ugallery.lfm
+msgid "TEdit 的 Hint：组框里的编辑框也能弹提示"
+msgstr "TEdit Hint: edit boxes inside a group box show tips too"
+
+#: demos/gallery/ugallery.lfm
+msgid "TFPTimer（1 秒，工作线程）："
+msgstr "TFPTimer (1 s, worker thread):"
+
+#: demos/gallery/ugallery.lfm
+msgid "TFloatSpinEdit（价格）："
+msgstr "TFloatSpinEdit (price):"
+
+#: demos/gallery/ugallery.lfm
+msgid "TGroupBox 组框"
+msgstr "TGroupBox group box"
+
+#: demos/dbaware/uAwareMain.lfm
+msgid "TLWChart（对应 uniGUI 的 uniChart，Ext charts 包渲染）+ 日期选择 + Toast"
+msgstr "TLWChart (the uniGUI uniChart counterpart, rendered by the Ext charts package) + date picker + toast"
+
+#: demos/dbaware/uAwareMain.lfm
+msgid "TLWColorPicker（点色块选颜色）"
+msgstr "TLWColorPicker (click a swatch to pick a color)"
+
+#: demos/dbaware/uAwareMain.lfm
+msgid "TLWDBGrid（对应 uniDBGrid 的 PagingBar/FilterBar/Summary）：240 行数据，每页 20 行 + 顶部过滤 + 底部价格合计"
+msgstr "TLWDBGrid (the uniDBGrid PagingBar/FilterBar/Summary counterpart): 240 rows, 20 per page + filter bar on top + price total at the bottom"
+
+#: demos/gallery/ugallery.lfm
+msgid "TLWDBGrid：1000 行 / 每页 50 / 顶部过滤 / qty 列汇总 / 两级表头 —— 显示层分页，对应 uniDBGrid 的分页过滤汇总能力。"
+msgstr "TLWDBGrid: 1000 rows / 50 per page / top filter / qty column summary / two-level header — paging at the display layer, matching uniDBGrid's paging, filtering and summary."
+
+#: demos/dbaware/uAwareMain.lfm
+msgid "TLWHTMLFrame —— 面板内渲染任意 HTML（对应 uniGUI 的 uniHTMLFrame）"
+msgstr "TLWHTMLFrame — renders arbitrary HTML inside a panel (the uniGUI uniHTMLFrame counterpart)"
+
+#: demos/dbaware/uAwareMain.lfm
+msgid "TLWPDFFrame —— 内嵌显示 PDF（对应 uniGUI 的 uniPDFFrame，用浏览器自带查看器）"
+msgstr "TLWPDFFrame — embeds a PDF (the uniGUI uniPDFFrame counterpart, using the browser's own viewer)"
+
+#: demos/gallery/ugallery.lfm
+msgid "TLWPDFFrame（浏览器自带 PDF 查看器）："
+msgstr "TLWPDFFrame (browser PDF viewer):"
+
+#: demos/gallery/ugallery.lfm
+msgid "TLabel 标签"
+msgstr "TLabel label"
+
+#: demos/gallery/ugallery.lfm
+msgid "TListBox：点某项回传 OnClick，Hint 挂在列表上"
+msgstr "TListBox: clicking an item fires OnClick; the Hint is on the list"
+
+#: demos/gallery/ugallery.lfm
+msgid "TMaskEdit（手机号）："
+msgstr "TMaskEdit (mobile number):"
+
+#: demos/gallery/ugallery.lfm
+msgid "TPanel：容器 + 事件面"
+msgstr "TPanel: container + event surface"
+
+#: demos/gallery/ugallery.lfm
+msgid "TRadioGroup 单选组"
+msgstr "TRadioGroup radio group"
+
+#: demos/gallery/ugallery.lfm
+msgid "TScrollBox：内容比视口大，浏览器里可以滚动"
+msgstr "TScrollBox: content is larger than the viewport and scrolls in the browser"
+
+#: demos/gallery/ugallery.lfm
+msgid "TSpeedButton（互斥组，可保持按下）："
+msgstr "TSpeedButton (mutually exclusive group, can stay pressed):"
+
+#: demos/gallery/ugallery.lfm
+msgid "TSpinEdit（年龄）："
+msgstr "TSpinEdit (age):"
+
+#: demos/gallery/ugallery.lfm
+msgid "TStaticText 静态文本"
+msgstr "TStaticText static text"
+
+#: demos/gallery/ugallery.lfm
+msgid "TStringGrid（可编辑，保存/调用 -> gridsave.json）："
+msgstr "TStringGrid (editable, save/load -> gridsave.json):"
+
+#: demos/gallery/ugallery.pas
+msgid "TTabControl：页签是字符串列表，客户区是公共的一块---"
+msgstr "TTabControl: tabs are a string list sharing one client area---"
+
+#: demos/gallery/ugallery.lfm
+msgid "TTabControl：页签是字符串列表，客户区是公共的一块。"
+msgstr "TTabControl: tabs are a string list and share one client area."
+
+#: demos/gallery/ugallery.lfm
+msgid "TToolBar 在浏览器端渲染成 Ext toolbar；TStatusBar 渲染成底部状态条（分格文本，服务端随时改）。"
+msgstr "TToolBar renders as an Ext toolbar in the browser; TStatusBar renders as a bottom status bar (per-panel text the server can change at any time)."
+
+#: demos/gallery/ugallery.lfm
+msgid "TTrackBar（音量）："
+msgstr "TTrackBar (volume):"
+
+#: src/core/lwhttp.pas
+msgid "Theme      : %s   (切换: /?theme=gray 等)"
+msgstr "  Theme      : %s   (switch: /?theme=gray etc.)"
+
+#: demos/mobile_demo/uMobileMain.pas
+msgid "] 窗体已创建（桌面布局渲染中）"
+msgstr "] form created (rendering the desktop layout)"
+
+#: demos/controls/uControls.pas
+msgid "checkgroup: 第 %d 项 = %s"
+msgstr "checkgroup: item %d = %s"
+
+#: demos/controls/uControls.pas
+msgid "checklistbox: 勾选变化，第 %d 项 = %s"
+msgstr "checklistbox: check state changed, item %d = %s"
+
+#: demos/controls/uControls.pas
+msgid "checklistbox: 选中第 %d 项 %s"
+msgstr "checklistbox: selected item %d %s"
+
+#: demos/dbaware/uLogin.lfm
+msgid "dbaware · 登录后进入数据管理 / 报表中心"
+msgstr "dbaware · sign in to reach data management / report center"
+
+#: demos/gallery/uabout.lfm
+msgid "lazarusWeb 0.9.6 · 全功能画廊"
+msgstr "lazarusWeb 0.9.6 · full-feature gallery"
+
+#: demos/menu_html/uMenuHtml.lfm
+msgid "lazarusWeb · HTML 菜单 + LCL 控件联动（Alpine.js）"
+msgstr "lazarusWeb · HTML menu + LCL controls (Alpine.js)"
+
+#: demos/menu_lcl/uMenuLcl.lfm
+msgid "lazarusWeb · LCL 侧栏菜单组件 TLWSideMenu + LCL 控件联动"
+msgstr "lazarusWeb · TLWSideMenu side menu + LCL controls"
+
+#: demos/db/dbdemo.lpr
+msgid "lazarusWeb · SQLite 演示"
+msgstr "lazarusWeb · SQLite demo"
+
+#: demos/gallery/gallery.lpr
+msgid "lazarusWeb · 全功能画廊"
+msgstr "lazarusWeb · full-feature gallery"
+
+#: demos/gallery/ugallery - 副本.pas
+msgid "lazarusWeb · 全功能画廊（对照 uniGUI mdemo）"
+msgstr "lazarusWeb · full-feature gallery (mirrors uniGUI mdemo)"
+
+#: demos/accel/uAccel.lfm
+msgid "lazarusWeb · 加速键审计"
+msgstr "lazarusWeb · accelerator audit"
+
+#: demos/accel/uAccel.pas
+msgid "lazarusWeb · 加速键审计（&Caption）"
+msgstr "lazarusWeb · accelerator audit (&Caption)"
+
+#: demos/controls/controlsdemo.lpr
+msgid "lazarusWeb · 容器/列表控件"
+msgstr "lazarusWeb · container and list controls"
+
+#: demos/dialogs/udialogs.lfm
+msgid "lazarusWeb · 对话框"
+msgstr "lazarusWeb · dialogs"
+
+#: demos/menu_tree/uMenuTree.lfm
+msgid "lazarusWeb · 左侧折叠菜单（TTreeView + Alpine.js）"
+msgstr "lazarusWeb · collapsible side menu (TTreeView + Alpine.js)"
+
+#: demos/files/uFileForm.lfm
+msgid "lazarusWeb · 文件上传 / 下载"
+msgstr "lazarusWeb · file upload / download"
+
+#: demos/files/filedemo.lpr
+msgid "lazarusWeb · 文件上传下载"
+msgstr "lazarusWeb · file upload and download"
+
+#: demos/audit/auditdemo.lpr
+msgid "lazarusWeb · 架构审计"
+msgstr "lazarusWeb · architecture audit"
+
+#: demos/menu_main/uMenuMain.lfm
+msgid "lazarusWeb · 标准 MainMenu 菜单 + LCL 控件联动（Alpine.js）"
+msgstr "lazarusWeb · standard MainMenu + LCL controls (Alpine.js)"
+
+#: demos/dbaware/uLogin.lfm
+msgid "lazarusWeb · 登录"
+msgstr "lazarusWeb · sign in"
+
+#: demos/login/uMain.lfm
+msgid "lazarusWeb · 登录后的主窗体"
+msgstr "lazarusWeb · main form after sign-in"
+
+#: demos/login/logindemo.lpr
+msgid "lazarusWeb · 登录演示（TLWLoginForm）"
+msgstr "lazarusWeb · login demo (TLWLoginForm)"
+
+#: demos/mobile_demo/uMobileMain.lfm
+msgid "lazarusWeb · 移动模板演示（方案 B）"
+msgstr "lazarusWeb · mobile template demo (option B)"
+
+#: demos/dbaware/uAwareMain.lfm
+msgid "lazarusWeb · 综合演示（DB + HTML + PDF + 图表 + 大表）"
+msgstr "lazarusWeb · combined demo (DB + HTML + PDF + chart + large grid)"
+
+#: demos/dbaware/dbaware.lpr
+msgid "lazarusWeb · 综合演示（登录 + 多窗体 + 打印导出）"
+msgstr "lazarusWeb · combined demo (login + multiple forms + print/export)"
+
+#: demos/multi/uMain.lfm
+msgid "lazarusWeb · 综合示例"
+msgstr "lazarusWeb · combined sample"
+
+#: demos/grid/uGrid.lfm
+msgid "lazarusWeb · 表格"
+msgstr "lazarusWeb · grid"
+
+#: demos/gallery/ugallery - 副本.pas
+msgid "lazarusWeb 下载演示"
+msgstr "lazarusWeb download demo"
+
+#: demos/procdemo/host/uhost.pas
+msgid "lazarusWeb 主框架 —— 本页面不含任何插件单元"
+msgstr "lazarusWeb host — this page links no plugin units"
+
+#: demos/procdemo/host/uhost.pas
+msgid "lazarusWeb 主框架（插件是独立 exe）"
+msgstr "lazarusWeb host (plugins are separate exes)"
+
+#: demos/procdemo/host/hostdemo.lpr
+msgid "lazarusWeb 主框架（进程级插件演示）"
+msgstr "lazarusWeb host (process-level plugin demo)"
+
+#: demos/plugindemo/plugindemo.lpr
+msgid "lazarusWeb 插件化演示"
+msgstr "lazarusWeb plugin demo"
+
+#: demos/procdemo/dashplug/dashplug.lpr
+msgid "lazarusWeb 插件：仪表盘"
+msgstr "lazarusWeb plugin: dashboard"
+
+#: demos/procdemo/notesplug/notesplug.lpr
+msgid "lazarusWeb 插件：便签"
+msgstr "lazarusWeb plugin: notes"
+
+#: demos/procdemo/reportsplug/reportsplug.lpr
+msgid "lazarusWeb 插件：报表汇总"
+msgstr "lazarusWeb plugin: report summary"
+
+#: demos/dbaware/uLogin.lfm
+msgid "lazarusWeb 综合演示"
+msgstr "lazarusWeb combined demo"
+
+#: demos/dbaware/uAwareMain.pas
+msgid "lazarusWeb 综合演示（dbaware）"
+msgstr "lazarusWeb combined demo (dbaware)"
+
+#: src/core/lwdispatch.pas
+msgid "nav %s: 内建动作失败已忽略（%s: %s），交给 OnClick 处理"
+msgstr "nav %s: built-in action failed and was ignored (%s: %s); falling back to OnClick"
+
+#: demos/gallery/ugallery.lfm
+msgid "nogui 部署必须用 FCL 的 TFPTimer：LCL TTimer 依赖 widgetset（nogui 下直接 EOutOfResources），TFPTimer 还要 UseTimerThread=True 才起后台线程。线程里只更新纯内存状态，浏览器端任意一次交互都拿最新值 —— 适合计数、心跳、后台生产数据。"
+msgstr "nogui deployments must use FCL's TFPTimer: LCL TTimer depends on the widgetset (EOutOfResources under nogui), and TFPTimer needs UseTimerThread=True to start a background thread. The thread only updates in-memory state, and any browser interaction sees the latest value — good for counters, heartbeats and background data production."
+
+#: demos/controls/uControls.pas
+msgid "radiogroup: %s（第 %d 项）"
+msgstr "radiogroup: %s (item %d)"
+
+#: demos/gallery/uabout.pas
+msgid "· 全功能画廊"
+msgstr "· full-feature gallery"
+
+#: demos/dbaware/uAwareMain.pas
+msgid "· 已保存"
+msgstr "· saved"
+
+#: src/core/lwroute.pas
+msgid "」未启动或不可达"
+msgstr "\" is not running or unreachable"
+
+#: demos/procdemo/modules/umod_notes.pas
+msgid "」，共"
+msgstr "\", "
+
+#: demos/dbaware/uAwareMain.pas
+msgid "一月"
+msgstr "January"
+
+#: demos/audit/uAudit.lfm
+msgid "三态复选"
+msgstr "Tri-state checkbox"
+
+#: demos/dbaware/uAwareMain.pas
+msgid "三月"
+msgstr "March"
+
+#: demos/dbaware/uAwareMain.lfm
+msgid "上一条"
+msgstr "Previous"
+
+#: demos/db/uDbMain.lfm
+msgid "上传…"
+msgstr "Upload…"
+
+#: src/core/lwfileupload.pas
+msgid "上传文件…"
+msgstr "Upload file..."
+
+#: demos/files/uFileForm.lfm
+msgid "上传文件到服务端，或把服务端文件下载回浏览器"
+msgstr "Upload files to the server, or download server files back to the browser"
+
+#: demos/dbaware/uAwareMain.lfm
+msgid "上传本地 PDF…"
+msgstr "Upload a local PDF…"
+
+#: demos/files/uFileForm.pas
+msgid "上传清单.csv"
+msgstr "Upload manifest.csv"
+
+#: demos/files/uFileForm.lfm
+msgid "上传：文件落在服务端临时目录，OnUpload 拿到完整路径；下载：业务代码调 SendFile / SendText"
+msgstr "Upload: files land in the server temp directory and OnUpload receives the full path; download: business code calls SendFile / SendText"
+
+#: demos/gallery/ugallery.pas
+msgid "上架"
+msgstr "Listed"
+
+#: demos/dbaware/uAwareMain.lfm
+msgid "下一条"
+msgstr "Next"
+
+#: demos/gallery/ugallery.lfm
+msgid "下载 PDF"
+msgstr "Download PDF"
+
+#: demos/gallery/ugallery.lfm
+msgid "下载一段文本"
+msgstr "Download a text snippet"
+
+#: demos/files/uFileForm.lfm
+msgid "下载所选文件"
+msgstr "Download selected file"
+
+#: demos/gallery/ugallery.lfm
+msgid "下载示例 PDF"
+msgstr "Download sample PDF"
+
+#: demos/menu_html/uMenuHtml.lfm
+msgid "下载考试安排表"
+msgstr "Download exam schedule"
+
+#: demos/db/uDbMain.lfm
+msgid "下载选中"
+msgstr "Download selected"
+
+#: demos/gallery/ugallery.lfm
+msgid "下载（服务端 SendText / SendFile）："
+msgstr "Download (server-side SendText / SendFile):"
+
+#: demos/dialogs/udialogs.lfm
+msgid "下面是普通的 LCL 调用；点按钮时服务端线程会挂起，直到你在浏览器里作答。"
+msgstr "These are plain LCL calls; when you click, the server thread blocks until you answer in the browser."
+
+#: demos/procdemo/host/uhost.pas
+msgid "不进插件；升级客户端运行时只换宿主一处。"
+msgstr "never enter a plugin; upgrading the client runtime means replacing it in the host only."
+
+#: demos/gallery/ugallery.pas
+msgid "个"
+msgstr " "
+
+#: src/core/lwhttp.pas
+msgid "个连接没退，直接结束进程"
+msgstr "connection(s) still open; terminating the process"
+
+#: src/core/lwlang.pas
+msgid "中文"
+msgstr "Chinese"
+
+#: src/core/lwdlg.pas
+msgid "中止"
+msgstr "Abort"
+
+#: demos/gallery/ugallery.lfm
+msgid "事件日志（所有事件回显到这里）"
+msgstr "Event log (every event is echoed here)"
+
+#: demos/dbaware/uAwareMain.pas
+msgid "二月"
+msgstr "February"
+
+#: demos/dbaware/uAwareMain.pas
+msgid "五月"
+msgstr "May"
+
+#: demos/menu_tree/uMenuTree.pas
+msgid "人员证书"
+msgstr "Personnel certificates"
+
+#: demos/gallery/ugallery.lfm
+msgid "人民币"
+msgstr "CNY"
+
+#: src/core/lwhttp.pas
+msgid "仍打不开？管理员运行 tools\\allow-firewall.bat（放行 专用+公用 两种配置文件）"
+msgstr "Still cannot open it? Run tools\\allow-firewall.bat as administrator (allows both the private and the public profile)"
+
+#: demos/menu_lcl/uMenuLcl.lfm
+msgid "从业人员理论考核"
+msgstr "Practitioner theory exam"
+
+#: demos/dbaware/uAwareMain.lfm
+msgid "从数据库统计"
+msgstr "Count from the database"
+
+#: demos/gallery/ugallery.pas
+msgid "代码覆盖率"
+msgstr "Code coverage"
+
+#: demos/gallery/ugallery.lfm
+msgid "仪表 +7"
+msgstr "Gauges +7"
+
+#: demos/dbaware/uAwareMain.lfm
+msgid "仪表盘 +10"
+msgstr "Dashboard +10"
+
+#: demos/gallery/ugallery.pas
+msgid "件"
+msgstr " pcs"
+
+#: demos/db/uDbMain.pas
+msgid "价格与库存|3-5"
+msgstr "Price and stock|3-5"
+
+#: demos/gallery/ugallery.pas
+msgid "价格与库存|4-5"
+msgstr "Price and stock|4-5"
+
+#: demos/menu_tree/uMenuTree.pas
+msgid "企业资质"
+msgstr "Company qualification"
+
+#: src/core/lwpanel.pas
+msgid "会话"
+msgstr "Session"
+
+#: demos/gallery/ugallery.lfm
+msgid "会话遮罩"
+msgstr "Session mask"
+
+#: demos/gallery/ugallery.lfm
+msgid "会话：gallery"
+msgstr "Session: gallery"
+
+#: demos/hello/uHello.pas
+msgid "你好，"
+msgstr "Hello, "
+
+#: demos/mobile_demo/uMobileMain.pas
+msgid "你好，%s！服务端事件在两种布局下同样生效。"
+msgstr "Hello, %s! Server events work the same in both layouts."
+
+#: demos/hello/uHello.lfm
+msgid "你的名字"
+msgstr "Your name"
+
+#: demos/procdemo/modules/umod_notes.lfm
+msgid "便签 — 本页面由插件 umod_notes 提供"
+msgstr "Notes — this page is served by the umod_notes plugin"
+
+#: demos/procdemo/modules/umod_notes.lfm
+msgid "便签（插件）"
+msgstr "Notes (plugin)"
+
+#: demos/dbaware/uAwareMain.lfm
+msgid "保存"
+msgstr "Save"
+
+#: demos/db/uDbMain.lfm
+msgid "保存(S)"
+msgstr "Save(S)"
+
+#: demos/dbaware/uAwareMain.pas
+msgid "保存失败："
+msgstr "Save failed: "
+
+#: demos/db/uDbMain.pas
+msgid "保存失败：编码和名称不能为空"
+msgstr "Save failed: code and name are required"
+
+#: demos/procdemo/modules/umod_notes.lfm
+msgid "保存的标题会进列表，并可通过 /lw/ajax/notes_export 导出为 JSON。"
+msgstr "Saved titles go into the list and can be exported as JSON via /lw/ajax/notes_export."
+
+#: src/core/lwdlg.pas
+msgid "全否"
+msgstr "No to all"
+
+#: src/core/lwdlg.pas
+msgid "全是"
+msgstr "Yes to all"
+
+#: src/core/lwdlg.pas
+msgid "全部"
+msgstr "All"
+
+#: demos/db/uDbMain.pas
+msgid "全部分类"
+msgstr "All categories"
+
+#: demos/dbaware/uAwareMain.pas
+msgid "六月"
+msgstr "June"
+
+#: demos/menu_html/uMenuHtml.pas
+msgid "共 %d 条（%s）"
+msgstr "%d record(s) (%s)"
+
+#: demos/grid/uGrid.pas
+msgid "共 %d 行"
+msgstr "%d row(s)"
+
+#: demos/dbaware/uAwareMain.lfm
+msgid "关于"
+msgstr "About"
+
+#: demos/gallery/uabout.lfm
+msgid "关于 lazarusWeb"
+msgstr "About lazarusWeb"
+
+#: demos/multi/uMain.lfm
+msgid "关于(&A)"
+msgstr "About(&A)"
+
+#: demos/db/uDbMain.lfm
+msgid "关键字"
+msgstr "Keyword"
+
+#: src/core/lwdlg.pas
+msgid "关闭"
+msgstr "Close"
+
+#: demos/dbaware/uAwareMain.lfm
+msgid "关闭窗口"
+msgstr "Close window"
+
+#: src/core/lwhttp.pas
+msgid "关闭面板窗口 = 隐藏到系统托盘；结束服务请用面板菜单「退出」"
+msgstr "Closing the panel hides it to the tray; use the panel menu \"Exit\" to stop the service"
+
+#: demos/menu_html/uMenuHtml.lfm
+msgid "其他功能"
+msgstr "Other features"
+
+#: demos/procdemo/modules/umod_notes.lfm
+msgid "内容"
+msgstr "Content"
+
+#: demos/db/uDbMain.lfm
+msgid "分类"
+msgstr "Category"
+
+#: demos/db/uDbMain.lfm
+msgid "分类统计"
+msgstr "Category statistics"
+
+#: demos/gallery/ugallery - 副本.pas
+msgid "切到页签："
+msgstr "Switch to tab: "
+
+#: demos/db/uDbMain.lfm
+msgid "删除(D)"
+msgstr "Delete(D)"
+
+#: demos/dbaware/uAwareMain.pas
+msgid "删除失败："
+msgstr "Delete failed: "
+
+#: demos/db/uDbMain.lfm
+msgid "删除选中"
+msgstr "Delete selected"
+
+#: src/core/lwapp.pas
+msgid "别名: --tls-cert= / --tls-key= 等价于 --ssl-cert= / --ssl-key="
+msgstr "Alias: --tls-cert= / --tls-key= are equivalent to --ssl-cert= / --ssl-key="
+
+#: demos/dbaware/uReport.pas
+msgid "制表："
+msgstr "Prepared by: "
+
+#: demos/multi/uMain.lfm
+msgid "刷新"
+msgstr "Refresh"
+
+#: demos/dbaware/uAwareMain.pas
+msgid "刷新失败："
+msgstr "Refresh failed: "
+
+#: demos/procdemo/modules/umod_dashboard.pas
+msgid "刷新指标"
+msgstr "Refresh metrics"
+
+#: demos/dbaware/uAwareMain.lfm
+msgid "刷新数据"
+msgstr "Refresh data"
+
+#: src/core/lwroute.pas
+msgid "刷新本页"
+msgstr "refresh this page"
+
+#: demos/dbaware/uReport.lfm
+msgid "刷新预览"
+msgstr "Refresh preview"
+
+#: demos/procdemo/modules/umod_dashboard.pas
+msgid "刷新：进程已运行"
+msgstr "Refresh: the process is already running"
+
+#: demos/grid/uGrid.lfm
+msgid "加载数据"
+msgstr "Load data"
+
+#: demos/gallery/ugallery.lfm
+msgid "动作 1"
+msgstr "Action 1"
+
+#: demos/gallery/ugallery.lfm
+msgid "动作 2"
+msgstr "Action 2"
+
+#: demos/gallery/ugallery.lfm
+msgid "动作 4"
+msgstr "Action 4"
+
+#: demos/gallery/ugallery - 副本.pas
+msgid "动态"
+msgstr "Dynamic"
+
+#: demos/gallery/ugallery.lfm
+msgid "动态创建控件："
+msgstr "Dynamically created controls:"
+
+#: demos/gallery/ugallery.lfm
+msgid "动态加一个按钮"
+msgstr "Dynamically add a button"
+
+#: demos/gallery/ugallery.lfm
+msgid "北京"
+msgstr "Beijing"
+
+#: demos/procdemo/modules/umod_reports.pas
+msgid "区域      收入          成本          毛利"
+msgstr "Region      Revenue      Cost      Margin"
+
+#: demos/db/uDbMain.lfm
+msgid "单价"
+msgstr "Unit price"
+
+#: src/core/lwapp.pas
+msgid "单会话可用 ?lwlang=en 临时切换（写进会话，不影响别人）"
+msgstr "a single session can switch temporarily with ?lwlang=en (stored per session, other users unaffected)"
+
+#: demos/gallery/ugallery.lfm
+msgid "原生语义的对话框全部走浏览器渲染（lwdlg 挂钩 Dialogs 单元）："
+msgstr "Native dialogs are all rendered in the browser (lwdlg hooks the Dialogs unit):"
+
+#: demos/multi/uMain.pas
+msgid "参数已应用"
+msgstr "Settings applied"
+
+#: demos/multi/uMain.lfm
+msgid "参数设置"
+msgstr "Settings"
+
+#: demos/gallery/ugallery.pas
+msgid "发布准备"
+msgstr "Release preparation"
+
+#: src/core/lwdlg.pas
+msgid "取消"
+msgstr "Cancel"
+
+#: demos/accel/uAccel.pas
+msgid "取消(&C)"
+msgstr "Cancel(&C)"
+
+#: demos/accel/uAccel.pas
+msgid "另存为(&A)"
+msgstr "Save as(&A)"
+
+#: demos/db/uDbMain.lfm
+msgid "只看库存 < 10"
+msgstr "Show only stock < 10"
+
+#: demos/dbaware/uAwareMain.pas
+msgid "各分类金额合计（来自 SQLite）"
+msgstr "Amount totals per category (from SQLite)"
+
+#: src/core/lwreport.pas
+msgid "合计"
+msgstr "Total"
+
+#: demos/db/uDbMain.pas
+msgid "合计 %d 个品项 · 库存 %d 件 · 货值 ¥%.2f"
+msgstr "%d item(s) · %d in stock · value ¥%.2f"
+
+#: demos/db/uDbMain.lfm
+msgid "名称"
+msgstr "Name"
+
+#: src/core/lwdlg.pas
+msgid "否"
+msgstr "No"
+
+#: src/core/lwnewproject.pas
+msgid "启动后弹出服务端面板窗口（状态/日志/停止），浏览器访问同一端口。"
+msgstr "A server panel window opens on start (status / log / stop); browse to the same port."
+
+#: src/core/lwbase.pas
+msgid "启用 HTTPS 时 PEM 证书与私钥必须同时指定，或都留空使用自签证书"
+msgstr "With HTTPS, the PEM certificate and key must both be given, or both left empty to use a self-signed certificate"
+
+#: demos/accel/uAccel.pas
+msgid "启用(&E)"
+msgstr "Enable(&E)"
+
+#: demos/gallery/ugallery.pas
+msgid "商品信息|0-1"
+msgstr "Product info|0-1"
+
+#: demos/db/uDbMain.lfm
+msgid "商品库存管理 · SQLite 演示"
+msgstr "Product inventory · SQLite demo"
+
+#: demos/dbaware/uReport.pas
+msgid "商品清单"
+msgstr "Product list"
+
+#: demos/dbaware/uAwareMain.pas
+msgid "四月"
+msgstr "April"
+
+#: demos/dbaware/uAwareMain.lfm
+msgid "图表/其它"
+msgstr "Charts / other"
+
+#: demos/gallery/ugallery.lfm
+msgid "图表仪表"
+msgstr "Charts and gauges"
+
+#: demos/gallery/ugallery.lfm
+msgid "在售"
+msgstr "On sale"
+
+#: demos/menu_html/uMenuHtml.pas
+msgid "场次,考试时间,考试科目,人数,考生姓名"
+msgstr "Session,Exam time,Subject,Candidates,Candidate name"
+
+#: demos/db/uDbMain.pas
+msgid "基本信息|0-2"
+msgstr "Basic info|0-2"
+
+#: src/core/lwhttp.pas
+msgid "处理请求时出错: %s: %s"
+msgstr "Error while handling the request: %s: %s"
+
+#: demos/db/uDbMain.lfm
+msgid "备注"
+msgstr "Notes"
+
+#: demos/hello/uHello.pas
+msgid "复选框状态变化:"
+msgstr "Checkbox state changed:"
+
+#: demos/dbaware/uAwareMain.lfm
+msgid "大表分页"
+msgstr "Large grid paging"
+
+#: demos/gallery/ugallery.pas
+msgid "套"
+msgstr "set"
+
+#: demos/gallery/ugallery.lfm
+msgid "定时器/动态"
+msgstr "Timer / dynamic"
+
+#: src/core/lwhttp.pas
+msgid "客户端已断开，本次请求/响应中止（正常现象，无需处理）——常见于浏览器关页签/刷新或请求超时取消；连接已被 fcl-web 自动回收，服务不受影响。"
+msgstr "Client disconnected; this request/response was aborted (normal, no action needed) - usually a closed tab, a reload or a request timeout; fcl-web has already recycled the connection, the service is unaffected."
+
+#: demos/gallery/ugallery.lfm
+msgid "容器布局"
+msgstr "Container layout"
+
+#: src/core/lwroute.pas
+msgid "宿主 ini 键："
+msgstr "host ini key: "
+
+#: src/core/lwroute.pas
+msgid "宿主已按登记把本页代理到"
+msgstr "The host proxied this page to"
+
+#: src/core/lwlogin.pas
+msgid "密 码"
+msgstr "PASSWORD"
+
+#: demos/dbaware/uLogin.lfm
+msgid "密码"
+msgstr "Password"
+
+#: demos/gallery/ugallery.lfm
+msgid "对话框"
+msgstr "Dialogs"
+
+#: src/core/lwsession.pas
+msgid "对话框被忽略：已有对话框在等待用户响应"
+msgstr "Dialog ignored: another dialog is already waiting for the user"
+
+#: demos/gallery/ugallery - 副本.pas
+msgid "对话框返回值："
+msgstr "Dialog result: "
+
+#: demos/gallery/ugallery.lfm
+msgid "对话框返回值：-"
+msgstr "Dialog result: -"
+
+#: demos/gallery/ugallery - 副本.pas
+msgid "对话框返回值：mrNo"
+msgstr "Dialog result: mrNo"
+
+#: demos/gallery/ugallery - 副本.pas
+msgid "对话框返回值：mrYes"
+msgstr "Dialog result: mrYes"
+
+#: demos/gallery/ugallery - 副本.pas
+msgid "对话框返回值：模态"
+msgstr "Dialog result: modal"
+
+#: demos/gallery/ugallery - 副本.pas
+msgid "对话框返回值：警告已确认"
+msgstr "Dialog result: warning acknowledged"
+
+#: demos/dbaware/uReport.lfm
+msgid "导出 CSV"
+msgstr "Export CSV"
+
+#: demos/dbaware/uReport.lfm
+msgid "导出 Excel"
+msgstr "Export Excel"
+
+#: demos/files/uFileForm.lfm
+msgid "导出清单 CSV"
+msgstr "Export list CSV"
+
+#: demos/gallery/ugallery.lfm
+msgid "尚未生成。点左边按钮：载入模板 → 灌示例数据 → 排版 → 导出 PDF。"
+msgstr "Not generated yet. Click the button on the left: load template -> fill sample data -> lay out -> export PDF."
+
+#: demos/multi/uMain.pas
+msgid "就绪"
+msgstr "Ready"
+
+#: demos/procdemo/host/uhost.pas
+msgid "工作原理："
+msgstr "How it works:"
+
+#: demos/gallery/ugallery.lfm
+msgid "工具条"
+msgstr "Toolbar"
+
+#: demos/gallery/uLazReportDemo.pas
+msgid "工程名称"
+msgstr "Project name"
+
+#: demos/gallery/uLazReportDemo.pas
+msgid "工程部位"
+msgstr "Work location"
+
+#: demos/gallery/ugallery.lfm
+msgid "左边改格子 / 右边改控件，同一份数据实时联动；导航条是 TLWDBNavigator（nogui 友好）。两个网格都连 sqlite（gallery.db）：改一格即落库，重启进程数据不丢（删掉该文件即重建种子数据）。unit 列点击展开下拉选择（TColumn.PickList），made 列点击弹出日期选择，上架（active）列是一个勾选框，点一下即切换并落库。"
+msgstr "Edit a cell on the left or a control on the right — the same record stays in sync; the navigator is TLWDBNavigator (nogui-friendly). Both grids use sqlite (gallery.db): editing a cell writes through immediately and data survives a restart (delete the file to reseed). The unit column opens a dropdown (TColumn.PickList), the made column opens a date picker, and the active column is a checkbox that toggles and writes through on click."
+
+#: demos/gallery/ugallery.lfm
+msgid "左面板（alLeft）"
+msgstr "Left panel (alLeft)"
+
+#: demos/files/uFileForm.pas
+msgid "已上传 %d 个文件，共 %s KB"
+msgstr "%d file(s) uploaded, %s KB total"
+
+#: demos/gallery/ugallery.pas
+msgid "已从 gridsave.json 调用"
+msgstr "Loaded from gridsave.json"
+
+#: demos/gallery/ugallery.pas
+msgid "已保存"
+msgstr "Saved"
+
+#: demos/procdemo/modules/umod_notes.pas
+msgid "已保存「"
+msgstr "Saved \""
+
+#: demos/dbaware/uAwareMain.pas
+msgid "已删除并落库"
+msgstr "Deleted and written to the database"
+
+#: demos/dbaware/uAwareMain.pas
+msgid "已刷新"
+msgstr "Refreshed"
+
+#: demos/multi/uMain.pas
+msgid "已加载 %d 行"
+msgstr "%d row(s) loaded"
+
+#: demos/multi/uMain.pas
+msgid "已取消关于"
+msgstr "About cancelled"
+
+#: demos/dbaware/uReport.pas
+msgid "已导出 CSV：%s（%d 行）"
+msgstr "Exported CSV: %s (%d rows)"
+
+#: demos/dbaware/uReport.pas
+msgid "已导出 Excel：%s（%d 行）"
+msgstr "Exported Excel: %s (%d rows)"
+
+#: demos/procdemo/modules/umod_dashboard.pas
+msgid "已打开便签页"
+msgstr "Opened the notes page"
+
+#: demos/procdemo/modules/umod_dashboard.pas
+msgid "已打开报表页"
+msgstr "Opened the reports page"
+
+#: demos/multi/uMain.pas
+msgid "已查看关于（返回 mrOk）"
+msgstr "Viewed About (returned mrOk)"
+
+#: src/core/lwapp.pas
+msgid "已注册窗体:"
+msgstr "Registered forms: "
+
+#: demos/grid/uGrid.pas
+msgid "已清空"
+msgstr "Cleared"
+
+#: demos/procdemo/modules/umod_notes.pas
+msgid "已清空输入（列表保留）"
+msgstr "Input cleared (the list is kept)"
+
+#: demos/gallery/ugallery.pas
+msgid "已生成 %d 页 · %s（模板 %s · %s）"
+msgstr "Generated %d page(s) · %s (template %s · %s)"
+
+#: demos/menu_html/uMenuHtml.pas
+msgid "已生成下载（%s）"
+msgstr "Download generated (%s)"
+
+#: demos/menu_html/uMenuHtml.pas
+msgid "已生成考试安排表下载"
+msgstr "Exam schedule download generated"
+
+#: demos/procdemo/modules/umod_dashboard.pas
+msgid "已返回首页"
+msgstr "Returned to home"
+
+#: src/core/lwdlg.pas
+msgid "帮助"
+msgstr "Help"
+
+#: demos/multi/uMain.lfm
+msgid "帮助(&H)"
+msgstr "Help(&H)"
+
+#: demos/files/uFileForm.pas
+msgid "序号,文件名,字节数,服务端路径"
+msgstr "No.,File name,Bytes,Server path"
+
+#: demos/db/uDbMain.lfm
+msgid "库存"
+msgstr "Stock"
+
+#: demos/db/uDbMain.pas
+msgid "库存 %d 件 · 货值 ¥%.2f"
+msgstr "%d in stock · value ¥%.2f"
+
+#: demos/dbaware/uReport.pas
+msgid "库存大表明细"
+msgstr "Large stock grid"
+
+#: demos/dbaware/uAwareMain.lfm
+msgid "应用到下方面板"
+msgstr "Apply to the lower panel"
+
+#: demos/gallery/ugallery.lfm
+msgid "应用到右上方面板"
+msgstr "Apply to the upper-right panel"
+
+#: demos/multi/uMain.lfm
+msgid "应用参数"
+msgstr "Apply settings"
+
+#: demos/audit/uAudit.lfm
+msgid "底部页签一"
+msgstr "Bottom tab one"
+
+#: demos/audit/uAudit.lfm
+msgid "底部页签二"
+msgstr "Bottom tab two"
+
+#: demos/gallery/ugallery.lfm
+msgid "张三"
+msgstr "John Doe"
+
+#: demos/dbaware/uAwareMain.pas
+msgid "当前值："
+msgstr "Current value: "
+
+#: demos/dbaware/uAwareMain.lfm
+msgid "当前值：72%"
+msgstr "Current value: 72%"
+
+#: demos/dbaware/uAwareMain.pas
+msgid "当前文件："
+msgstr "Current file: "
+
+#: demos/dbaware/uAwareMain.lfm
+msgid "当前文件：（未选择）"
+msgstr "Current file: (none)"
+
+#: demos/dbaware/uAwareMain.pas
+msgid "当前用户："
+msgstr "Current user: "
+
+#: demos/grid/uGrid.pas
+msgid "当前行: %s  %s"
+msgstr "Current row: %s  %s"
+
+#: demos/dbaware/uAwareMain.lfm
+msgid "当前选中记录（点行定位，翻页/过滤后依然正确）："
+msgstr "Current record (click a row to locate; stays correct after paging/filtering):"
+
+#: demos/menu_html/uMenuHtml.pas
+msgid "当前：%s（服务端 %s）"
+msgstr "Current: %s (server %s)"
+
+#: src/core/lwdlg.pas
+msgid "忽略"
+msgstr "Ignore"
+
+#: demos/dbaware/uAwareMain.lfm
+msgid "成功 Toast"
+msgstr "Success toast"
+
+#: demos/menu_tree/uMenuTree.pas
+msgid "成绩查询"
+msgstr "Score lookup"
+
+#: demos/menu_html/uMenuHtml.pas
+msgid "成绩查询：共 %d 条"
+msgstr "Score lookup: %d record(s)"
+
+#: demos/menu_tree/uMenuTree.pas
+msgid "成绩统计"
+msgstr "Score statistics"
+
+#: demos/menu_html/uMenuHtml.pas
+msgid "成绩统计：3 个单位 / 9 人"
+msgstr "Score statistics: 3 organizations / 9 people"
+
+#: demos/dbaware/uReport.lfm
+msgid "打印…"
+msgstr "Print…"
+
+#: demos/accel/uAccel.pas
+msgid "打开(&O)"
+msgstr "Open(&O)"
+
+#: demos/procdemo/modules/umod_reports.pas
+msgid "打开仪表盘"
+msgstr "Open dashboard"
+
+#: demos/procdemo/host/uhost.pas
+msgid "打开仪表盘插件（本标签）"
+msgstr "Open the dashboard plugin (this tab)"
+
+#: demos/procdemo/host/uhost.pas
+msgid "打开便签插件（本标签）"
+msgstr "Open the notes plugin (this tab)"
+
+#: demos/procdemo/modules/umod_dashboard.pas
+msgid "打开便签页"
+msgstr "Open notes page"
+
+#: demos/procdemo/modules/umod_dashboard.pas
+msgid "打开失败，已注册窗体："
+msgstr "Open failed; registered forms: "
+
+#: demos/procdemo/modules/umod_dashboard.pas
+msgid "打开失败，未登记 page.Host"
+msgstr "Open failed: page.Host is not registered"
+
+#: demos/procdemo/modules/umod_dashboard.pas
+msgid "打开失败，未登记 page.Reports"
+msgstr "Open failed: page.Reports is not registered"
+
+#: demos/procdemo/modules/umod_notes.pas
+msgid "打开失败：未登记 page.Host"
+msgstr "Open failed: page.Host is not registered"
+
+#: demos/procdemo/modules/umod_notes.pas
+msgid "打开失败：未登记 page.Reports"
+msgstr "Open failed: page.Reports is not registered"
+
+#: demos/procdemo/host/uhost.pas
+msgid "打开报表插件（本标签）"
+msgstr "Open the reports plugin (this tab)"
+
+#: demos/procdemo/modules/umod_dashboard.pas
+msgid "打开报表页"
+msgstr "Open reports page"
+
+#: demos/hello/uHello.lfm
+msgid "打招呼"
+msgstr "Say hello"
+
+#: demos/gallery/ugallery.lfm
+msgid "扩展输入"
+msgstr "Extended input"
+
+#: src/core/lwnewproject.pas
+msgid "找不到客户端资源目录："
+msgstr "Client asset directory not found: "
+
+#: src/core/lwconfig.pas
+msgid "找不到配置文件:"
+msgstr "Config file not found: "
+
+#: src/core/lwapp.pas
+msgid "把 src\\client\\ 拷到部署目录（或用 root\\lw\\ 扁平部署，或把文件拷到 exe 同目录）。"
+msgstr "Copy src\\client\\ into the deployment directory (or use the flat root\\lw\\ layout, or copy the files next to the exe)."
+
+#: demos/mobile_demo/uMobileMain.pas
+msgid "把浏览器窗口拖窄到 834px 以下（或用手机打开），顶层控件会自动搬进移动模板单列排布；拖宽回 1100px 以上再搬回来。两种布局共用同一棵控件树与事件通道。「拍照上传」在手机上直接唤起系统相机，局域网 http 也能用。"
+msgstr "Drag the browser window narrower than 834px (or open it on a phone) and the top-level controls move into the mobile template single column; widen it past 1100px to move them back. Both layouts share the same control tree and event channel. \"Camera upload\" opens the system camera directly on a phone, and works over plain http on a LAN too."
+
+#: demos/dbaware/uAwareMain.lfm
+msgid "折线图"
+msgstr "Line chart"
+
+#: demos/menu_tree/uMenuTree.pas
+msgid "报名查询"
+msgstr "Registration lookup"
+
+#: demos/menu_html/uMenuHtml.pas
+msgid "报名查询：%s 年份共 %d 条"
+msgstr "Registration lookup: %d record(s) for %s"
+
+#: demos/gallery/uLazReportDemo.pas
+msgid "报告编号"
+msgstr "Report number"
+
+#: src/core/lwreport.pas
+msgid "报表"
+msgstr "Report"
+
+#: demos/gallery/ugallery.lfm
+msgid "报表 LazReport"
+msgstr "LazReport report"
+
+#: demos/dbaware/uReport.lfm
+msgid "报表中心 · 打印与导出"
+msgstr "Report center · print and export"
+
+#: demos/dbaware/uReport.lfm
+msgid "报表中心 —— 预览 / 打印 / 导出（lwreport 报表引擎）"
+msgstr "Report center — preview / print / export (lwreport engine)"
+
+#: demos/dbaware/uAwareMain.lfm
+msgid "报表中心（切换窗体）"
+msgstr "Report center (switch form)"
+
+#: demos/procdemo/modules/umod_reports.pas
+msgid "报表汇总 — 本页面由插件 umod_reports 提供"
+msgstr "Report summary — this page is served by the umod_reports plugin"
+
+#: demos/procdemo/modules/umod_reports.pas
+msgid "报表汇总（插件）"
+msgstr "Report summary (plugin)"
+
+#: demos/dbaware/uReport.pas
+msgid "报表生成失败："
+msgstr "Report generation failed: "
+
+#: demos/dbaware/uReport.pas
+msgid "报表生成失败：临时目录不可写（"
+msgstr "Report generation failed: the temp directory is not writable ("
+
+#: src/core/lwcamera.pas
+msgid "拍照…"
+msgstr "Camera..."
+
+#: demos/mobile_demo/uMobileMain.lfm
+msgid "拍照上传"
+msgstr "Take a photo to upload"
+
+#: src/core/lwnewproject.pas
+msgid "拷贝失败："
+msgstr "Copy failed: "
+
+#: demos/audit/uAudit.lfm
+msgid "按下"
+msgstr "Pressed"
+
+#: demos/gallery/ugallery.lfm
+msgid "按钮"
+msgstr "Button"
+
+#: src/core/lwapp.pas
+msgid "提示: 需随包带 libssl-3-x64.dll + libcrypto-3-x64.dll"
+msgstr "Note: ship libssl-3-x64.dll + libcrypto-3-x64.dll alongside"
+
+#: demos/gallery/ugallery.lfm
+msgid "提示：TDateEdit/TTimeEdit 在浏览器端是 Ext 的 datefield/timefield，值以 ISO 格式回传。"
+msgstr "Note: in the browser TDateEdit/TTimeEdit become Ext datefield/timefield and send values back in ISO format."
+
+#: demos/files/uFileForm.lfm
+msgid "提示：下载链接是一次性令牌，URL 里不会出现服务端路径。"
+msgstr "Note: download links are one-time tokens; no server path appears in the URL."
+
+#: demos/db/uDbMain.lfm
+msgid "提示：点列头排序 · 点行编辑"
+msgstr "Tip: click a header to sort · click a row to edit"
+
+#: demos/procdemo/host/uhost.pas
+msgid "插件 = 独立 exe（notesplug / dashplug / reportsplug），由 lwroute 按 /p/<名>/ 反向代理。"
+msgstr "Plugins = separate exes (notesplug / dashplug / reportsplug) reverse-proxied by lwroute under /p/<name>/."
+
+#: src/core/lwroute.pas
+msgid "插件 exe 没有运行"
+msgstr "the plugin exe is not running"
+
+#: src/core/lwroute.pas
+msgid "插件「"
+msgstr "Plugin \""
+
+#: src/core/lwroute.pas
+msgid "插件不可达"
+msgstr "Plugin unreachable"
+
+#: demos/procdemo/modules/umod_dashboard.pas
+msgid "插件自检："
+msgstr "Plugin self-check: "
+
+#: src/core/lwroute.pas
+msgid "插件路由: /p/"
+msgstr "Plugin route: /p/"
+
+#: src/core/lwhttp.pas
+msgid "收到非 HTTP 流量（看起来是 TLS 握手），本服务当前是 HTTP。若浏览器地址是 https:// 请改成 http://；要 HTTPS 请在启动参数加 --ssl（或给 --ssl-cert/--ssl-key，给证书会自动开启 HTTPS）。"
+msgstr "Received non-HTTP traffic (looks like a TLS handshake) but this service speaks HTTP. If the browser address is https:// change it to http://; for HTTPS add --ssl to the command line (or give --ssl-cert/--ssl-key, supplying a certificate turns HTTPS on automatically)."
+
+#: demos/dbaware/uAwareMain.lfm
+msgid "改任一控件 → 保存 → 字段真落库；点左侧行 → 全部控件自动跟随。"
+msgstr "Change any control -> Save -> the field really hits the database; click a row on the left -> all controls follow."
+
+#: demos/dbaware/uAwareMain.lfm
+msgid "数据感知"
+msgstr "Data-aware"
+
+#: demos/dbaware/uReport.lfm
+msgid "数据源"
+msgstr "Data source"
+
+#: demos/dbaware/uReport.pas
+msgid "数据源：bigitems · 240 行，用于验证多页打印（表头逐页重复）"
+msgstr "Data source: bigitems · 240 rows, used to verify multi-page printing (the header repeats on every page)"
+
+#: demos/dbaware/uReport.pas
+msgid "数据源：items · 含金额合计（单价 × 库存）"
+msgstr "Data source: items · includes an amount total (unit price × stock)"
+
+#: demos/db/uDbMain.lfm
+msgid "数据维护"
+msgstr "Data maintenance"
+
+#: demos/gallery/ugallery.lfm
+msgid "数量"
+msgstr "Quantity"
+
+#: demos/gallery/ugallery.pas
+msgid "数量与金额|2-3"
+msgstr "Quantity and amount|2-3"
+
+#: demos/dbaware/uAwareMain.lfm
+msgid "文件"
+msgstr "File"
+
+#: demos/accel/uAccel.pas
+msgid "文件(&F)"
+msgstr "File(&F)"
+
+#: demos/db/uDbMain.lfm
+msgid "新增(N)"
+msgstr "New(N)"
+
+#: src/core/lwnewproject.pas
+msgid "无法创建目录:"
+msgstr "Cannot create directory: "
+
+#: src/core/lwnewproject.pas
+msgid "无法创建目录："
+msgstr "Cannot create directory: "
+
+#: src/core/lwhttp.pas
+msgid "无窗口模式（--nogui），Ctrl+C 退出"
+msgstr "Windowless mode (--nogui); press Ctrl+C to quit"
+
+#: demos/mobile_demo/uMobileMain.pas
+msgid "日志已清空。"
+msgstr "Log cleared."
+
+#: demos/gallery/ugallery - 副本.pas
+msgid "时间："
+msgstr "Time: "
+
+#: src/core/lwdlg.pas
+msgid "是"
+msgstr "Yes"
+
+#: demos/dbaware/uAwareMain.lfm
+msgid "显示遮罩"
+msgstr "Show mask"
+
+#: demos/gallery/ugallery - 副本.pas
+msgid "最后动作："
+msgstr "Last action: "
+
+#: src/core/lwroute.pas
+msgid "最常见原因："
+msgstr "Most common cause: "
+
+#: demos/menu_tree/uMenuTree.pas
+msgid "最近点击：%s（服务端 %s）"
+msgstr "Last click: %s (server %s)"
+
+#: demos/gallery/ugallery.lfm
+msgid "月度销售（万元）"
+msgstr "Monthly sales (10k CNY)"
+
+#: demos/dbaware/uAwareMain.pas
+msgid "月度销量（示例数据）"
+msgstr "Monthly volume (sample data)"
+
+#: demos/gallery/ugallery.lfm
+msgid "服务器负载"
+msgstr "Server load"
+
+#: demos/hello/uHello.pas
+msgid "服务端处理 ->"
+msgstr "Server handling ->"
+
+#: demos/files/uFileForm.lfm
+msgid "服务端已收到的文件"
+msgstr "Files the server has received"
+
+#: demos/multi/uAbout.lfm
+msgid "服务端用真实 LCL 控件，"
+msgstr "The server uses real LCL controls,"
+
+#: demos/dialogs/udialogs.pas
+msgid "服务端线程此刻会挂起等待，和本地程序里的 ShowMessage 完全一样。"
+msgstr "The server thread now blocks exactly as with ShowMessage in a local program."
+
+#: src/core/lwpanel.pas
+msgid "服务面板已隐藏到托盘。"
+msgstr "The service panel is hidden in the tray. "
+
+#: src/core/lwhttp.pas
+msgid "未注册的 AJAX 端点:"
+msgstr "Unregistered AJAX endpoint: "
+
+#: src/core/lwhyper.pas
+msgid "未知参数:"
+msgstr "Unknown argument: "
+
+#: demos/dbaware/uAwareMain.lfm
+msgid "本月完成率"
+msgstr "Completion rate this month"
+
+#: demos/procdemo/modules/umod_notes.pas
+msgid "条"
+msgstr "items"
+
+#: demos/gallery/ugallery - 副本.pas
+msgid "条目"
+msgstr "Entry"
+
+#: demos/login/uMain.lfm
+msgid "来一条 Toast"
+msgstr "Show a toast"
+
+#: demos/gallery/ugallery.pas
+msgid "构建"
+msgstr "Build"
+
+#: demos/audit/uAudit.lfm
+msgid "架构审计 · 设计期属性核对"
+msgstr "Architecture audit · design-time property check"
+
+#: demos/db/uDbMain.lfm
+msgid "查询"
+msgstr "Search"
+
+#: demos/dbaware/uAwareMain.lfm
+msgid "柱状图"
+msgstr "Bar chart"
+
+#: demos/multi/uMain.lfm
+msgid "标准"
+msgstr "Standard"
+
+#: demos/gallery/ugallery.lfm
+msgid "标准控件"
+msgstr "Standard controls"
+
+#: demos/accel/uAccel.pas
+msgid "标签一(&T)"
+msgstr "Tab one(&T)"
+
+#: demos/accel/uAccel.pas
+msgid "标签二(&U)"
+msgstr "Tab two(&U)"
+
+#: demos/procdemo/modules/umod_notes.lfm
+msgid "标题"
+msgstr "Title"
+
+#: demos/procdemo/modules/umod_notes.pas
+msgid "标题不能为空"
+msgstr "Title cannot be empty"
+
+#: src/core/lwhttp.pas
+msgid "根目录下只有 %s，按它提供所有版本号的请求"
+msgstr "              Only %s exists under the root; it serves every version number"
+
+#: demos/procdemo/modules/umod_dashboard.pas
+msgid "模块仪表盘 — 本页面由插件 umod_dashboard 提供"
+msgstr "Module dashboard — this page is served by the umod_dashboard plugin"
+
+#: demos/procdemo/modules/umod_dashboard.pas
+msgid "模块仪表盘（插件）"
+msgstr "Module dashboard (plugin)"
+
+#: demos/gallery/ugallery.lfm
+msgid "模态窗体(uAbout)"
+msgstr "Modal form (uAbout)"
+
+#: demos/gallery/ugallery.lfm
+msgid "模板：混凝土配合比.frf（FastReport 2.46）→ QF_Lazreport 服务端无头渲染 → fcl-pdf 导出，浏览器自带查看器预览"
+msgstr "Template: concrete-mix.frf (FastReport 2.46) -> headless QF_Lazreport rendering on the server -> fcl-pdf export, previewed with the browser's own viewer"
+
+#: src/core/lwreport.pas
+msgid "横向"
+msgstr "Horizontal"
+
+#: demos/procdemo/modules/umod_reports.pas
+msgid "次汇总"
+msgstr "summaries"
+
+#: demos/hello/uHello.pas
+msgid "次点击"
+msgstr "clicks"
+
+#: demos/login/uMain.lfm
+msgid "欢迎回来！认证通过后才会创建这个窗体。"
+msgstr "Welcome back! This form is created only after authentication succeeds."
+
+#: demos/gallery/ugallery.lfm
+msgid "欧元"
+msgstr "EUR"
+
+#: src/core/lwhttp.pas
+msgid "正在连接 lazarusWeb 服务端…"
+msgstr "Connecting to the lazarusWeb server…"
+
+#: demos/procdemo/host/uhost.pas
+msgid "每个插件页都带「返回首页」（各插件 ini 的 page.Host=/），也能用浏览器「后退」。"
+msgstr "Every plugin page has \"Back to home\" (page.Host=/ in each plugin ini), and the browser's Back button works too."
+
+#: demos/gallery/ugallery.pas
+msgid "每日吞吐"
+msgstr "Daily throughput"
+
+#: demos/db/uDbMain.pas
+msgid "没有匹配的记录"
+msgstr "No matching records"
+
+#: demos/gallery/ugallery.lfm
+msgid "测试"
+msgstr "Test"
+
+#: src/core/lwhttp.pas
+msgid "浏览…"
+msgstr "Browse…"
+
+#: src/core/lwapp.pas
+msgid "浏览器渲染层保持 ext 默认值 —— 两种渲染层都会白屏，请部署 src\\client\\ 或 ext-<版本>\\。"
+msgstr "The browser renderer stays on the ext default - both renderers would show a blank page; deploy src\\client\\ or ext-<version>\\"
+
+#: demos/multi/uAbout.lfm
+msgid "浏览器端用 Alpine.js / Ext JS 渲染。"
+msgstr "The browser renders with Alpine.js / Ext JS."
+
+#: demos/mobile_demo/uMobileMain.lfm
+msgid "浏览器里的 Pascal"
+msgstr "Pascal in the browser"
+
+#: demos/hello/uHello.pas
+msgid "浏览器里看到的每个控件，服务端都有一个对应对象。"
+msgstr "Every control you see in the browser has a real object on the server."
+
+#: src/core/lwhttp.pas
+msgid "消息"
+msgstr "Message"
+
+#: demos/menu_html/uMenuHtml.lfm
+msgid "深圳市xxx管理员晚上好！"
+msgstr "Good evening, Shenzhen xxx administrator!"
+
+#: demos/grid/uGrid.lfm
+msgid "清空"
+msgstr "Clear"
+
+#: demos/files/uFileForm.lfm
+msgid "清空列表"
+msgstr "Clear list"
+
+#: demos/mobile_demo/uMobileMain.lfm
+msgid "清空日志"
+msgstr "Clear log"
+
+#: demos/gallery/ugallery - 副本.pas
+msgid "源码"
+msgstr "Source"
+
+#: demos/gallery/ugallery - 副本.pas
+msgid "演示"
+msgstr "Demo"
+
+#: demos/login/uLogin.lfm
+msgid "演示登录 / 权限框架（admin / 123456 + 图形验证码）"
+msgstr "Demo login / auth framework (admin / 123456 + image captcha)"
+
+#: src/core/lwhttp.pas
+msgid "点「浏览」选择文件，确认后自动上传"
+msgstr "Click \"Browse\" to choose a file; it uploads automatically after you confirm"
+
+#: demos/gallery/ugallery.lfm
+msgid "点上面的工具按钮试试"
+msgstr "Try the toolbar buttons above"
+
+#: demos/procdemo/host/uhost.pas
+msgid "点上面的按钮在【本标签】打开插件页面（location.href 同标签跳转）；"
+msgstr "Click a button above to open the plugin page in this tab (location.href same-tab navigation);"
+
+#: demos/gallery/ugallery - 副本.pas
+msgid "点击次数："
+msgstr "Clicks: "
+
+#: demos/gallery/ugallery.lfm
+msgid "点击次数：0"
+msgstr "Clicks: 0"
+
+#: demos/accel/uAccel.pas
+msgid "点击："
+msgstr "Clicked: "
+
+#: src/core/lwpanel.pas
+msgid "点此图标恢复面板；结束服务请用右键菜单「退出」。"
+msgstr "Click this icon to bring the panel back; use the right-click menu \"Exit\" to stop the service."
+
+#: demos/mobile_demo/uMobileMain.pas
+msgid "照片已保存到服务端：%s（%d KB）。图片框是浏览器本地预览；换前置/后置摄像头改 TLWCamera.Facing。"
+msgstr "Photo saved on the server: %s (%d KB). The image box is a local browser preview; change TLWCamera.Facing to switch front/back camera."
+
+#: demos/gallery/ugallery.pas
+msgid "物料|0-1"
+msgstr "Material|0-1"
+
+#: demos/gallery/ugallery.pas
+msgid "状态"
+msgstr "Status"
+
+#: demos/db/uDbMain.pas
+msgid "状态:"
+msgstr "Status: "
+
+#: demos/accel/uAccel.pas
+msgid "状态栏 & 原样"
+msgstr "Status bar & literal"
+
+#: demos/db/uDbMain.pas
+msgid "状态："
+msgstr "Status: "
+
+#: demos/db/uDbMain.lfm
+msgid "状态：浏览"
+msgstr "Status: browsing"
+
+#: src/core/lwpanel.pas
+msgid "独立服务器 - 端口"
+msgstr "Standalone server - port"
+
+#: demos/gallery/ugallery.pas
+msgid "生成失败："
+msgstr "Generation failed: "
+
+#: demos/gallery/ugallery.lfm
+msgid "生成报表（LazReport）"
+msgstr "Generate report (LazReport)"
+
+#: demos/dbaware/uAwareMain.lfm
+msgid "生成示例 PDF"
+msgstr "Generate sample PDF"
+
+#: src/core/lwlogin.pas
+msgid "用户名"
+msgstr "User name"
+
+#: src/core/lwlogin.pas
+msgid "用户名或密码错误（演示账号 admin / admin）"
+msgstr "Wrong user name or password (demo account admin / admin)"
+
+#: src/core/lwapp.pas
+msgid "用法:"
+msgstr "Usage: "
+
+#: demos/accel/uAccel.pas
+msgid "甲(&A)"
+msgstr "A(&A)"
+
+#: src/core/lwapp.pas
+msgid "界面语言: %s（languages\\%s\\；单会话可用 ?lwlang=zh 切换）"
+msgstr "UI language: %s (languages\\%s\\; one session can switch with ?lwlang=zh)"
+
+#: src/core/lwapp.pas
+msgid "界面语言: %s（中文即源码原文；单会话可用 ?lwlang=en 切换）"
+msgstr "UI language: %s (Chinese is the source text; one session can switch with ?lwlang=en)"
+
+#: src/core/lwlogin.pas
+msgid "登 录"
+msgstr "SIGN IN"
+
+#: src/core/lwlogin.pas
+msgid "登录"
+msgstr "Sign in"
+
+#: demos/login/uLogin.lfm
+msgid "登录 lazarusWeb"
+msgstr "Sign in to lazarusWeb"
+
+#: src/core/lwlogin.pas
+msgid "登录失败"
+msgstr "Sign-in failed"
+
+#: src/core/lwlogin.pas
+msgid "登录（演示账号 admin / admin）"
+msgstr "Sign in (demo account admin / admin)"
+
+#: src/core/lwnewproject.pas
+msgid "的主窗体。"
+msgstr " main form."
+
+#: src/core/lwpanel.pas
+msgid "监听:"
+msgstr "Listen:"
+
+#: demos/menu_tree/uMenuTree.pas
+msgid "监考人员"
+msgstr "Invigilators"
+
+#: src/core/lwdlg.pas
+msgid "确定"
+msgstr "OK"
+
+#: demos/dialogs/udialogs.pas
+msgid "确定要删除这条记录吗？"
+msgstr "Delete this record?"
+
+#: demos/gallery/ugallery - 副本.pas
+msgid "确认继续吗？"
+msgstr "Continue?"
+
+#: demos/gallery/ugallery - 副本.pas
+msgid "磁盘空间不足！"
+msgstr "Out of disk space!"
+
+#: demos/dbaware/uAwareMain.pas
+msgid "示例 PDF 生成失败（临时目录不可写？）"
+msgstr "Sample PDF generation failed (temp directory not writable?)"
+
+#: demos/procdemo/modules/umod_dashboard.pas
+msgid "秒"
+msgstr "second(s)"
+
+#: demos/mobile_demo/uMobileMain.lfm
+msgid "移动端模板演示 · 同一窗体两种布局"
+msgstr "Mobile template demo · one form, two layouts"
+
+#: demos/hello/uHello.pas
+msgid "窗体已在服务端创建：这是一个真实的 LCL 窗体。"
+msgstr "The form exists on the server: this is a real LCL form."
+
+#: demos/dbaware/uAwareMain.lfm
+msgid "窗口"
+msgstr "Window"
+
+#: src/core/lwpanel.pas
+msgid "端口可能已被别的程序占用，换一个 --port= 再试。"
+msgstr "The port may be used by another program; try a different --port=."
+
+#: demos/procdemo/modules/umod_reports.pas
+msgid "第"
+msgstr "No. "
+
+#: demos/dbaware/uAwareMain.pas
+msgid "第 %d / %d 条 · %s · 编码 %s"
+msgstr "Record %d / %d · %s · code %s"
+
+#: demos/db/uDbMain.pas
+msgid "第 %d / %d 条 · 排序：%s %s"
+msgstr "Record %d / %d · sort: %s %s"
+
+#: demos/dbaware/uAwareMain.lfm
+msgid "第 1 / 3 条 · 浏览 · 编码 P1001"
+msgstr "Record 1 / 3 · browsing · code P1001"
+
+#: demos/audit/uAudit.lfm
+msgid "第一页"
+msgstr "Page one"
+
+#: demos/accel/uAccel.pas
+msgid "第二格"
+msgstr "Second panel"
+
+#: demos/audit/uAudit.lfm
+msgid "第二页"
+msgstr "Page two"
+
+#: demos/procdemo/modules/umod_notes.pas
+msgid "等待操作"
+msgstr "Waiting for action"
+
+#: demos/procdemo/modules/umod_reports.pas
+msgid "等待汇总"
+msgstr "Waiting for summary"
+
+#: src/core/lwlang.pas
+msgid "简体中文"
+msgstr "Simplified Chinese"
+
+#: demos/gallery/ugallery.pas
+msgid "箱"
+msgstr "box"
+
+#: demos/accel/uAccel.pas
+msgid "红(&R)"
+msgstr "Red(&R)"
+
+#: demos/multi/uMain.lfm
+msgid "级别"
+msgstr "Level"
+
+#: demos/gallery/uabout.lfm
+msgid "纯 Pascal 服务端 + 真实 LCL 控件 + Ext JS 前端。"
+msgstr "Pure Pascal server + real LCL controls + Ext JS front end."
+
+#: src/core/lwreport.pas
+msgid "纵向"
+msgstr "Vertical"
+
+#: demos/multi/uMain.lfm
+msgid "线程"
+msgstr "Thread"
+
+#: demos/gallery/ugallery.lfm
+msgid "组内复选 A"
+msgstr "Group check A"
+
+#: demos/gallery/ugallery.lfm
+msgid "组内复选 B"
+msgstr "Group check B"
+
+#: demos/gallery/ugallery.lfm
+msgid "组内编辑框"
+msgstr "Group edit box"
+
+#: demos/menu_html/uMenuHtml.lfm
+msgid "统计"
+msgstr "Statistics"
+
+#: demos/menu_html/uMenuHtml.pas
+msgid "统计完成（%s）"
+msgstr "Statistics done (%s)"
+
+#: demos/dbaware/uAwareMain.lfm
+msgid "统计当前行数"
+msgstr "Count current rows"
+
+#: demos/db/uDbMain.pas
+msgid "统计指标|1-3"
+msgstr "Metrics|1-3"
+
+#: src/core/lwdlg.pas
+msgid "继续"
+msgstr "Continue"
+
+#: demos/accel/uAccel.pas
+msgid "绿(&G)"
+msgstr "Green(&G)"
+
+#: demos/db/uDbMain.lfm
+msgid "编码"
+msgstr "Code"
+
+#: demos/gallery/ugallery.lfm
+msgid "网格列表"
+msgstr "Grid list"
+
+#: demos/gallery/ugallery.lfm
+msgid "美元"
+msgstr "USD"
+
+#: demos/menu_tree/uMenuTree.pas
+msgid "考场安排"
+msgstr "Exam room arrangement"
+
+#: demos/menu_html/uMenuHtml.lfm
+msgid "考生姓名："
+msgstr "Candidate name: "
+
+#: demos/menu_html/uMenuHtml.pas
+msgid "考试安排表.csv"
+msgstr "exam-schedule.csv"
+
+#: demos/menu_tree/uMenuTree.pas
+msgid "考试安排表下载"
+msgstr "Exam schedule download"
+
+#: demos/menu_tree/uMenuTree.pas
+msgid "考试管理"
+msgstr "Exam administration"
+
+#: demos/menu_tree/uMenuTree.pas
+msgid "考试计划"
+msgstr "Exam plan"
+
+#: demos/multi/uMain.lfm
+msgid "自动刷新"
+msgstr "Auto refresh"
+
+#: demos/multi/uMain.pas
+msgid "自动刷新=%s 级别=%s 线程=%d"
+msgstr "Auto refresh=%s level=%s thread=%d"
+
+#: demos/gallery/ugallery.pas
+msgid "自动化测试"
+msgstr "Automated testing"
+
+#: src/core/lwlang.pas
+msgid "英文"
+msgstr "English"
+
+#: demos/gallery/ugallery.pas
+msgid "行 x"
+msgstr "row x"
+
+#: src/core/lwreport.pas
+msgid "行 ·"
+msgstr "rows · "
+
+#: demos/multi/uMain.pas
+msgid "行数 %d"
+msgstr "%d row(s)"
+
+#: demos/dialogs/udialogs.pas
+msgid "要保存刚才的修改吗？"
+msgstr "Save your changes?"
+
+#: demos/gallery/ugallery.pas
+msgid "规格与日期|2-3"
+msgstr "Spec and dates|2-3"
+
+#: demos/gallery/ugallery.lfm
+msgid "视图 1"
+msgstr "View 1"
+
+#: demos/gallery/ugallery.lfm
+msgid "视图 2"
+msgstr "View 2"
+
+#: demos/gallery/ugallery.lfm
+msgid "视图 3"
+msgstr "View 3"
+
+#: src/core/lwhttp.pas
+msgid "警告      : %s 不存在，页面会白屏"
+msgstr "  Warning   : %s not found, the page will be blank"
+
+#: src/core/lwhyper.pas
+msgid "警告:"
+msgstr "Warning: "
+
+#: src/core/lwapp.pas
+msgid "警告: %s；已关闭 HTTPS，回退 HTTP 启动（请检查证书路径或改回 ssl=0）"
+msgstr "Warning: %s; HTTPS disabled, starting over HTTP (check the certificate paths or set ssl=0)"
+
+#: src/core/lwapp.pas
+msgid "警告: --client=%s 非法（应为 ext 或 alpine），忽略"
+msgstr "Warning: --client=%s is invalid (ext or alpine expected), ignored"
+
+#: src/core/lwapp.pas
+msgid "警告: --lang=%s 未收录（zh/en），忽略（保持系统语言）"
+msgstr "Warning: --lang=%s is not supported (zh/en), ignored (keeping the system language)"
+
+#: src/core/lwhttp.pas
+msgid "警告: 优雅退出时出错:"
+msgstr "Warning: error during graceful shutdown: "
+
+#: src/core/lwhttp.pas
+msgid "警告: 停止监听时出错:"
+msgstr "Warning: error while stopping the listener: "
+
+#: src/core/lwroute.pas
+msgid "警告: 插件上游不支持 https://（进程间走本机/内网 HTTP），剥掉协议:"
+msgstr "Warning: the plugin upstream does not support https:// (inter-process traffic is plain local/LAN HTTP), stripping the scheme: "
+
+#: src/core/lwroute.pas
+msgid "警告: 插件上游为空，忽略:"
+msgstr "Warning: empty plugin upstream, ignored: "
+
+#: src/core/lwroute.pas
+msgid "警告: 插件名非法（只允许字母数字 .-_，1..64 位）:"
+msgstr "Warning: invalid plugin name (letters, digits and .-_ only, 1..64 chars): "
+
+#: src/core/lwapp.pas
+msgid "警告: 未找到 alpine.min.js 也没有可用的 ext-all.js，"
+msgstr "Warning: neither alpine.min.js nor a usable ext-all.js was found,"
+
+#: src/core/lwapp.pas
+msgid "警告: 未找到客户端脚本 lw.js，浏览器将白屏！"
+msgstr "Warning: client script lw.js not found — the browser will show a blank page!"
+
+#: src/core/lwapp.pas
+msgid "警告: 未找到翻译文件 languages\\%s\\lazarusweb.po，界面回退中文"
+msgstr "Warning: translation file languages\\%s\\lazarusweb.po not found, falling back to Chinese"
+
+#: src/core/lwapp.pas
+msgid "警告: 未识别的参数 %s，已忽略（检查拼写；TLS 参数是 --ssl / --ssl-host / --ssl-cert / --ssl-key，也接受 --tls-cert / --tls-key）"
+msgstr "Warning: unknown parameter %s ignored (check the spelling; TLS options are --ssl / --ssl-host / --ssl-cert / --ssl-key, --tls-cert / --tls-key are accepted too)"
+
+#: src/core/lwhttp.pas
+msgid "警告: 监听线程 3 秒内没有退出，跳过服务器清理（内存泄漏但可安全退出）"
+msgstr "Warning: the listener thread did not exit within 3 seconds; skipping server cleanup (leaks memory but exits safely)"
+
+#: src/core/lwapp.pas
+msgid "警告: 配置文件 client=%s 非法（应为 ext 或 alpine），按 ext 处理"
+msgstr "Warning: config client=%s is invalid (ext or alpine expected), using ext"
+
+#: src/core/lwapp.pas
+msgid "警告: 配置文件 language=%s 未收录（zh/en），忽略（保持系统语言）"
+msgstr "Warning: config language=%s is not supported (zh/en), ignored (keeping the system language)"
+
+#: src/core/lwapp.pas
+msgid "警告: 配置文件 port=%d 非法（应为 1..65535），用默认 %d"
+msgstr "Warning: config port=%d is invalid (expected 1..65535); using default %d"
+
+#: src/core/lwapp.pas
+msgid "警告: 配置文件 theme=%s 未收录（classic/crisp/gray/material/neptune/graphite），按 crisp 处理"
+msgstr "Warning: config theme=%s is not one of classic/crisp/gray/material/neptune/graphite, using crisp"
+
+#: src/core/lwconfig.pas
+msgid "警告: 配置文件里的 extdir 不存在 ->"
+msgstr "Warning: extdir from the config file does not exist ->"
+
+#: src/core/lwconfig.pas
+msgid "警告: 配置文件里的 extdir 是空目录 ->"
+msgstr "Warning: extdir from the config file is an empty directory ->"
+
+#: demos/menu_html/uMenuHtml.lfm
+msgid "计划考试年份："
+msgstr "Planned exam year: "
+
+#: demos/multi/uMain.lfm
+msgid "订单数据"
+msgstr "Order data"
+
+#: demos/db/uDbMain.pas
+msgid "记录 %d/%d"
+msgstr "Record %d/%d"
+
+#: demos/db/uDbMain.pas
+msgid "记录 0/0"
+msgstr "Record 0/0"
+
+#: demos/gallery/ugallery.pas
+msgid "评分"
+msgstr "Score"
+
+#: src/core/lwapp.pas
+msgid "该令牌，缺省不开）。lwhyper 拉起 worker 时自动注入"
+msgstr "the token; off by default). lwhyper injects it when starting workers"
+
+#: demos/menu_html/uMenuHtml.lfm
+msgid "该菜单项在本 demo 中未实现，仅演示「HTML 菜单 → LCL 页签」联动。"
+msgstr "This menu item is not implemented in this demo; it only shows the \"HTML menu -> LCL tabs\" wiring."
+
+#: demos/menu_lcl/uMenuLcl.lfm
+msgid "该菜单项在本 demo 中未实现，仅演示「LCL 侧栏菜单组件 → LCL 页签」联动。"
+msgstr "This menu item is not implemented in this demo; it only shows the \"LCL side menu -> LCL tabs\" wiring."
+
+#: demos/menu_main/uMenuMain.lfm
+msgid "该菜单项在本 demo 中未实现，仅演示「MainMenu → LCL 页签」联动。"
+msgstr "This menu item is not implemented in this demo; it only shows the \"MainMenu -> LCL tabs\" wiring."
+
+#: demos/controls/uControls.lfm
+msgid "语言"
+msgstr "Language"
+
+#: demos/gallery/ugallery - 副本.pas
+msgid "说明"
+msgstr "Description"
+
+#: demos/gallery/ugallery - 副本.pas
+msgid "请输入你的名字："
+msgstr "Enter your name: "
+
+#: demos/menu_tree/uMenuTree.lfm
+msgid "请选择左侧菜单"
+msgstr "Choose a menu item on the left"
+
+#: demos/gallery/ugallery.lfm
+msgid "读取服务端时钟"
+msgstr "Read the server clock"
+
+#: demos/gallery/ugallery.lfm
+msgid "调用"
+msgstr "Call"
+
+#: demos/dialogs/udialogs.pas
+msgid "调用 MessageDlg(mtConfirmation, [mbYes, mbNo])…"
+msgstr "Calling MessageDlg(mtConfirmation, [mbYes, mbNo])…"
+
+#: demos/dialogs/udialogs.pas
+msgid "调用 QuestionDlg（自定义按钮文字）…"
+msgstr "Calling QuestionDlg (custom button captions)…"
+
+#: demos/dialogs/udialogs.pas
+msgid "调用 ShowMessage，等待浏览器点确定…"
+msgstr "Calling ShowMessage and waiting for the browser to click OK…"
+
+#: demos/menu_tree/uMenuTree.pas
+msgid "资质管理"
+msgstr "Qualification management"
+
+#: demos/procdemo/modules/umod_reports.pas
+msgid "跳转失败：未登记 page.Dashboard"
+msgstr "Navigation failed: page.Dashboard is not registered"
+
+#: demos/procdemo/modules/umod_reports.pas
+msgid "跳转失败：未登记 page.Host"
+msgstr "Navigation failed: page.Host is not registered"
+
+#: demos/procdemo/modules/umod_reports.pas
+msgid "跳转失败：未登记 page.Notes"
+msgstr "Navigation failed: page.Notes is not registered"
+
+#: src/core/lwroute.pas
+msgid "转发失败:"
+msgstr "Forwarding failed: "
+
+#: demos/hello/uHello.lfm
+msgid "转成大写"
+msgstr "Convert to upper case"
+
+#: demos/gallery/ugallery - 副本.pas
+msgid "输入框"
+msgstr "Input box"
+
+#: demos/dialogs/udialogs.lfm
+msgid "输入要保存的文件名"
+msgstr "Enter a file name to save as"
+
+#: demos/grid/uGrid.lfm
+msgid "过滤名称"
+msgstr "Filter name"
+
+#: src/core/lwpanel.pas
+msgid "运行 %.2d:%.2d:%.2d"
+msgstr "Uptime %.2d:%.2d:%.2d"
+
+#: demos/dbaware/uReport.lfm
+msgid "返回主界面"
+msgstr "Back to the main screen"
+
+#: demos/procdemo/modules/umod_notes.lfm
+msgid "返回仪表盘"
+msgstr "Back to dashboard"
+
+#: demos/procdemo/modules/umod_notes.pas
+msgid "返回失败：没有注册名为 Dashboard 的窗体"
+msgstr "Navigation failed: no form named Dashboard is registered"
+
+#: demos/procdemo/modules/umod_dashboard.pas
+msgid "返回首页"
+msgstr "Back to home"
+
+#: demos/gallery/ugallery - 副本.pas
+msgid "这是 ShowMessage，浏览器端渲染成 Ext 窗口。"
+msgstr "This is ShowMessage, rendered as an Ext window in the browser."
+
+#: demos/dialogs/udialogs.pas
+msgid "这是一条来自服务端的消息。"
+msgstr "This is a message from the server."
+
+#: src/core/lwnewproject.pas
+msgid "这样服务端不需要任何图形环境，LCL 控件仍然真的。"
+msgstr "The server needs no graphical environment, yet the LCL controls are real."
+
+#: src/core/lwnewproject.pas
+msgid "这里没有一行 Web 代码：TButton / TEdit / TMemo 都是真实的 LCL 控件，"
+msgstr "There is not a single line of Web code here: TButton / TEdit / TMemo are real LCL controls, "
+
+#: demos/gallery/ugallery.pas
+msgid "进度"
+msgstr "Progress"
+
+#: demos/accel/uAccel.pas
+msgid "退出(&X)"
+msgstr "Exit(&X)"
+
+#: demos/dbaware/uAwareMain.lfm
+msgid "退出登录"
+msgstr "Sign out"
+
+#: demos/dbaware/uAwareMain.pas
+msgid "退货"
+msgstr "Return"
+
+#: demos/dbaware/uAwareMain.pas
+msgid "选中："
+msgstr "Selected: "
+
+#: demos/dbaware/uAwareMain.lfm
+msgid "选中：19:53:00"
+msgstr "Selected: 19:53:00"
+
+#: demos/dbaware/uAwareMain.lfm
+msgid "选中：2026-11-09"
+msgstr "Selected: 2026-11-09"
+
+#: demos/dialogs/udialogs.lfm
+msgid "选择一个文件（会先上传到服务端）"
+msgstr "Choose a file (uploaded to the server first)"
+
+#: demos/dialogs/udialogs.pas
+msgid "选择操作"
+msgstr "Choose an action"
+
+#: demos/gallery/ugallery.lfm
+msgid "选择文件上传…"
+msgstr "Choose a file to upload…"
+
+#: demos/files/uFileForm.lfm
+msgid "选择文件并上传…"
+msgstr "Choose a file and upload…"
+
+#: demos/procdemo/modules/umod_dashboard.pas
+msgid "都走 TLWApp.OpenForm(注册名)，本进程没有目标窗体时按 ini 的"
+msgstr "all go through TLWApp.OpenForm(name); when this process has no such form, the ini"
+
+#: src/core/lwapp.pas
+msgid "配置文件: %s"
+msgstr "Config file: %s"
+
+#: src/core/lwconfig.pas
+msgid "配置文件打不开:"
+msgstr "Cannot open config file: "
+
+#: src/core/lwconfig.pas
+msgid "配置文件过大，忽略:"
+msgstr "Config file too large; ignored: "
+
+#: src/core/lwlogin.pas
+msgid "重 置"
+msgstr "RESET"
+
+#: src/core/lwnewproject.pas
+msgid "重名（FPC 会报 Duplicate identifier），请换个名字，例如"
+msgstr "duplicate name (FPC reports Duplicate identifier); choose another, e.g."
+
+#: demos/multi/uMain.lfm
+msgid "重新加载"
+msgstr "Reload"
+
+#: demos/procdemo/modules/umod_reports.pas
+msgid "重新汇总"
+msgstr "Recalculate"
+
+#: demos/db/uDbMain.lfm
+msgid "重置"
+msgstr "Reset"
+
+#: src/core/lwdlg.pas
+msgid "重试"
+msgstr "Retry"
+
+#: demos/dbaware/uAwareMain.pas
+msgid "销量"
+msgstr "Volume"
+
+#: demos/dbaware/uAwareMain.lfm
+msgid "错误 Toast"
+msgstr "Error toast"
+
+#: src/core/lwapp.pas
+msgid "错误: 找不到配置文件 -> %s"
+msgstr "Error: config file not found -> %s"
+
+#: src/core/lwpanel.pas
+msgid "错误: 无法启动服务:"
+msgstr "Error: cannot start the service: "
+
+#: src/core/lwapp.pas
+msgid "错误: 项目根目录不存在 -> %s"
+msgstr "Error: project root does not exist -> %s"
+
+#: demos/gallery/ugallery.pas
+msgid "阶段"
+msgstr "Stage"
+
+#: demos/db/uDbMain.pas
+msgid "附件：%d 个 · 共 %d KB"
+msgstr "Attachments: %d · %d KB total"
+
+#: demos/db/uDbMain.pas
+msgid "附件：—"
+msgstr "Attachments: —"
+
+#: demos/db/uDbMain.pas
+msgid "附件：先选中一条商品"
+msgstr "Attachments: select a product first"
+
+#: demos/db/uDbMain.pas
+msgid "附件：暂无（点\"上传…\"添加）"
+msgstr "Attachments: none yet (click \"Upload...\" to add)"
+
+#: demos/dbaware/uAwareMain.lfm
+msgid "隐藏遮罩"
+msgstr "Hide mask"
+
+#: src/core/lwpanel.pas
+msgid "面板 ① 托盘图标已隐藏"
+msgstr "Panel 1: tray icon hidden"
+
+#: src/core/lwpanel.pas
+msgid "面板 ② 服务已停止"
+msgstr "Panel 2: service stopped"
+
+#: src/core/lwpanel.pas
+msgid "面板 ③ 已请求结束消息循环（500ms 未退则由看门狗强制结束）"
+msgstr "Panel 3: message loop stop requested (the watchdog forces it out if it does not exit within 500ms)"
+
+#: demos/accel/uAccel.pas
+msgid "页一(&1)"
+msgstr "Page one(&1)"
+
+#: demos/accel/uAccel.pas
+msgid "页二(&2)"
+msgstr "Page two(&2)"
+
+#: demos/controls/uControls.lfm
+msgid "颜色"
+msgstr "Color"
+
+#: demos/dbaware/uAwareMain.pas
+msgid "颜色："
+msgstr "Color: "
+
+#: demos/dbaware/uAwareMain.lfm
+msgid "颜色：clRed"
+msgstr "Color: clRed"
+
+#: demos/dbaware/uAwareMain.lfm
+msgid "饼图"
+msgstr "Pie chart"
+
+#: src/core/lwcaptcha.pas
+msgid "验证码"
+msgstr "Verification code"
+
+#: src/core/lwlogin.pas
+msgid "验证码错误，已换一张，请重新输入"
+msgstr "Wrong captcha — a new one was generated, please try again"
+
+#: src/core/lwlogin.pas
+msgid "默认主窗体未注册（TLWApp.Register）"
+msgstr "No default main form registered (TLWApp.Register)"
+
+#: demos/hello/uHello.pas
+msgid "！第"
+msgstr "! No. "
+
+#: demos/gallery/ugallery.lfm
+msgid "（上传落到 exe 旁 uploads\\<会话号>\\，服务端拿完整路径）"
+msgstr "(uploads land in uploads\\<session id>\\ next to the exe; the server gets the full path)"
+
+#: demos/dbaware/uReport.lfm
+msgid "（尚未生成）"
+msgstr "(not generated yet)"
+
+#: demos/db/uDbMain.pas
+msgid "（当前没有记录）"
+msgstr "(no records)"
+
+#: src/core/lwroute.pas
+msgid "（或正在重启）。请启动对应插件程序后"
+msgstr " (or restarting). Start that plugin program and then"
+
+#: demos/gallery/ugallery - 副本.pas
+msgid "（最后："
+msgstr "(last: "
+
+#: demos/menu_html/uMenuHtml.lfm
+msgid "（服务端生成 CSV，走框架的令牌下载通道）"
+msgstr "(the server builds the CSV and uses the framework's token download channel)"
+
+#: src/core/lwpanel.pas
+msgid "（点 X 隐藏到托盘，右键退出）"
+msgstr " (X hides it to the tray, right-click to exit)"
+
+#: demos/controls/uControls.pas
+msgid "（等待事件）"
+msgstr "(waiting for an event)"
+
+#: demos/menu_html/uMenuHtml.lfm
+msgid "（等待查询）"
+msgstr "(waiting for a query)"
+
+#: demos/hello/uHello.lfm
+msgid "（等待点击）"
+msgstr "(waiting for a click)"
+
+#: demos/menu_html/uMenuHtml.lfm
+msgid "（等待统计）"
+msgstr "(waiting for statistics)"
+
+#: demos/menu_tree/uMenuTree.lfm
+msgid "（节点路径）"
+msgstr "(node path)"
+
+#: demos/dialogs/udialogs.pas
+msgid "（超时或已关闭）"
+msgstr "(timed out or already closed)"
+
+#: demos/dialogs/udialogs.pas
+msgid "（返回/关闭）"
+msgstr "(returned/closed)"
+
+#: demos/files/uFileForm.pas
+msgid "（还没有上传）"
+msgstr "(nothing uploaded yet)"
+
+#: src/core/lwhttp.pas
+msgid "（部署目录需含 src/client/ 或 lw/"
+msgstr "(the deployment directory must contain src/client/ or lw/"
+
+#: demos/dbaware/uReport.pas
+msgid "）· 本报表由 lazarusWeb 生成，可用浏览器打印或另存为 PDF。"
+msgstr ") - this report was generated by lazarusWeb; print it or save it as PDF from the browser."
+
+#: src/core/lwroute.pas
+msgid "，但连接失败。"
+msgstr ", but the connection failed."
+
+#: src/core/lwhttp.pas
+msgid "，或把该文件拷到 exe 同目录）"
+msgstr ", or copy that file next to the exe)"
+
+#: src/core/lwhyper.pas
+msgid "，换版逐个重启 worker）"
+msgstr ", restart the workers one by one when rolling out a new version)"
+
+#: src/core/lwconfig.pas
+msgid "，改为自动查找 ext 目录"
+msgstr ", switching to auto-detect the ext directory"
+
+#: src/core/lwhyper.pas
+msgid "；lwhyper 已关闭 HTTPS，回退 HTTP 启动（请检查证书路径或改回 ssl=0）"
+msgstr "; lwhyper disabled HTTPS and falls back to HTTP (check the certificate paths or set ssl=0)"
+

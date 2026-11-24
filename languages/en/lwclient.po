@@ -1,0 +1,345 @@
+# lwclient —— lazarusWeb English translation
+# 由 tools/i18n/build_po.py 从 tools/i18n/en/*.tsv 生成
+# 空 msgstr = 沿用中文原文
+msgid ""
+msgstr ""
+"Project-Id-Version: lazarusWeb\n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=UTF-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+"Language: en\n"
+"X-Generator: lazarusWeb build_po.py\n"
+
+
+#: src/client/lw-alpine.js
+msgid "PDF：尚未指定文件"
+msgstr "PDF: no file specified"
+
+#: src/client/lw.js
+msgid "chart 构建失败"
+msgstr "chart failed to build"
+
+#: src/client/lw.js
+msgid "chart：当前 Ext 目录未提供 charts 包"
+msgstr "chart: the current Ext directory does not provide the charts package"
+
+#: src/client/lw.js
+msgid "。已改为「选择图片文件」，再点一次拍照按钮即可。"
+msgstr ". It now opens the file picker; tap the camera button again."
+
+#: src/client/lw-alpine.js
+msgid "上一条"
+msgstr "Previous"
+
+#: src/client/lw.js
+msgid "上一页"
+msgstr "Prev page"
+
+#: src/client/lw-alpine.js
+msgid "上传中"
+msgstr "Uploading"
+
+#: src/client/lw-alpine.js
+msgid "上传失败"
+msgstr "Upload failed"
+
+#: src/client/lw-alpine.js
+msgid "上传文件…"
+msgstr "Upload file…"
+
+#: src/client/lw-alpine.js
+msgid "下一条"
+msgstr "Next"
+
+#: src/client/lw.js
+msgid "下一页"
+msgstr "Next page"
+
+#: src/client/lw-alpine.js
+msgid "与服务端失去连接，正在重试…"
+msgstr "Lost connection to the server, retrying…"
+
+#: src/client/lw-alpine.js
+msgid "主题（可拖动）"
+msgstr "Theme (draggable)"
+
+#: src/client/lw-alpine.js
+msgid "亮色"
+msgstr "Light"
+
+#: src/client/lw-alpine.js
+msgid "会话已结束"
+msgstr "Session ended"
+
+#: src/client/lw-alpine.js
+msgid "会话已过期，正在重新连接…"
+msgstr "Session expired, reconnecting…"
+
+#: src/client/lw-alpine.js
+msgid "保存"
+msgstr "Save"
+
+#: src/client/lw-alpine.js
+msgid "保存中"
+msgstr "Saving"
+
+#: src/client/lw-alpine.js
+msgid "保存文件"
+msgstr "Save file"
+
+#: src/client/lw-alpine.js
+msgid "共"
+msgstr "Total "
+
+#: src/client/lw-alpine.js
+msgid "关闭"
+msgstr "Close"
+
+#: src/client/lw-alpine.js
+msgid "减少"
+msgstr "Decrease"
+
+#: src/client/lw-alpine.js
+msgid "删除"
+msgstr "Delete"
+
+#: src/client/lw-alpine.js
+msgid "刷新"
+msgstr "Refresh"
+
+#: src/client/lw-alpine.js
+msgid "取消"
+msgstr "Cancel"
+
+#: src/client/lw-alpine.js
+msgid "合计"
+msgstr "Total"
+
+#: src/client/lw-alpine.js
+msgid "增加"
+msgstr "Increase"
+
+#: src/client/lw-alpine.js
+msgid "墨绿夜色"
+msgstr "Forest night"
+
+#: src/client/lw.js
+msgid "尚未选择文件"
+msgstr "No file selected"
+
+#: src/client/lw-alpine.js
+msgid "已改为「选择图片文件」，再点一次拍照按钮即可。"
+msgstr "Switched to \"choose an image file\" — click the camera button again."
+
+#: src/client/lw-alpine.js
+msgid "平均"
+msgstr "Average"
+
+#: src/client/lw-alpine.js
+msgid "当前页面不能调用摄像头（网页需为 HTTPS 或 localhost）"
+msgstr "This page cannot use the camera (it needs HTTPS or localhost)"
+
+#: src/client/lw-alpine.js
+msgid "打开文件"
+msgstr "Open file"
+
+#: src/client/lw-alpine.js
+msgid "护眼绿"
+msgstr "Mint green"
+
+#: src/client/lw-alpine.js
+msgid "拍摄"
+msgstr "Capture"
+
+#: src/client/lw-alpine.js
+msgid "拍照…"
+msgstr "Take photo…"
+
+#: src/client/lw-alpine.js
+msgid "提示"
+msgstr "Info"
+
+#: src/client/lw-alpine.js
+msgid "插入"
+msgstr "Insert"
+
+#: src/client/lw-alpine.js
+msgid "摄像头刚打开，稍等一下再拍。"
+msgstr "The camera is warming up; try again in a moment."
+
+#: src/client/lw.js
+msgid "文件名"
+msgstr "File name"
+
+#: src/client/lw-alpine.js
+msgid "无法创建会话："
+msgstr "Cannot create session: "
+
+#: src/client/lw-alpine.js
+msgid "无法打开摄像头"
+msgstr "Cannot open the camera"
+
+#: src/client/lw-alpine.js
+msgid "最后一条"
+msgstr "Last"
+
+#: src/client/lw-alpine.js
+msgid "最大化"
+msgstr "Maximize"
+
+#: src/client/lw-alpine.js
+msgid "服务端返回 HTTP"
+msgstr "Server returned HTTP "
+
+#: src/client/lw-alpine.js
+msgid "未知错误"
+msgstr "unknown error"
+
+#: src/client/lw.js
+msgid "末页"
+msgstr "Last page"
+
+#: src/client/lw-alpine.js
+msgid "条"
+msgstr " item(s)"
+
+#: src/client/lw-alpine.js
+msgid "正在上传…"
+msgstr "Uploading… "
+
+#: src/client/lw-alpine.js
+msgid "正在创建服务端会话…"
+msgstr "Creating server session…"
+
+#: src/client/lw-alpine.js
+msgid "浏览器拒绝了摄像头权限（可点地址栏左侧的摄像头图标重新允许）"
+msgstr "The browser denied camera access (click the camera icon at the left of the address bar to allow it)"
+
+#: src/client/lw-alpine.js
+msgid "消息"
+msgstr "Message"
+
+#: src/client/lw-alpine.js
+msgid "深色"
+msgstr "Dark"
+
+#: src/client/lw-alpine.js
+msgid "深蓝夜色"
+msgstr "Midnight blue"
+
+#: src/client/lw-alpine.js
+msgid "画面还没准备好"
+msgstr "Frame not ready"
+
+#: src/client/lw-alpine.js
+msgid "看不清？点击换一张"
+msgstr "Hard to read? Click for another one"
+
+#: src/client/lw-alpine.js
+msgid "确定"
+msgstr "OK"
+
+#: src/client/lw-alpine.js
+msgid "确认"
+msgstr "Confirm"
+
+#: src/client/lw-alpine.js
+msgid "窗体已全部关闭。服务端仍在运行时，刷新本页可重新进入。"
+msgstr "All windows are closed. If the server is still running, reload this page to re-enter."
+
+#: src/client/lw-alpine.js
+msgid "第"
+msgstr "Page "
+
+#: src/client/lw-alpine.js
+msgid "第一条"
+msgstr "First"
+
+#: src/client/lw-alpine.js
+msgid "米黄纸张"
+msgstr "Paper"
+
+#: src/client/lw-alpine.js
+msgid "编辑"
+msgstr "Edit"
+
+#: src/client/lw-alpine.js
+msgid "网络错误"
+msgstr "Network error"
+
+#: src/client/lw-alpine.js
+msgid "网络错误，文件没有传到服务端"
+msgstr "Network error: the file did not reach the server"
+
+#: src/client/lw-alpine.js
+msgid "警告"
+msgstr "Warning"
+
+#: src/client/lw-alpine.js
+msgid "计数"
+msgstr "Count"
+
+#: src/client/lw-alpine.js
+msgid "跟随系统"
+msgstr "Follow system"
+
+#: src/client/lw-alpine.js
+msgid "输入"
+msgstr "Input"
+
+#: src/client/lw-alpine.js
+msgid "输入关键字后回车…"
+msgstr "Type a keyword and press Enter…"
+
+#: src/client/lw-alpine.js
+msgid "过滤:"
+msgstr "Filter: "
+
+#: src/client/lw-alpine.js
+msgid "还原"
+msgstr "Restore"
+
+#: src/client/lw-alpine.js
+msgid "这台电脑上没有检测到摄像头"
+msgstr "No camera was detected on this computer"
+
+#: src/client/lw-alpine.js
+msgid "选择图片"
+msgstr "Choose image"
+
+#: src/client/lw.js
+msgid "选择文件…"
+msgstr "Choose file…"
+
+#: src/client/lw.js
+msgid "选择颜色"
+msgstr "Pick a color"
+
+#: src/client/lw-alpine.js
+msgid "配色："
+msgstr "Theme: "
+
+#: src/client/lw-alpine.js
+msgid "错误"
+msgstr "Error"
+
+#: src/client/lw-alpine.js
+msgid "页 · 共"
+msgstr " of "
+
+#: src/client/lw.js
+msgid "首页"
+msgstr "First page"
+
+#: src/client/lw-alpine.js
+msgid "验证码"
+msgstr "Captcha"
+
+#: src/client/lw-alpine.js
+msgid "高对比"
+msgstr "High contrast"
+
+#: src/client/lw-alpine.js
+msgid "（点击切换）"
+msgstr " (click to switch)"
+
