@@ -28,5 +28,5 @@ echo "=== host ==="
 
 echo
 echo "run:  $HERE/host/pluginsdemo"
-echo "open: http://127.0.0.1:8878/"
+echo "open: https://127.0.0.1:8878/"
 echo "hint: plugin exe refuses to run on its own (start guard)"

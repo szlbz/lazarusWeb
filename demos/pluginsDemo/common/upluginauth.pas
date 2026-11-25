@@ -65,6 +65,13 @@ const
 { 账号口令校验。True 时 ARoles/ADisplay 是账号的角色与中文名 }
 function LWAuthLogin(const AUser, APass: string;
   out ARoles, ADisplay, AErr: string): Boolean;
+{ 挑战-响应版（TLWLoginForm.SecureLogin=True 时用）：
+  AUserHash/APassHash 是浏览器上报的 SHA256(令牌|值)，ANonce 是
+  TLWLoginForm.LoginNonce。服务端拿同一令牌复算账户名与口令的摘要比对；
+  用户名大小写不敏感（双方都转小写），口令大小写敏感。
+  命中时 ARealUser 返回真实登录名 —— 会话变量必须写它，不能写哈希。 }
+function LWAuthLoginHashed(const AUserHash, APassHash, ANonce: string;
+  out ARealUser, ARoles, ADisplay, AErr: string): Boolean;
 { 角色串里是否含某个角色（逗号分隔，忽略大小写与空格） }
 function LWAuthHasRole(const ARoles, ARole: string): Boolean;
 { 当前角色能不能打开需要 ANeed 的插件。ANeed 空 = 所有已登录用户 }
@@ -241,6 +248,49 @@ begin
       Exit(True);
     end;
   { 不区分"用户不存在"和"口令错误"：别让人拿错误提示枚举账号 }
+  AErr := '用户名或密码错误';
+end;
+
+function LWAuthLoginHashed(const AUserHash, APassHash, ANonce: string;
+  out ARealUser, ARoles, ADisplay, AErr: string): Boolean;
+var
+  i: Integer;
+  uh: string;
+begin
+  ARealUser := '';
+  ARoles := '';
+  ADisplay := '';
+  AErr := '';
+  Result := False;
+  if (ANonce = '') or (AUserHash = '') then
+  begin
+    AErr := '登录参数不完整（挑战令牌缺失）';
+    Exit;
+  end;
+
+  { 用户名也是哈希，无法按名字直接查表：逐个账户复算摘要匹配。
+    账户量小（演示 3 个）无所谓；真实项目应在库里存
+    SHA256(盐|用户名) 的索引列，或退回"用户名明文 + 只哈希口令"。 }
+  for i := Low(LWAuthAccounts) to High(LWAuthAccounts) do
+  begin
+    uh := LWSha256Hex(ANonce + '|' +
+      LowerCase(Trim(LWAuthAccounts[i].User)));
+    if not SameText(uh, AUserHash) then
+      Continue;
+
+    if not SameText(LWSha256Hex(ANonce + '|' + LWAuthAccounts[i].Pass),
+      APassHash) then
+    begin
+      AErr := '用户名或密码错误';
+      Exit;
+    end;
+
+    ARealUser := LWAuthAccounts[i].User;
+    ARoles := LWAuthAccounts[i].Roles;
+    ADisplay := LWAuthAccounts[i].Display;
+    Exit(True);
+  end;
+
   AErr := '用户名或密码错误';
 end;
 

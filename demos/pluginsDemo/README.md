@@ -131,7 +131,8 @@ Linux/macOS 用 `bash build.sh`（或 `chmod +x build.sh` 后直接执行）；
 **改了 `common\upluginguard.pas`（守卫/口令）要全部重编**：宿主和三个插件都链接它，
 只重编一边会出现「令牌对不上，插件起不来」。`build.bat` / `build.sh` 已经按顺序全编。
 
-浏览器打开 <http://127.0.0.1:8878/>，**先看到登录页**：admin / analyst / guest
+浏览器打开 <https://127.0.0.1:8878/>（**已启用 TLS**，自签证书首次访问点「继续访问」），
+**先看到登录页**：admin / analyst / guest
 （口令见 `common\upluginauth.pas` 的 `LWAuthDemoPass`）。登录后默认打开当前账号
 能访问的第一个插件页，不同账号看到的侧栏项数不同（见下面「用户权限」）。
 点左侧其它插件会在右侧**新增页签**；同一插件重复点击只切回已有页签。
@@ -166,8 +167,12 @@ API 调用按页面路径自动带 `/p/notes/` 前缀，代理后原样回插件
 | token 对得上 | `token = SHA1(secret|nonce)`，secret 只在宿主与插件里（十六进制存放，不出明文） |
 | 父进程是宿主 | Windows 下取父进程 exe 名，与 `--lw-plug-host` 比对 |
 
-任何一条不过：往 stderr 打提示 + 弹消息框 + 写 `plugin-guard.log`（在插件 exe 同目录），
-然后 `Halt(3)`。宿主的 `StartOne` 看到退出码 3 会在日志里注明「被启动守卫拦了」。
+任何一条不过：都往 stderr 打提示 + 写 `plugin-guard.log`（在插件 exe 同目录），然后
+`Halt(3)`（退出码 3）；宿主的 `StartOne` 看到退出码 3 会在日志里注明「被启动守卫拦了」。
+**只有 `missing`（一条令牌参数都没带，典型场景是用户双击插件 exe）才弹消息框** ——
+`stale` / `badtoken` / `nothost` 这些「带了参数但不对」的情况只写 stderr + 日志，不弹框，
+免得宿主正等端口时被一个没人点的模态框卡住（见 `common\upluginguard.pas` 的 `showBox := reason = 'missing'`）。
+脚本/CI 里连双击场景也想静默，设 `LW_PLUGIN_GUARD_NOUI=1`。
 
 插件这边只需要在 `.lpr` 的 `begin` 第一句加：
 
@@ -183,7 +188,8 @@ dashplug.exe
 rem 弹出「『仪表盘』是 lazarusWeb 的插件程序，不能单独运行。」，控制台 exit 3
 rem 插件目录下多一行 plugin-guard.log：  ...  pid=1234  missing
 
-rem 脚本/CI 里不想弹窗（只写 stderr 与日志）：
+rem 带错令牌（badtoken）本来就不弹窗，只写 stderr 与日志（退出码 3）；
+rem 双击那种 missing 场景在脚本/CI 里想静默，设 LW_PLUGIN_GUARD_NOUI=1：
 set LW_PLUGIN_GUARD_NOUI=1
 dashplug.exe --lw-plug-nonce=1795482878-deadbeef --lw-plug-token=0000 --lw-plug-host=dashplug.exe
 echo %ERRORLEVEL%      rem 3，日志里是 badtoken
@@ -234,6 +240,7 @@ echo %ERRORLEVEL%      rem 3，日志里是 badtoken
 ```bat
 pluginsdemo.exe --port=8878 --no-captcha
 rem 或 set LW_LOGIN_NO_CAPTCHA=1
+rem 访问地址仍为 https://127.0.0.1:8878/（TLS 由 pluginsdemo.ini 开启）
 ```
 
 注意：**只把控件 `Visible := False` 不等于关闭验证码** —— 基类仍会拿空输入
@@ -254,7 +261,7 @@ set LW_CAPTCHA_DEBUG=1
                               （Session.SessionSetVar，不是全局变量：同一进程
                               里多个浏览器是不同用户，全局变量会串号）
 菜单   umain.BuildMenu        逐个插件 LWAuthCanOpen(本会话角色, 清单 roles)，
-                              无权限的项根本不进侧栏，菜单头显示「可见 2 / 共 3」
+                              无权限的项根本不进侧栏，菜单头显示「插件导航（2 / 共 3）」
 路由   src\core\lwroute.pas   /p/<名>/ 代理之前调 LWAuthGuard（宿主注册），
                               无权限直接 403，请求不会到达插件进程
 ```
@@ -352,6 +359,28 @@ rem 2) 回到浏览器点「便签」菜单：状态栏提示已热更新，pid 
 
 便签数据写在插件 exe 同目录（`.run\notesplug.notes.txt`），所以热更新重启
 进程后已保存的便签仍在 —— 用来直观区分「代码换了」和「数据丢了」。
+
+## 传输加密
+
+`host/pluginsdemo.ini` 已开启 TLS：
+
+```ini
+ssl=1
+sslcert=..\..\..\cert-ca\server-chain.pem
+sslkey=..\..\..\cert-ca\server.key
+```
+
+两层防护：
+
+1. **链路**：整条浏览器链路走 HTTPS / WSS，局域网抓包读不出载荷；
+   证书 SAN 含 `localhost` 与 `127.0.0.1`，自签证书首次访问浏览器会告警，
+   点「继续访问」即可。
+2. **字段**：`host/ulogin.pas` 已设 `SecureLogin := True`，浏览器把
+   用户名 / 口令 / 验证码换成 `SHA256(验证码令牌|值)` 再上报；令牌一次
+   即废，抓到的摘要不能换会话重放，口令原文不出浏览器。
+
+`--no-captcha` 时没有令牌，自动退回明文登录（自动化测试不受影响）。
+详见 `docs/登录凭据传输安全分析.md`。
 
 ## 端口
 

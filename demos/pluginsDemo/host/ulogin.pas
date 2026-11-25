@@ -69,6 +69,12 @@ begin
   if not LoginCaptchaDisabled then
     AddCaptchaHint;
 
+  { 登录字段挑战-响应：浏览器把 用户名/口令/验证码 换成
+    SHA256(验证码令牌|值) 再上报，口令原文不出浏览器；
+    令牌随验证码一次作废，抓包也无法重放。
+    必须开着验证码（令牌来源）；--no-captcha 时自动退回明文。 }
+  SecureLogin := True;
+
   OnLogin := @DoAuth;
 end;
 
@@ -120,9 +126,18 @@ end;
 procedure TLoginForm.DoAuth(Sender: TObject; const AUser, APass: string;
   var AOk: Boolean; var AErr: string);
 var
-  roles, disp: string;
+  roles, disp, realUser: string;
 begin
-  AOk := LWAuthLogin(AUser, APass, roles, disp, AErr);
+  { 挑战-响应模式下 AUser/APass 都是摘要，必须用 LoginNonce 复算比对；
+    明文模式（--no-captcha 或窗体重构关掉验证码）走原路径 }
+  if SecureLoginActive then
+    AOk := LWAuthLoginHashed(AUser, APass, LoginNonce, realUser, roles, disp, AErr)
+  else
+  begin
+    AOk := LWAuthLogin(AUser, APass, roles, disp, AErr);
+    realUser := Trim(AUser);
+  end;
+
   if not AOk then
   begin
     { 错误提示里带点线索，省得演示时反复试密码 }
@@ -131,9 +146,10 @@ begin
     Exit;
   end;
   { 写会话变量：菜单过滤（LWAuthSessionRoles）和 /p/ 鉴权（LWAuthRolesForSid）
-    都从这里取。写全局变量会把 A 用户的身份带给同一进程里的 B 用户 }
-  LWAuthSessionSet(Trim(AUser), roles);
-  LWLogFmt('[pluginsDemo] 登录成功 user=%s roles=%s', [Trim(AUser), roles]);
+    都从这里取。安全模式下 AUser 是摘要，必须写 ARealUser —— 否则顶栏、
+    插件身份头和权限日志里全是哈希串。 }
+  LWAuthSessionSet(realUser, roles);
+  LWLogFmt('[pluginsDemo] 登录成功 user=%s roles=%s', [realUser, roles]);
 end;
 
 end.
