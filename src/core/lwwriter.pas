@@ -89,6 +89,38 @@ type
 { 临时剖析：按 kind 打印耗时（LW_KIND_PROF=1 时才有数据）}
 procedure LWKindProfReport;
 
+{ ---------------- 第三方控件绑定（运行期登记） ----------------
+
+  KindOf 是一条编译期写死的 if 链，第三方控件没法"在外面写代码"接进来。
+  这里开一张运行期登记表：业务工程在 TLWApp.Run 之前登记一次，就能让
+  某个第三方类按指定 kind 下发，核心包不必为此引入第三方包依赖。
+
+  AProps 为 nil 时只做 kind 映射——前提是该 kind 的浏览器渲染器只依赖
+  基类属性（如 'label'）；有专属字段要下发时由回调自己往节点里写。
+
+  匹配规则：沿 C 的类继承链从最派生往祖先走，第一个登记过的类胜出。
+  所以 TMyChart 与 TChart 同时登记时，TMyChart 命中它自己那条。
+
+  ⚠️ 登记必须发生在第一批请求之前（Run 之前）。表是只增链表，
+     运行期读不加锁、节点永不释放，登记后有并发请求也不会读到半截数据。 }
+
+type
+  TLWKindPropsProc = procedure(C: TControl; O: TJSONObject);
+
+procedure LWRegisterControlKind(AClass: TClass; const AKind: string;
+  AProps: TLWKindPropsProc = nil);
+{ 按登记表查 C 命中哪个 kind；未登记返回空串 }
+function LWRegisteredKind(C: TControl): string;
+
+{ 通用属性桥：按属性名把 published 属性读进 JSON 节点。
+  字段名 = 属性名小写（前端按小写取值），取值规则：
+    字符串 -> string；整数/浮点 -> number；布尔 -> bool；
+    枚举 -> 名字串（TColor 特判成 #rrggbb）；TStrings -> 字符串数组；
+    其余对象类属性（TFont/TPicture…）跳过，避免把整棵对象图拖进载荷。
+  读不到的属性静默跳过：第三方控件的 published 表随版本变，不能因此失败。 }
+procedure LWBindPublishedProps(C: TControl; O: TJSONObject;
+  const AProps: array of string);
+
 implementation
 
 type
@@ -199,8 +231,132 @@ begin
   Result := Result or C.ClassNameIs('TNoteBookStringsTabControl');
 end;
 
-function KindOf(C: TControl): string;
+{ ---------------- 第三方控件登记表（只增链表，节点不释放） ---------------- }
+
+type
+  PLWKindEntry = ^TLWKindEntry;
+  TLWKindEntry = record
+    Cls: TClass;
+    Kind: string;
+    Props: TLWKindPropsProc;
+    Next: PLWKindEntry;
+  end;
+
+var
+  GLwKindHead: PLWKindEntry = nil;
+
+procedure LWRegisterControlKind(AClass: TClass; const AKind: string;
+  AProps: TLWKindPropsProc);
+var
+  e: PLWKindEntry;
 begin
+  if (AClass = nil) or (AKind = '') then Exit;
+  New(e);
+  e^.Cls := AClass;
+  e^.Kind := AKind;
+  e^.Props := AProps;
+  { 头插。登记只在 Run 之前发生（单线程），读者要么看到空表，
+    要么看到一条字段已写完的完整节点；节点永不释放，所以无需加锁 }
+  e^.Next := GLwKindHead;
+  GLwKindHead := e;
+end;
+
+{ 沿类继承链从最派生往祖先找，第一个命中即返回 —— 派生类自动优先 }
+function LwFindKindEntry(C: TControl): PLWKindEntry;
+var
+  p: TClass;
+  e: PLWKindEntry;
+begin
+  Result := nil;
+  if (C = nil) or (GLwKindHead = nil) then Exit;
+  p := C.ClassType;
+  while p <> nil do
+  begin
+    e := GLwKindHead;
+    while e <> nil do
+    begin
+      if e^.Cls = p then Exit(e);
+      e := e^.Next;
+    end;
+    p := p.ClassParent;
+  end;
+end;
+
+function LWRegisteredKind(C: TControl): string;
+var
+  e: PLWKindEntry;
+begin
+  e := LwFindKindEntry(C);
+  if e <> nil then Result := e^.Kind else Result := '';
+end;
+
+procedure LWBindPublishedProps(C: TControl; O: TJSONObject;
+  const AProps: array of string);
+var
+  i, j: Integer;
+  pi: PPropInfo;
+  pt: PTypeInfo;
+  obj: TObject;
+  ts: TStrings;
+  arr: TJSONArray;
+  key: string;
+begin
+  if (C = nil) or (O = nil) then Exit;
+  for i := Low(AProps) to High(AProps) do
+  begin
+    pi := GetPropInfo(C, AProps[i]);
+    if pi = nil then Continue;
+    pt := pi^.PropType;
+    key := LowerCase(pi^.Name);
+    try
+      case pt^.Kind of
+        tkSString, tkAString, tkUString, tkWString, tkLString:
+          O.Add(key, GetStrProp(C, pi));
+        tkBool:
+          O.Add(key, GetOrdProp(C, pi) <> 0);
+        tkInteger:
+          O.Add(key, GetOrdProp(C, pi));
+        tkInt64, tkQWord:
+          O.Add(key, GetInt64Prop(C, pi));
+        tkFloat:
+          O.Add(key, GetFloatProp(C, pi));
+        tkEnumeration:
+          { TColor 是枚举的别名，直接发名字前端认不出颜色 }
+          if pt = TypeInfo(TColor) then
+            O.Add(key, ColorToCSS(TColor(GetOrdProp(C, pi))))
+          else
+            O.Add(key, GetEnumName(pt, GetOrdProp(C, pi)));
+        tkClass:
+          begin
+            obj := GetObjectProp(C, pi);
+            if obj is TStrings then
+            begin
+              ts := TStrings(obj);
+              arr := TJSONArray.Create;
+              for j := 0 to ts.Count - 1 do
+                arr.Add(ts[j]);
+              O.Add(key, arr);
+            end;
+          end;
+      else
+        { tkSet / tkMethod / 其它对象类属性：不下发 }
+      end;
+    except
+      on E: Exception do
+        LWLogFmt('[bind] 属性 %s 读取失败（%s）: %s',
+          [pi^.Name, C.ClassName, E.Message]);
+    end;
+  end;
+end;
+
+function KindOf(C: TControl): string;
+var
+  e: PLWKindEntry;
+begin
+  { 第三方登记优先：登记过的类直接用自己的 kind，不进下面这条长链，
+    也就不受"派生类必须排在祖先之前"的顺序约束 }
+  e := LwFindKindEntry(C);
+  if e <> nil then Exit(e^.Kind);
   { DB 感知控件必须排在同族的普通控件之前判断：
     TDBEdit/TDBMemo/TDBCheckBox/TDBComboBox 都不是 TEdit/TMemo/TCheckBox/TComboBox，
     但保持这个顺序可以避免以后换实现时踩坑 }
@@ -1452,7 +1608,16 @@ var
   fm: TCustomForm;
   i, j: Integer;
   pvComp: TComponent;
+  ke: PLWKindEntry;
 begin
+  { 第三方登记的回调优先：命中且带回调时，节点字段完全由业务侧写，
+    不再走下面的内建分支（内建分支里的类型强转会不成立） }
+  ke := LwFindKindEntry(C);
+  if (ke <> nil) and Assigned(ke^.Props) then
+  begin
+    ke^.Props(C, O);
+    Exit;
+  end;
   { TStaticText 与 TLabel 在浏览器端都渲染成一块文字（前端 kind 分别是
     static / label），共用这里输出的 text。之前这里只判 'label'，
     'static' 节点因此没有 text 字段，前端 x-text 绑到空串、控件整个看不见
@@ -2271,6 +2436,11 @@ begin
   end;
   o.Add('modal', AIsModal);
   o.Add('modalresult', AForm.ModalResult);
+  { 登录字段挑战-响应：前端据此把 edUser/edPass/edCode 换成 SHA256(令牌|值)。
+    走 TLWForm 的虚方法而不是判断 TLWLoginForm，避免 writer 反向依赖
+    lwlogin（lwwriter -> lwlogin -> lwapp -> lwhttp 会成环）。 }
+  if (AForm is TLWForm) and TLWForm(AForm).SecureLoginActive then
+    o.Add('securelogin', True);
   o.Add('fg', ColorToCSS(AForm.Font.Color));
   o.Add('bg', ColorToCSS(AForm.Color));
   { 浏览器端配色：auto / light / dark（Alpine 渲染层认这个键；

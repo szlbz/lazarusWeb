@@ -56,6 +56,8 @@ type
     FLoginCodeEdit: TEdit;   { 显式指定验证码输入框 }
     FRequireCaptcha: Boolean;
     FAutoBuildUI: Boolean;
+    FSecureLogin: Boolean;
+    function GetLoginNonce: string;
     function GetUserEdit: TEdit;
     function GetPassEdit: TEdit;
     function GetCodeEdit: TEdit;
@@ -75,6 +77,9 @@ type
     procedure TryLogin;
     { 换一张验证码（作废旧答案）；frontend 的 img 会跟着重拉 }
     procedure RefreshCaptcha;
+    { 登录字段挑战-响应是否真正生效：开了 SecureLogin 且有验证码控件
+      （令牌来源）。writer 用它决定前端是否哈希三个字段 }
+    function SecureLoginActive: Boolean; override;
     property UserEdit: TEdit read GetUserEdit;
     property PassEdit: TEdit read GetPassEdit;
     { 验证码输入框（约定名 edCode / 名字含 code / 除账号密码外的第一个编辑框）}
@@ -89,6 +94,15 @@ type
       或 FormCreate 里自己建的）时本属性不起作用 —— 它只在"一个控件
       都没有"时兜底。不想用就在 FormCreate 里置 False }
     property AutoBuildUI: Boolean read FAutoBuildUI write FAutoBuildUI default True;
+    { 登录字段挑战-响应（默认关）。开启后浏览器把 用户名/口令/验证码 都换成
+      SHA256(令牌|值) 再上报，服务端拿同一令牌复算比对：抓包看不到原文，
+      令牌随验证码一次性作废，也无法重放。
+      依赖验证码控件提供令牌；窗体没有 TLWCaptcha 时自动退回明文（日志告警），
+      因为挑战值必须是一次性的，不能拿固定串充数。 }
+    property SecureLogin: Boolean read FSecureLogin write FSecureLogin default False;
+    { 当前挑战令牌（= 验证码令牌）。OnLogin 里要用它做哈希比对；
+      未开启 SecureLogin 或没有验证码控件时返回空串。 }
+    property LoginNonce: string read GetLoginNonce;
   published
     { 是否校验图形验证码（默认 True）。窗体上没有 TLWCaptcha 时自动跳过 ——
       老工程不受影响，拖一个控件上去就生效 }
@@ -103,7 +117,7 @@ type
 implementation
 
 uses
-  lwapp;
+  lwapp, lwrlog;
 
 constructor TLWLoginForm.CreateNew(AOwner: TComponent; Num: Integer);
 begin
@@ -111,6 +125,26 @@ begin
   { published 的 default True 只是流式标记，字段本身要在这里初始化 }
   FRequireCaptcha := True;
   FAutoBuildUI := True;
+  FSecureLogin := False;
+end;
+
+function TLWLoginForm.GetLoginNonce: string;
+var
+  cap: TLWCaptcha;
+begin
+  Result := '';
+  if not (FSecureLogin and FRequireCaptcha) then
+    Exit;
+  cap := GetCaptcha;
+  if cap <> nil then
+    Result := cap.Token;
+end;
+
+function TLWLoginForm.SecureLoginActive: Boolean;
+begin
+  { 必须真的在验码：--no-captcha 只是把控件藏起来，控件对象还在；
+    少了 FRequireCaptcha 就会"前端明文、服务端按哈希比对"，登录必失败 }
+  Result := FSecureLogin and FRequireCaptcha and (GetCaptcha <> nil);
 end;
 
 { 自动补建：只有"设计期一个控件都没放"的登录窗体才走这里。
@@ -305,7 +339,7 @@ procedure TLWLoginForm.TryLogin;
 var
   S: TLWSessionBase;
   u, p, err, code: string;
-  ok: Boolean;
+  ok, capOk: Boolean;
   main: TCustomForm;
   cap: TLWCaptcha;
 begin
@@ -325,7 +359,13 @@ begin
     begin
       code := '';
       if GetCodeEdit <> nil then code := GetCodeEdit.Text;
-      if not LWCaptchaCheck(cap.Token, code) then
+      { 安全模式下 code 是 SHA256(令牌|大写输入)，由服务端复算答案比对；
+        明文模式保持原逻辑。两条路都一验即废令牌。 }
+      if FSecureLogin then
+        capOk := LWCaptchaCheckHashed(cap.Token, code)
+      else
+        capOk := LWCaptchaCheck(cap.Token, code);
+      if not capOk then
       begin
         { 一枚码只试一次：失败立即换图并清空输入框，
           用户不必手动点图，也不可能拿同一张图反复试 }
@@ -335,7 +375,11 @@ begin
       end;
       { 校验通过后把输入框清掉：这张图已作废，留着旧码只会误导用户 }
       if GetCodeEdit <> nil then GetCodeEdit.Text := '';
-    end;
+    end
+    else if FSecureLogin then
+      { 没有令牌就没有一次性挑战值，硬哈希只会让所有登录失败；
+         退回明文并明确告警，而不是静默降级 }
+      LWLogRaw('警告: SecureLogin=True 但登录窗体没有 TLWCaptcha，本次登录退回明文传输');
   end;
 
   ok := False;

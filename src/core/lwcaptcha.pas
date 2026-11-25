@@ -70,6 +70,11 @@ procedure LWCaptchaPng(const AToken: string; ALen, AWidth, AHeight: Integer;
   结果无论对错，该令牌的答案都作废 —— 一枚码只允许试一次。 }
 function LWCaptchaCheck(const AToken, AInput: string): Boolean;
 
+{ 校验挑战-响应版：AInputHash = SHA256(AToken|大写去空格后的输入)。
+  答案同样按 SHA256(AToken|大写答案) 复算比对；令牌一次即作废。
+  登录字段加密开启时由 TLWLoginForm.TryLogin 调用，明文输入不再进服务端。 }
+function LWCaptchaCheckHashed(const AToken, AInputHash: string): Boolean;
+
 { 作废某令牌的答案（不影响令牌本身）。 }
 procedure LWCaptchaDrop(const AToken: string);
 
@@ -79,7 +84,7 @@ function LWCaptchaPeek(const AToken: string): string;
 implementation
 
 uses
-  FPImage, FPWritePNG;
+  FPImage, FPWritePNG, lwbase;
 
 const
   { 去掉肉眼易混的 0/O/1/I/L 之外的字符…… 实际保留 L（它在 5x7 里和 1 差得远），
@@ -240,6 +245,32 @@ begin
     if code <> '' then
     begin
       Result := SameText(code, s);
+      GCaptchaCodes.Delete(GCaptchaCodes.IndexOfName(AToken));
+    end;
+  finally
+    GCaptchaLock.Leave;
+  end;
+end;
+
+function LWCaptchaCheckHashed(const AToken, AInputHash: string): Boolean;
+var
+  code, expect: string;
+begin
+  Result := False;
+  if (AToken = '') or (AInputHash = '') then
+  begin
+    LWCaptchaDrop(AToken);
+    Exit;
+  end;
+  code := '';
+  GCaptchaLock.Enter;
+  try
+    code := GCaptchaCodes.Values[AToken];
+    { 与明文版同样的"一次即废"：无论对错都删令牌，杜绝同一张图反复试 }
+    if code <> '' then
+    begin
+      expect := LWSha256Hex(AToken + '|' + UpperCase(Trim(code)));
+      Result := SameText(expect, AInputHash);
       GCaptchaCodes.Delete(GCaptchaCodes.IndexOfName(AToken));
     end;
   finally

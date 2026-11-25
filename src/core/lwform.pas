@@ -58,6 +58,10 @@ type
     function IsWebModal: Boolean;
     { 浏览器端是否已显示这个窗体（由会话维护，VCL 的 Visible 不参与） }
     property WebVisible: Boolean read FWebVisible write FWebVisible;
+    { 登录字段是否要求挑战-响应。基类恒 False；TLWLoginForm 在开启
+      SecureLogin 且窗体带验证码时覆盖为 True。writer 只依赖 lwform，
+      不引用 lwlogin —— 否则 lwwriter -> lwlogin -> lwapp -> lwhttp 成环。 }
+    function SecureLoginActive: Boolean; virtual;
 
     { 让浏览器下载服务端上的一个文件。
       路径不会出现在 URL 里：先在 lwdownload 里换成一次性令牌，
@@ -143,6 +147,11 @@ var
 begin
   S := LWCurrentSession;
   Result := (S <> nil) and S.SessionIsModal(Self);
+end;
+
+function TLWForm.SecureLoginActive: Boolean;
+begin
+  Result := False;
 end;
 
 procedure TLWForm.SendFile(const AFileName, ADownloadName: string);

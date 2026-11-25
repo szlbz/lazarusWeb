@@ -1510,7 +1510,11 @@ begin
     Name := 'lwlang';
     Value := ALang;
     Path := '/';
+    {$IF FPC_FULLVERSION >= 30301}
     MaxAge := 31536000;
+    {$else}
+    Expires := Now + 365;
+    {$endif}
     SameSite := ssLax;
   end;
 end;

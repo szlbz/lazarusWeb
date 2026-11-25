@@ -118,6 +118,10 @@ function LWResolveExeRelativePath(const APath: string): string;
 { HTTPS 证书参数校验：证书和私钥必须同时给或同时不给；给了就必须存在。
   AErr 返回可直接打印的中文错误。调用前建议先 LWResolveExeRelativePath。 }
 function LWValidateTLSFiles(const ACert, AKey: string; out AErr: string): Boolean;
+{ SHA-256（小写十六进制）。用于登录字段的挑战-响应：前端把
+  SHA256(token|值) 当口令上报，服务端用同一 token 复算比对。
+  输入按 UTF-8 字节处理；自包含实现，避免 lwcore 依赖 fcl-hash。 }
+function LWSha256Hex(const AText: string): string;
 { 上传/浏览器选文件等服务端落地文件的根目录：默认 <exe目录>/uploads/，
   与"配置文件保存到 exe 目录"的部署约定一致；exe 旁不可写时自动退回
   <临时目录>/uploads/。部署/业务可在启动早期赋 LWUploadRoot 覆盖。 }
@@ -558,6 +562,89 @@ procedure LWLCLLeave;
 begin
   if GLCLGateReady then
     LeaveCriticalSection(GLCLGate);
+end;
+
+{ ---------------- SHA-256 ---------------- }
+
+function LWSha256Hex(const AText: string): string;
+const
+  K: array[0..63] of LongWord = (
+    $428a2f98, $71374491, $b5c0fbcf, $e9b5dba5, $3956c25b, $59f111f1, $923f82a4, $ab1c5ed5,
+    $d807aa98, $12835b01, $243185be, $550c7dc3, $72be5d74, $80deb1fe, $9bdc06a7, $c19bf174,
+    $e49b69c1, $efbe4786, $0fc19dc6, $240ca1cc, $2de92c6f, $4a7484aa, $5cb0a9dc, $76f988da,
+    $983e5152, $a831c66d, $b00327c8, $bf597fc7, $c6e00bf3, $d5a79147, $06ca6351, $14292967,
+    $27b70a85, $2e1b2138, $4d2c6dfc, $53380d13, $650a7354, $766a0abb, $81c2c92e, $92722c85,
+    $a2bfe8a1, $a81a664b, $c24b8b70, $c76c51a3, $d192e819, $d6990624, $f40e3585, $106aa070,
+    $19a4c116, $1e376c08, $2748774c, $34b0bcb5, $391c0cb3, $4ed8aa4a, $5b9cca4f, $682e6ff3,
+    $748f82ee, $78a5636f, $84c87814, $8cc70208, $90befffa, $a4506ceb, $bef9a3f7, $c67178f2);
+
+  function Ror(X: LongWord; N: Byte): LongWord; inline;
+  begin
+    Result := (X shr N) or (X shl (32 - N));
+  end;
+
+var
+  h0, h1, h2, h3, h4, h5, h6, h7: LongWord;
+  w: array[0..63] of LongWord;
+  msg: TBytes;
+  bitLen: QWord;
+  i, chunk, n, total, p: Integer;
+  a, b, c, d, e, f, g, hh, t1, t2, s0, s1, ch, maj: LongWord;
+  hs: array[0..7] of LongWord;
+begin
+  n := Length(AText);
+  total := ((n + 1 + 8 + 63) div 64) * 64;
+  SetLength(msg, total);            { SetLength 新增字节已清零 }
+  if n > 0 then
+    Move(AText[1], msg[0], n);
+  msg[n] := $80;
+  bitLen := QWord(n) * 8;
+  for i := 0 to 7 do
+    msg[total - 8 + i] := Byte((bitLen shr (56 - i * 8)) and $FF);
+
+  h0 := $6a09e667; h1 := $bb67ae85; h2 := $3c6ef372; h3 := $a54ff53a;
+  h4 := $510e527f; h5 := $9b05688c; h6 := $1f83d9ab; h7 := $5be0cd19;
+
+  chunk := 0;
+  while chunk < total do
+  begin
+    for i := 0 to 15 do
+      w[i] := (LongWord(msg[chunk + i * 4]) shl 24) or
+              (LongWord(msg[chunk + i * 4 + 1]) shl 16) or
+              (LongWord(msg[chunk + i * 4 + 2]) shl 8) or
+               LongWord(msg[chunk + i * 4 + 3]);
+    for i := 16 to 63 do
+    begin
+      s0 := Ror(w[i - 15], 7) xor Ror(w[i - 15], 18) xor (w[i - 15] shr 3);
+      s1 := Ror(w[i - 2], 17) xor Ror(w[i - 2], 19) xor (w[i - 2] shr 10);
+      w[i] := w[i - 16] + s0 + w[i - 7] + s1;
+    end;
+
+    a := h0; b := h1; c := h2; d := h3;
+    e := h4; f := h5; g := h6; hh := h7;
+    for i := 0 to 63 do
+    begin
+      s1 := Ror(e, 6) xor Ror(e, 11) xor Ror(e, 25);
+      ch := (e and f) xor ((not e) and g);
+      t1 := hh + s1 + ch + K[i] + w[i];
+      s0 := Ror(a, 2) xor Ror(a, 13) xor Ror(a, 22);
+      maj := (a and b) xor (a and c) xor (b and c);
+      t2 := s0 + maj;
+      hh := g; g := f; f := e; e := d + t1;
+      d := c; c := b; b := a; a := t1 + t2;
+    end;
+
+    h0 := h0 + a; h1 := h1 + b; h2 := h2 + c; h3 := h3 + d;
+    h4 := h4 + e; h5 := h5 + f; h6 := h6 + g; h7 := h7 + hh;
+    Inc(chunk, 64);
+  end;
+
+  hs[0] := h0; hs[1] := h1; hs[2] := h2; hs[3] := h3;
+  hs[4] := h4; hs[5] := h5; hs[6] := h6; hs[7] := h7;
+  Result := '';
+  for i := 0 to 7 do
+    for p := 3 downto 0 do
+      Result := Result + LowerCase(IntToHex(Byte(hs[i] shr (p * 8)), 2));
 end;
 
 initialization
