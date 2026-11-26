@@ -45,7 +45,82 @@ procedure LWApplyVLEValidate(C: TComponent; AReq: TJSONObject);
 { 触发控件上的某个事件方法 }
 function LWInvokeEvent(C: TComponent; const AEv: string; ARow, ACol: Integer): Boolean;
 
+{ ISO 串 -> TDateTime（'yyyy-mm-dd' / 'hh:nn:ss' / 'yyyy-mm-dd hh:nn:ss'，
+  也接受浏览器 datetime-local 的 'yyyy-mm-ddThh:nn:ss'）。解析失败返回 ADef }
+function LWISOToDateTime(const S: string; ADef: TDateTime): TDateTime;
+
+{ ---------------- 值回写登记表（第三方控件用） ----------------
+
+  内建回写是一条写死的 if 链（TEdit / TComboBox / TDateEdit …），第三方控件
+  没法在外面接进来。这里开一张登记表：单元在自己的 initialization 里登记
+  一次，LWApplyValue 就会先问这张表，命中即由登记方自己写控件。
+
+  为什么需要：DateTimeCtrls 的 TDateTimePicker 只有 DateTime/Date/Time 属性，
+  写 Text 无效；核心包又不依赖 DateTimeCtrls（与 VirtualTreeView 同策），
+  所以桥接放在 lwdatetime.pas 里，由用到它的工程 uses。
+
+  匹配规则与 LWRegisterControlKind 一致：沿继承链从最派生往祖先找，
+  第一个登记过的类胜出。登记必须发生在第一批请求之前（Run 之前）。 }
+
+type
+  TLWValueWriterProc = procedure(C: TComponent; const S: string);
+
+procedure LWRegisterValueWriter(AClass: TClass; AProc: TLWValueWriterProc);
+{ 查 C 命中哪个登记的回写器；未登记返回 nil }
+function LWRegisteredValueWriter(C: TComponent): TLWValueWriterProc;
+
 implementation
+
+{ ---------------- 值回写登记表（第三方控件用） ---------------- }
+
+type
+  PLWValueWriter = ^TLWValueWriter;
+  TLWValueWriter = record
+    Cls: TClass;
+    Proc: TLWValueWriterProc;
+    Next: PLWValueWriter;
+  end;
+
+var
+  GLwValueHead: PLWValueWriter = nil;
+
+procedure LWRegisterValueWriter(AClass: TClass; AProc: TLWValueWriterProc);
+var
+  e: PLWValueWriter;
+begin
+  if (AClass = nil) or (AProc = nil) then Exit;
+  New(e);
+  e^.Cls := AClass;
+  e^.Proc := AProc;
+  { 头插。登记只在 Run 之前发生（单线程），读者要么看到空表，
+    要么看到一条字段已写完的完整节点；节点永不释放，所以无需加锁 }
+  e^.Next := GLwValueHead;
+  GLwValueHead := e;
+end;
+
+function LWRegisteredValueWriter(C: TComponent): TLWValueWriterProc;
+var
+  p: TClass;
+  e: PLWValueWriter;
+begin
+  Result := nil;
+  if (C = nil) or (GLwValueHead = nil) then Exit;
+  p := C.ClassType;
+  while p <> nil do
+  begin
+    e := GLwValueHead;
+    while e <> nil do
+    begin
+      if e^.Cls = p then
+      begin
+        Result := e^.Proc;
+        Exit;
+      end;
+      e := e^.Next;
+    end;
+    p := p.ClassParent;
+  end;
+end;
 
 { ISO 串 -> TDateTime。浏览器端统一回传 'yyyy-mm-dd' / 'hh:nn:ss'
   （日期+时间则 'yyyy-mm-dd hh:nn:ss'），与本地化格式无关。
@@ -85,6 +160,15 @@ begin
   Result := ADef;
   if S = '' then Exit;
   tmp := Trim(S);
+  { 浏览器原生 datetime-local 控件回传 'yyyy-mm-ddThh:nn:ss'，
+    把 T 当空格看，其余解析路径不变 }
+  sp := Pos('T', tmp);
+  if (sp = 0) then sp := Pos('t', tmp);
+  if (sp > 1) and (Pos(':', Copy(tmp, 1, sp - 1)) = 0) then
+    tmp[sp] := ' ';
+  { datetime-local 带小数秒时形如 '...:ss.123'，秒之后的部分不要 }
+  sp := Pos('.', tmp);
+  if sp > 0 then tmp := Copy(tmp, 1, sp - 1);
   sp := Pos(' ', tmp);
   if sp > 0 then
   begin
@@ -231,6 +315,7 @@ var
   d, d2: TJSONData;
   s: string;
   idx, row, col, i: Integer;
+  w: TLWValueWriterProc;
 begin
   if (C = nil) or (AReq = nil) then Exit;
   d := AReq.Find('val');
@@ -239,6 +324,22 @@ begin
     把整个事件处理打断（坑 142） }
   if not (d.JSONType in [jtString, jtNumber, jtBoolean]) then Exit;
   s := d.AsString;
+
+  { 第三方登记的回写优先：命中后由登记方自己写控件（TDateTimePicker 等）。
+    放在最前面是为了避开下面那些类型强转 —— 登记的是"内建链认不出的类" }
+  if GLwValueHead <> nil then
+  begin
+    w := LWRegisteredValueWriter(C);
+    if Assigned(w) then
+    begin
+      try
+        w(C, s);
+      except
+        { 第三方回写抛异常也不能打断事件派发（OnChange 还要照常触发） }
+      end;
+      Exit;
+    end;
+  end;
 
   { TPageControl：浏览器把切换后的页签序号回传，服务端跟着切。
     不写这条的话服务端 ActivePage 永远停在初始页 —— 业务在 OnChange
@@ -802,6 +903,10 @@ begin
   Result := (C is TEdit) or (C is TMemo) or (C is TComboBox) or
     (C is TCheckBox) or (C is TRadioButton) or (C is TSpinEdit) or
     (C is TFloatSpinEdit) or (C is TDateEdit) or (C is TTimeEdit);
+  { 第三方登记的输入控件（TDateTimePicker 等）也要参与快照，
+    否则点"保存"时读到的是旧值 }
+  if (not Result) and (GLwValueHead <> nil) then
+    Result := LWRegisteredValueWriter(C) <> nil;
 end;
 
 { 浏览器在事件包里附带"同一窗体所有输入控件的当前值"。

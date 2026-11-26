@@ -16,7 +16,8 @@
     dbgrid dbedit dbmemo dbcheckbox dbcombo     <- 数据感知控件
     htmlframe pdfframe                          <- 富内容显示（uniHTML/uniPDF）
     chart                                       <- 图表（uniChart，ext charts 包）
-    dateedit timeedit datetimeedit              <- 日期/时间选择器（TDateEdit 族）
+    dateedit timeedit datetimeedit              <- 日期/时间选择器（TDateEdit 族 /
+                                                   DateTimeCtrls 的 TDateTimePicker）
     unknown
 
   任何未识别的控件都会退化成 'unknown'（渲染成一个带类名的占位框），
@@ -217,6 +218,11 @@ begin
     { TDBNavigator 内部生成的按钮：navigator 自己以 buttons 数组下发 }
     C.ClassNameIs('TDBNavButton') or
     C.ClassNameIs('TDBNavFocusableButton') or
+    { DateTimeCtrls 的 TDateTimePicker 内部自带的下拉箭头按钮与上下箭头：
+      控件本体按 datetimeedit 下发，这两个内部件不能发（否则浏览器里多出
+      一个带类名的占位框） }
+    C.ClassNameIs('TDTSpeedButton') or
+    C.ClassNameIs('TDTUpDown') or
     { TRadioGroup / TCheckGroup 内部生成的单选/复选按钮：
       组控件自己以 items/checked 数组下发，不发这些子控件 }
     ((C.Parent <> nil) and
