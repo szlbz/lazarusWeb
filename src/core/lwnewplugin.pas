@@ -135,7 +135,7 @@ const
       %TAG%    日志前缀里的工程名（LWLog 里显示成 [工程名]）
     改动模板时记得两边同步：demo 是给框架开发者看的样本，这里是生成器。
     ------------------------------------------------------------------ }
-  cCommonLines: array[0..651] of string = (
+  cCommonLines: array[0..665] of string = (
     'unit upluginproc;',
     '{ %NAME% :: 进程级插件发现 / 路由 / 拉起 / 热更新（只有宿主链接本单元）',
     '',
@@ -179,7 +179,8 @@ const
     'interface',
     '',
     'uses',
-    '  Classes, SysUtils, Process, Sockets, lwconfig, lwroute, lwrlog, upluginguard;',
+    '  Classes, SysUtils, Process, Sockets, lwconfig, lwroute, lwrlog, upluginguard',
+    '  {$IFDEF UNIX}, BaseUnix{$ENDIF};',
     '',
     'type',
     '  TPlugPlugin = class',
@@ -298,8 +299,10 @@ const
     '    end;',
     '    {$IFDEF UNIX}',
     '    { TFileStream 新建的 .run 副本只有 0644，Linux 下 TProcess 会',
-    '      Permission denied；显式补执行位，Windows 下无此问题 }',
-    '    FileSetAttr(Dst, &755);',
+    '      Permission denied（退出码 127）；显式补执行位。',
+    '      用 fpChmod 而不是 FileSetAttr：实测本机的 FileSetAttr 没生效，',
+    '      复制出来的副本仍是 0644。Windows 下无此问题 }',
+    '    fpChmod(Dst, &755);',
     '    {$ENDIF}',
     '  finally',
     '    fs.Free;',
@@ -361,12 +364,23 @@ const
     '      exe := ExpandFileName(exe)',
     '    else',
     '      exe := ExpandFileName(IncludeTrailingPathDelimiter(dir) + exe);',
-    '    { Linux 下 FPC 产物没有 .exe 后缀：清单仍写 exe=xxx.exe，',
-    '      找不到时退到同目录的无后缀文件（Windows 下文件在，不走这里） }',
-    '    if (not FileExists(exe)) and (CompareText(ExtractFileExt(exe), ''.exe'') = 0) then',
+    '    { Linux 下 FPC 产物没有 .exe 后缀：清单仍写 exe=xxx.exe。',
+    '      UNIX 上只要同目录有同名的无后缀文件就优先用它 —— 不能只看',
+    '      "xxx.exe 不存在才退"，因为从 Windows 把构建目录整包传过来时，',
+    '      xxx.exe 会跟着一起上来（PE 文件），宿主 exec 它只会得到退出码 127，',
+    '      而真正的 aarch64/ELF 就在旁边（dashplug）。Windows 上没有无后缀',
+    '      文件，保持原来的"缺了才退"。 }',
+    '    if CompareText(ExtractFileExt(exe), ''.exe'') = 0 then',
     '    begin',
     '      alt := Copy(exe, 1, Length(exe) - 4);',
-    '      if FileExists(alt) then exe := alt;',
+    '      if FileExists(alt) then',
+    '      begin',
+    '        {$IFDEF UNIX}',
+    '        exe := alt;',
+    '        {$ELSE}',
+    '        if not FileExists(exe) then exe := alt;',
+    '        {$ENDIF}',
+    '      end;',
     '    end;',
     '',
     '    ic := Trim(cfg.Str([''icon''], ''''));',
@@ -3158,6 +3172,10 @@ begin
     '# set LAZBUILD=/path/to/lazbuild to override the tool' + #10 +
     'set -e' + #10 +
     #10 +
+    '# bash-only ${BASH_SOURCE[0]} below: re-exec under bash when called via sh/dash' + #10 +
+    'if [ -z "${BASH_VERSION:-}" ]; then' + #10 +
+    '  exec bash "$0" "$@"' + #10 +
+    'fi' + #10 +
     'HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"' + #10 +
     'LAZBUILD="${LAZBUILD:-lazbuild}"' + #10 +
     #10 +
@@ -3191,6 +3209,10 @@ begin
     '# Filtered by executable path so other projects are untouched.' + #10 +
     'set -u' + #10 +
     #10 +
+    '# bash-only ${BASH_SOURCE[0]} below: re-exec under bash when called via sh/dash' + #10 +
+    'if [ -z "${BASH_VERSION:-}" ]; then' + #10 +
+    '  exec bash "$0" "$@"' + #10 +
+    'fi' + #10 +
     'HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"' + #10 +
     'NAMES=" ' + O.Name + ' ' + sLWPluginSampleName + ' "' + #10 +
     'KILLED=0' + #10 +
