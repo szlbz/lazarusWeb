@@ -451,7 +451,10 @@ var
     if ini.Has(['theme']) then
     begin
       val := Trim(ini.Str(['theme'], ''));
-      if val = '' then
+      { auto 是向导模板/各 demo ini 的默认值，语义就是"交给框架选默认主题"。
+        以前它不在 ThemeKnown 里，每次启动都刷一条"未收录"警告；这里与空值
+        同等对待（不警告），不把 auto 本身下发给前端。 }
+      if (val = '') or SameText(val, 'auto') then
         GCfg.Theme := 'crisp'
       else if ThemeKnown(val) then
         GCfg.Theme := LowerCase(val)
@@ -694,7 +697,14 @@ begin
     else if ValueOf('--extdir=', val) then
       GCfg.ExtDir := val
     else if ValueOf('--theme=', val) then
-      GCfg.Theme := val
+    begin
+      { 与配置文件分支保持一致：--theme=auto 也按默认 crisp 处理 }
+      val := Trim(val);
+      if (val = '') or SameText(val, 'auto') then
+        GCfg.Theme := 'crisp'
+      else
+        GCfg.Theme := val;
+    end
     { --lang=en / --language=en：界面语言（PO 文件见 languages\<lang>\）}
     else if ValueOf('--lang=', val) or ValueOf('--language=', val) then
     begin
@@ -777,6 +787,11 @@ begin
       LWLogRaw('已注册窗体: ' + FormNames);
       Halt(0);
     end
+    { 宿主拉起插件时注入的三个守卫参数由 upluginguard.PlugGuardCheck 自己
+      读取，框架不消费；落到下面会被当成拼写错误逐条警告，每个插件启动
+      都刷三行。这里显式吞掉，其余未知参数仍然照常警告。 }
+    else if Copy(arg, 1, 10) = '--lw-plug-' then
+      Continue
     { 未知参数以前被静默忽略：--tls-cert 拼错成 --tlscert 这种，服务照常
       以 HTTP 起来，直到浏览器 https 握手才报一堆看不懂的二进制。现在直接
       说清楚，别让人对着"参数好像没生效"猜半天。 }
