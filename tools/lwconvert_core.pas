@@ -582,26 +582,172 @@ begin
     Result := s;
 end;
 
+{ 注释/字符串屏蔽：把注释体与字符串字面量的内容换成空格，长度与位置都保持不变，
+  这样后续 Pos/PosEx 命中的一定是真代码，拿到的偏移能直接用在原文上。
+  跳过四种写法：花括号注释、圆括号注释、双斜杠行注释、单引号字符串（两个单引号
+  表示一个引号）。注意编译指令（左花括号紧跟美元符）不是注释，整段原样保留。
+  换行符原样保留。 }
+function MaskNonCode(const S: string): string;
+var
+  i, n: Integer;
+  c: Char;
+begin
+  Result := S;
+  n := Length(S);
+  i := 1;
+  while i <= n do
+  begin
+    c := S[i];
+    if c = '{' then
+    begin
+      if (i < n) and (S[i + 1] = '$') then
+      begin
+        { 编译指令：原样保留，一直跳到配对的右花括号 }
+        Inc(i, 2);
+        while (i <= n) and (S[i] <> '}') do Inc(i);
+        Inc(i);
+      end
+      else
+      begin
+        Result[i] := ' ';
+        Inc(i);
+        while (i <= n) and (S[i] <> '}') do
+        begin
+          if not (S[i] in [#10, #13]) then Result[i] := ' ';
+          Inc(i);
+        end;
+        if i <= n then Result[i] := ' ';
+        Inc(i);
+      end;
+    end
+    else if (c = '(') and (i < n) and (S[i + 1] = '*') then
+    begin
+      Result[i] := ' ';
+      Result[i + 1] := ' ';
+      Inc(i, 2);
+      while i <= n do
+      begin
+        if (S[i] = '*') and (i < n) and (S[i + 1] = ')') then
+        begin
+          Result[i] := ' ';
+          Result[i + 1] := ' ';
+          Inc(i, 2);
+          Break;
+        end;
+        if not (S[i] in [#10, #13]) then Result[i] := ' ';
+        Inc(i);
+      end;
+    end
+    else if (c = '/') and (i < n) and (S[i + 1] = '/') then
+    begin
+      while (i <= n) and not (S[i] in [#10, #13]) do
+      begin
+        Result[i] := ' ';
+        Inc(i);
+      end;
+    end
+    else if c = '''' then
+    begin
+      Inc(i);
+      while i <= n do
+      begin
+        if S[i] = '''' then
+        begin
+          if (i < n) and (S[i + 1] = '''') then
+          begin
+            Result[i] := ' ';
+            Result[i + 1] := ' ';
+            Inc(i, 2);
+          end
+          else
+          begin
+            Inc(i);
+            Break;
+          end;
+        end
+        else
+        begin
+          if not (S[i] in [#10, #13]) then Result[i] := ' ';
+          Inc(i);
+        end;
+      end;
+    end
+    else
+      Inc(i);
+  end;
+end;
+
+function IsIdentChar(Ch: Char): Boolean;
+begin
+  Result := Ch in ['a'..'z', 'A'..'Z', '0'..'9', '_'];
+end;
+
+{ 在（已小写的）屏蔽串里找独立的关键字：前后都不能是标识符字符，
+  避免 "uses" 命中 "xxxuses" }
+function FindKeywordAt(const ALowMasked, ALowKw: string; AStart: Integer): Integer;
+var
+  p, n: Integer;
+  before, after: Char;
+begin
+  Result := 0;
+  n := Length(ALowMasked);
+  p := PosEx(ALowKw, ALowMasked, AStart);
+  while p > 0 do
+  begin
+    before := #0;
+    after := #0;
+    if p > 1 then before := ALowMasked[p - 1];
+    if p + Length(ALowKw) <= n then after := ALowMasked[p + Length(ALowKw)];
+    if not (IsIdentChar(before) or IsIdentChar(after)) then
+      Exit(p);
+    p := PosEx(ALowKw, ALowMasked, p + 1);
+  end;
+end;
+
+{ 定位真正该插的 uses 位置。
+  不能直接取文件里第一个 uses：文件开头常常残留一段注释掉/废弃的旧单元代码，
+  里面也有 interface + uses，插到那里等于白改（坑 210，khzl_find_unit.pas）。
+  做法：先找文件头关键字 unit / program / library / package，再从它后面找 uses；
+  一个都找不到（例如 include 片段）才退回文件里第一个 uses。 }
+function FindRealUses(const ALowMasked: string): Integer;
+var
+  p, q: Integer;
+begin
+  Result := 0;
+  p := FindKeywordAt(ALowMasked, 'unit', 1);
+  if p = 0 then p := FindKeywordAt(ALowMasked, 'program', 1);
+  if p = 0 then p := FindKeywordAt(ALowMasked, 'library', 1);
+  if p = 0 then p := FindKeywordAt(ALowMasked, 'package', 1);
+  if p > 0 then
+  begin
+    { 跳过 'unit xxx;' 这一行 }
+    q := PosEx(';', ALowMasked, p);
+    if q > 0 then p := q;
+    Result := FindKeywordAt(ALowMasked, 'uses', p + 1);
+    if Result > 0 then Exit;
+  end;
+  Result := FindKeywordAt(ALowMasked, 'uses', 1);
+end;
+
 { 在 interface 段的 uses 里补一个单元名 }
 function EnsureUsesUnit(AText: RawByteString; const AUnitName: string;
   out AAdded: Boolean): RawByteString;
 var
-  s, low: string;
+  s, masked, lowMasked: string;
   usesPos, semiPos: Integer;
 begin
   AAdded := False;
   Result := AText;
   s := string(Result);
-  low := LowerCase(s);
-  if Pos(',' + LowerCase(AUnitName), low) > 0 then Exit;
-  if Pos(LowerCase(AUnitName) + ',', low) > 0 then Exit;
-  if Pos(LowerCase(AUnitName) + ';', low) > 0 then Exit;
-  { 直接找第一个 uses 关键字即可：unit 的 interface uses / program 的 uses
-    都是文件里第一个（注释里出现的极罕见）。别去搜 interface —— 会被
-    uses 里的 "Interfaces" 截胡。 }
-  usesPos := PosEx('uses', low, 1);
+  masked := MaskNonCode(s);
+  lowMasked := LowerCase(masked);
+  { 已在 uses 里就跳过。只在真代码里找：文件开头常有一段整块注释掉的旧单元
+    代码，里面也有 uses lwform，按原文搜会把真 uses 判成"已有"（坑 210）。 }
+  if FindKeywordAt(lowMasked, LowerCase(AUnitName), 1) > 0 then Exit;
+  { 找真正单元头里的 uses：文件开头那段废弃代码里也有 uses，不能用 }
+  usesPos := FindRealUses(lowMasked);
   if usesPos = 0 then Exit;
-  semiPos := PosEx(';', s, usesPos);
+  semiPos := PosEx(';', masked, usesPos);
   if semiPos = 0 then Exit;
   s := Copy(s, 1, semiPos - 1) + ', ' + AUnitName + Copy(s, semiPos, MaxInt);
   AAdded := True;
