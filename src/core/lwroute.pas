@@ -213,22 +213,44 @@ begin
     Result := Trim(ARequest.GetCustomHeader('Cookie'));
 end;
 
-{ 本次请求的会话标识：?sid= > X-LW-Sid 头 > Cookie(lwpsid)。
-  三处都看的原因：
+{ 本次请求的会话标识。三处都看：
     - ?sid=  宿主序列化 iframe HTML 时拼进 URL（首次导航靠它）；
     - 头     API / 脚本调用自己带；
-    - cookie iframe 页面里的子资源请求（/p/名/lw/…、/lw/api/event）
-             由浏览器自动附加，是唯一能覆盖这些请求的通道。
-  cookie 名带 lwp 前缀且 Path=/p/，与宿主自身的 sid 传递（?sid=）互不干扰。 }
-function RouteReqSid(ARequest: TFPHTTPConnectionRequest): string;
+    - cookie iframe 页面里的子资源请求由浏览器自动附加。
+  cookie 名带 lwp 前缀且 Path=/p/，与宿主自身的 sid 传递互不干扰。
+
+  顺序按请求类型分：
+    - 页面导航（/p/名/）：?sid= > 头 > cookie。首次进来还没有 cookie，
+      必须靠宿主拼在 iframe URL 上的 sid。
+    - 插件内部 /lw/*（API、静态资源、长轮询、WS）：头 > cookie > ?sid=。
+      这些请求的 ?sid= 是**插件自己 session 的 sid**，宿主会话库里根本没有；
+      之前一律让 query 优先，导致每次轮询都 403、日志刷屏（页面看着
+      还正常，因为事件 POST 的 sid 在 body 里、靠 cookie 放行）。
+      cookie 是宿主放行导航时下发的，才是这类请求该用的宿主 sid。 }
+function RouteReqSid(ARequest: TFPHTTPConnectionRequest;
+  const ARest: string): string;
+var
+  qs, hd, ck: string;
 begin
-  Result := '';
   if Assigned(ARequest.QueryFields) then
-    Result := Trim(ARequest.QueryFields.Values['sid']);
-  if Result = '' then
-    Result := Trim(ARequest.GetCustomHeader('X-LW-Sid'));
-  if Result = '' then
-    Result := RouteCookieValue(RouteRawCookie(ARequest), LW_ROUTE_SID_COOKIE);
+    qs := Trim(ARequest.QueryFields.Values['sid'])
+  else
+    qs := '';
+  hd := Trim(ARequest.GetCustomHeader('X-LW-Sid'));
+  ck := RouteCookieValue(RouteRawCookie(ARequest), LW_ROUTE_SID_COOKIE);
+
+  if Copy(ARest, 1, 4) = '/lw/' then
+  begin
+    Result := hd;
+    if Result = '' then Result := ck;
+    if Result = '' then Result := qs;
+  end
+  else
+  begin
+    Result := qs;
+    if Result = '' then Result := hd;
+    if Result = '' then Result := ck;
+  end;
 end;
 
 { 403：鉴权回调拒绝。浏览器请求给人看的页面（说明是谁、为什么、怎么办），
@@ -695,14 +717,16 @@ begin
   { 用户权限：/p/ 是插件唯一的对外门，鉴权必须在这里做 —— 只靠宿主菜单
     隐藏不够，直接敲 URL、转发页面链接、iframe 里的子资源请求都会绕过 UI。
     回调由宿主用 LWRouteSetAuth 注册；没注册就一律放行（旧行为） }
-  sid := RouteReqSid(ARequest);
+  sid := RouteReqSid(ARequest, rest);
   if Assigned(GRouteAuth) then
   begin
     auser := '';
     areason := '';
     if not GRouteAuth(name, sid, auser, areason) then
     begin
-      LWLog('[route] 拒绝 /p/' + name + '/ sid=' + sid + '：' + areason);
+      { 日志带上真实子路径：以前固定写 /p/<名>/，分不清是页面导航
+        还是 iframe 里的 /lw/api/poll 被拒，排障时白费一轮 }
+      LWLog('[route] 拒绝 ' + APath + ' sid=' + sid + '：' + areason);
       RouteForbidden(ARequest, AResponse, name, auser, areason);
       Result := rrDone;
       Exit;
