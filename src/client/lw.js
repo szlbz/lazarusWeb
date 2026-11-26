@@ -337,6 +337,14 @@ var LW = (function () {
                 var tv = cmp.getValue();
                 return tv ? Ext.Date.format(tv, 'H:i:s') : '';
             }
+            /* TDateTimePicker（DateTimeCtrls）：按 dtkind 回传对应精度的 ISO 串 */
+            if (node.kind === 'datetimeedit') {
+                var dv2 = cmp.getValue();
+                if (!dv2) return '';
+                if (node.dtkind === 'time') return Ext.Date.format(dv2, 'H:i:s');
+                if (node.dtkind === 'datetime') return Ext.Date.format(dv2, 'Y-m-d H:i:s');
+                return Ext.Date.format(dv2, 'Y-m-d');
+            }
             if (cmp.getValue) {
                 var v = cmp.getValue();
                 return v == null ? '' : String(v);
@@ -348,7 +356,7 @@ var LW = (function () {
     /* 会承载"用户输入值"的控件类型（与服务端 LWIsSnapField 对应） */
     var FIELD_KINDS = ['edit', 'maskedit', 'memo', 'spin', 'floatspin', 'combo',
         'checkbox', 'radio', 'dbedit', 'dbmemo', 'dbcheckbox', 'dbcombo',
-        'dblookup', 'dateedit', 'timeedit'];
+        'dblookup', 'dateedit', 'timeedit', 'datetimeedit'];
 
     function owningWin(c) {
         if (!c) return null;
@@ -968,6 +976,24 @@ var LW = (function () {
                 cfg.readOnly = !!node.readonly;
                 cfg.editable = !node.readonly;
                 return addTo(Ext.create('Ext.form.field.Time', cfg), ct);
+
+            case 'datetimeedit':
+                /* TDateTimePicker（DateTimeCtrls）。dtkind 决定是纯日期、
+                   纯时间还是日期+时间：date/time 与上面两个 kind 同构；
+                   datetime 用 datefield 带时间格式（格式串里带 H:i:s，
+                   手输时间也认，日期仍走日历面板） */
+                if (node.dtkind === 'time') {
+                    cfg.format = 'H:i:s';
+                    cfg.value = node.iso || '';
+                    cfg.readOnly = !!node.readonly;
+                    cfg.editable = !node.readonly;
+                    return addTo(Ext.create('Ext.form.field.Time', cfg), ct);
+                }
+                cfg.format = (node.dtkind === 'datetime') ? 'Y-m-d H:i:s' : 'Y-m-d';
+                cfg.value = node.iso || '';
+                cfg.readOnly = !!node.readonly;
+                cfg.editable = !node.readonly;
+                return addTo(Ext.create('Ext.form.field.Date', cfg), ct);
 
             case 'chart':
                 /* TLWChart（uniChart 对应物）：ext 的 charts 包渲染 */
@@ -2632,7 +2658,8 @@ var LW = (function () {
                         }
                     } catch (e) { }
                 }
-            } else if (n.kind === 'dateedit' || n.kind === 'timeedit') {
+            } else if (n.kind === 'dateedit' || n.kind === 'timeedit' ||
+                       n.kind === 'datetimeedit') {
                 /* 服务端 Date/Time 变了才改，避免打断正在选择的面板 */
                 var iso = n.iso || '';
                 if (prev.iso !== iso && !(cmp.hasFocus && cmp.hasFocus())) {

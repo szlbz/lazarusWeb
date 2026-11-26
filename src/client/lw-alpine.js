@@ -802,7 +802,7 @@ var LW = (function () {
     /* 会承载"用户输入值"的控件类型（与服务端 LWIsSnapField 对应） */
     var FIELD_KINDS = ['edit', 'maskedit', 'memo', 'spin', 'floatspin', 'combo',
         'checkbox', 'radio', 'dbedit', 'dbmemo', 'dbcheckbox', 'dbcombo',
-        'dblookup', 'dateedit', 'timeedit'];
+        'dblookup', 'dateedit', 'timeedit', 'datetimeedit'];
 
     /* 从 DOM 读控件当前值（正在编辑的输入框以 DOM 为准） */
     function collectVal(id) {
@@ -963,7 +963,8 @@ var LW = (function () {
             down: !!node.down,
             val: node.value != null ? node.value : 0,
             idx: node.index != null ? node.index : -1,
-            iso: node.iso || '',
+            iso: (k === 'datetimeedit' && node.dtkind === 'datetime')
+                ? String(node.iso || '').replace(' ', 'T') : (node.iso || ''),
             src: node.src || '',
             items: node.items || [],
             keys: (k === 'dbradiogroup') ? (node.values || []) : (node.keys || []),
@@ -1555,6 +1556,19 @@ var LW = (function () {
 
             case 'timeedit':
                 return '<input type="time" step="1" class="lw-input" style="' + fs + '" x-model="' + r + '.iso"' + ro + ' ' + dis +
+                    ' @change="' + evAttr(id, 'OnChange', '{val:' + r + '.iso}') + '"/>';
+
+            case 'datetimeedit':
+                /* TDateTimePicker（DateTimeCtrls）：dtkind = date / time / datetime。
+                   原生 datetime-local 要 'yyyy-mm-ddThh:mm:ss'，与服务端的
+                   'yyyy-mm-dd hh:nn:ss' 差别只在分隔符，状态里已换成 T */
+                if (node.dtkind === 'time')
+                    return '<input type="time" step="1" class="lw-input" style="' + fs + '" x-model="' + r + '.iso"' + ro + ' ' + dis +
+                        ' @change="' + evAttr(id, 'OnChange', '{val:' + r + '.iso}') + '"/>';
+                if (node.dtkind === 'datetime')
+                    return '<input type="datetime-local" step="1" class="lw-input" style="' + fs + '" x-model="' + r + '.iso"' + ro + ' ' + dis +
+                        ' @change="' + evAttr(id, 'OnChange', '{val:' + r + '.iso}') + '"/>';
+                return '<input type="date" class="lw-input" style="' + fs + '" x-model="' + r + '.iso"' + ro + ' ' + dis +
                     ' @change="' + evAttr(id, 'OnChange', '{val:' + r + '.iso}') + '"/>';
 
             case 'checkbox':
@@ -3981,8 +3995,11 @@ var LW = (function () {
                 if (prev.key !== n.key && !focused) r.key = n.key != null ? String(n.key) : '';
                 if (JSON.stringify(prev.items) !== JSON.stringify(n.items)) r.items = n.items || [];
                 if (JSON.stringify(prev.keys) !== JSON.stringify(n.keys)) r.keys = n.keys || [];
-            } else if (n.kind === 'dateedit' || n.kind === 'timeedit') {
-                if (prev.iso !== n.iso && !focused) r.iso = n.iso || '';
+            } else if (n.kind === 'dateedit' || n.kind === 'timeedit' ||
+                       n.kind === 'datetimeedit') {
+                var niso = (n.kind === 'datetimeedit' && n.dtkind === 'datetime')
+                    ? String(n.iso || '').replace(' ', 'T') : (n.iso || '');
+                if (prev.iso !== niso && !focused) r.iso = niso;
             } else if (n.kind === 'progress') {
                 r.pos = n.pos || 0; r.max = n.max || 0;
             } else if (n.kind === 'trackbar') {
