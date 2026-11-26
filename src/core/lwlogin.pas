@@ -67,6 +67,9 @@ type
     procedure BuildDefaultUI;
   protected
     procedure PushToast(const ATitle, AText: string);
+    { 模态提示：必须点"确定"才消失，用于"账号锁定"这类不能被忽略的提示。
+      toast 只有 4 秒、一晃就过，用户很容易以为"没提示"；锁定必须显式。 }
+    procedure PushAlert(const ATitle, AText: string);
   public
     constructor CreateNew(AOwner: TComponent; Num: Integer = 0); override;
     { lfm 已在构造期读入、OnCreate 也已触发（TCustomForm.AfterConstruction
@@ -117,7 +120,166 @@ type
 implementation
 
 uses
-  lwapp, lwrlog;
+  lwapp, lwrlog, Math;
+
+type
+  { 单个 IP 的登录失败状态。全局共享 —— 同一 IP 换会话/换页签也累计 }
+  TLoginAttempt = class
+    Count: Integer;       { 连续失败次数；成功即清零 }
+    LastFail: TDateTime;  { 最近一次失败，用于清理长期不活动的记录 }
+    LockUntil: TDateTime; { > Now 表示锁定中；0 = 未锁 }
+  end;
+
+var
+  GLoginAttempts: TStringList;
+  GLoginAttemptsLock: TRTLCriticalSection;
+
+procedure LoginAttemptsInit;
+begin
+  InitCriticalSection(GLoginAttemptsLock);
+  GLoginAttempts := TStringList.Create;
+  GLoginAttempts.Sorted := True;
+  GLoginAttempts.Duplicates := dupIgnore;
+  GLoginAttempts.CaseSensitive := False;
+end;
+
+procedure LoginAttemptsDone;
+var
+  i: Integer;
+begin
+  if GLoginAttempts = nil then Exit;
+  for i := 0 to GLoginAttempts.Count - 1 do
+    TLoginAttempt(GLoginAttempts.Objects[i]).Free;
+  GLoginAttempts.Free;
+  GLoginAttempts := nil;
+  DoneCriticalSection(GLoginAttemptsLock);
+end;
+
+function FindAttempt(const AIP: string): TLoginAttempt;
+var
+  i: Integer;
+begin
+  Result := nil;
+  if GLoginAttempts = nil then Exit;
+  i := GLoginAttempts.IndexOf(AIP);
+  if i >= 0 then Result := TLoginAttempt(GLoginAttempts.Objects[i]);
+end;
+
+{ 记录数超过阈值时顺手扫掉长期不活动的项，避免爬虫换 IP 把表撑大。
+  必须在持锁状态下调用。 }
+procedure SweepAttempts;
+var
+  i: Integer;
+  a: TLoginAttempt;
+begin
+  if GLoginAttempts.Count <= 512 then Exit;
+  for i := GLoginAttempts.Count - 1 downto 0 do
+  begin
+    a := TLoginAttempt(GLoginAttempts.Objects[i]);
+    if (a = nil) or ((a.LockUntil <= Now) and (Now - a.LastFail > 1)) then
+    begin
+      a.Free;
+      GLoginAttempts.Delete(i);
+    end;
+  end;
+end;
+
+function LoginLockEnabled: Boolean;
+begin
+  Result := (GCfg.LoginFailMax > 0) and (GCfg.LoginLockMin > 0);
+end;
+
+{ 锁定中返回 True，AMinLeft 是剩余分钟（至少 1）。
+  锁到期自动复位计数 —— 不必等用户成功登录才解锁。 }
+function LoginLocked(const AIP: string; out AMinLeft: Integer): Boolean;
+var
+  a: TLoginAttempt;
+begin
+  Result := False;
+  AMinLeft := 0;
+  if (not LoginLockEnabled) or (AIP = '') then Exit;
+  EnterCriticalSection(GLoginAttemptsLock);
+  try
+    SweepAttempts;
+    a := FindAttempt(AIP);
+    if (a <> nil) and (a.LockUntil > Now) then
+    begin
+      Result := True;
+      AMinLeft := Ceil((a.LockUntil - Now) * 24 * 60);
+      if AMinLeft < 1 then AMinLeft := 1;
+    end
+    else if (a <> nil) and (a.LockUntil <> 0) then
+    begin
+      a.LockUntil := 0;
+      a.Count := 0;
+    end;
+  finally
+    LeaveCriticalSection(GLoginAttemptsLock);
+  end;
+end;
+
+{ 记一次凭证失败；达到阈值则置锁定截止并写日志。
+  验证码错误不进这里 —— 验证码本身一枚一作废，已经是独立防暴破门。 }
+procedure LoginNoteFail(const AIP: string; out AJustLocked: Boolean);
+var
+  a: TLoginAttempt;
+  i: Integer;
+begin
+  AJustLocked := False;
+  if (not LoginLockEnabled) or (AIP = '') then Exit;
+  EnterCriticalSection(GLoginAttemptsLock);
+  try
+    SweepAttempts;
+    a := FindAttempt(AIP);
+    if a = nil then
+    begin
+      a := TLoginAttempt.Create;
+      a.Count := 0;
+      a.LockUntil := 0;
+      a.LastFail := Now;
+      i := GLoginAttempts.Add(AIP);
+      GLoginAttempts.Objects[i] := a;
+    end;
+    a.LastFail := Now;
+    if a.LockUntil > Now then Exit;  { 锁定期内不再累加 }
+    Inc(a.Count);
+    if a.Count >= GCfg.LoginFailMax then
+    begin
+      a.LockUntil := Now + GCfg.LoginLockMin / (24 * 60);
+      AJustLocked := True;
+      LWLog('[login] 登录失败锁定: ip=' + AIP + ' 连续失败 ' +
+        IntToStr(a.Count) + ' 次，锁定 ' + IntToStr(GCfg.LoginLockMin) + ' 分钟');
+    end;
+  finally
+    LeaveCriticalSection(GLoginAttemptsLock);
+  end;
+end;
+
+{ 认证成功：清掉该 IP 的全部失败记录 }
+procedure LoginNoteSuccess(const AIP: string);
+var
+  i: Integer;
+begin
+  if (AIP = '') or (GLoginAttempts = nil) then Exit;
+  EnterCriticalSection(GLoginAttemptsLock);
+  try
+    i := GLoginAttempts.IndexOf(AIP);
+    if i >= 0 then
+    begin
+      TLoginAttempt(GLoginAttempts.Objects[i]).Free;
+      GLoginAttempts.Objects[i] := nil;
+      GLoginAttempts.Delete(i);
+    end;
+  finally
+    LeaveCriticalSection(GLoginAttemptsLock);
+  end;
+end;
+
+function LoginCurrentIP: string;
+begin
+  Result := '';
+  if LWCurrentSession <> nil then Result := LWCurrentSession.RemoteIP;
+end;
 
 constructor TLWLoginForm.CreateNew(AOwner: TComponent; Num: Integer);
 begin
@@ -335,14 +497,48 @@ begin
   end;
 end;
 
+procedure TLWLoginForm.PushAlert(const ATitle, AText: string);
+var
+  S: TLWSessionBase;
+  cmd: TJSONObject;
+begin
+  S := LWCurrentSession;
+  if S = nil then Exit;
+  cmd := TJSONObject.Create;
+  try
+    { msg = 浏览器端模态对话框，要点"确定"才消；toast 4 秒自动消失太容易错过。
+      前端 handleCmd 的 'msg' 分支会弹 showMsg，标题固定 lazarusWeb，
+      所以把自定义标题并进正文，确保"账号锁定"字样一定看得见。 }
+    cmd.Add('type', 'msg');
+    cmd.Add('title', ATitle);
+    cmd.Add('text', ATitle + '：' + AText);
+    S.SessionPushCommand(cmd.AsJSON);
+  finally
+    cmd.Free;
+  end;
+end;
+
 procedure TLWLoginForm.TryLogin;
 var
   S: TLWSessionBase;
-  u, p, err, code: string;
-  ok, capOk: Boolean;
+  u, p, err, code, ip: string;
+  ok, capOk, justLocked: Boolean;
+  minLeft: Integer;
   main: TCustomForm;
   cap: TLWCaptcha;
 begin
+  ip := LoginCurrentIP;
+  justLocked := False;   { 验证码/凭证两条失败路都要读它，先给确定初值 }
+  { 锁定检查放在最前面：验证码校验也不做，避免锁定期内还能刷验证码/口令 }
+  if LoginLocked(ip, minLeft) then
+  begin
+    { 必须用模态框：toast 4 秒自动消失，多试几次/切个窗口就没了，
+      用户会以为"锁了但没提示"。模态框不点确定不消，且文案带"锁定"字样。 }
+    PushAlert('账号已锁定', '登录失败次数过多，账号已锁定，请在 ' +
+      IntToStr(minLeft) + ' 分钟后再试');
+    Exit;
+  end;
+
   u := '';
   p := '';
   if GetUserEdit <> nil then u := GetUserEdit.Text;
@@ -367,10 +563,19 @@ begin
         capOk := LWCaptchaCheck(cap.Token, code);
       if not capOk then
       begin
+        { 验证码错误也计入失败次数：此前这里直接 Exit 不计数，导致反复
+          输错验证码永远锁不了 —— 用户"错了 N 次没锁定"的主要来源。
+          验证码一枚一作废确实已是独立防暴破门，但用户视角两种失败都算
+          "登录失败"，都该触发同一道锁；成功登录仍会一次清零。 }
+        LoginNoteFail(ip, justLocked);
         { 一枚码只试一次：失败立即换图并清空输入框，
           用户不必手动点图，也不可能拿同一张图反复试 }
         RefreshCaptcha;
-        PushToast('登录失败', '验证码错误，已换一张，请重新输入');
+        if justLocked then
+          PushAlert('账号已锁定', '登录失败次数过多，账号已锁定，请在 ' +
+            IntToStr(GCfg.LoginLockMin) + ' 分钟后再试')
+        else
+          PushToast('登录失败', '验证码错误，已换一张，请重新输入');
         Exit;
       end;
       { 校验通过后把输入框清掉：这张图已作废，留着旧码只会误导用户 }
@@ -397,6 +602,7 @@ begin
   S := LWCurrentSession;
   if ok then
   begin
+    LoginNoteSuccess(ip);
     if S <> nil then S.Authenticated := True;
     { 隐藏登录窗（浏览器端销毁窗口），创建并显示默认主窗体 }
     Self.Hide;
@@ -418,10 +624,16 @@ begin
   end
   else
   begin
+    { 凭证失败计数：验证码错误在上面那一关也已计入，两条路共用同一个 IP 计数 }
+    LoginNoteFail(ip, justLocked);
     { 验证码在校验阶段就已经消费掉了，账号密码错也必须换一张新图，
       否则浏览器停在旧图上，用户再提交一次必然报"验证码错误" }
     RefreshCaptcha;
-    PushToast('登录失败', err);
+    if justLocked then
+      PushAlert('账号已锁定', '登录失败次数过多，账号已锁定，请在 ' +
+        IntToStr(GCfg.LoginLockMin) + ' 分钟后再试')
+    else
+      PushToast('登录失败', err);
   end;
 end;
 
@@ -440,5 +652,9 @@ end;
 initialization
   { lfm 根类 / 子类实例化需要运行时类注册 }
   RegisterClass(TLWLoginForm);
+  LoginAttemptsInit;
+
+finalization
+  LoginAttemptsDone;
 
 end.

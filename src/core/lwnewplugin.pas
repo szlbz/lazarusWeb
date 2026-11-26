@@ -3089,6 +3089,11 @@ begin
     'port=' + IntToStr(O.Port) + LineEnding +
     'theme=auto' + LineEnding +
     LineEnding +
+    '; 登录失败锁定（可选，默认 5 次 / 15 分钟）：' + LineEnding +
+    ';   loginfailmax=5    同一 IP 连续登录失败几次后锁定：验证码/账号密码都算（0 = 关闭）' + LineEnding +
+    ';   loginlockmin=15   锁定时长分钟（0 = 关闭）；成功登录即清零' + LineEnding +
+    ';   命令行 --login-fail-max=N --login-lock-min=M 优先于这里。' + LineEnding +
+    LineEnding +
     '; 插件不在这里逐个登记：宿主启动时扫描 plugins\*\*.plugin.ini，' + LineEnding +
     '; 按清单注册 /p/<名>/ 路由并拉起插件 exe。' + LineEnding +
     '; 插件运行副本放在 plugins\.run\，所以原始插件 exe 可以被重新编译（热更新）。' + LineEnding;
