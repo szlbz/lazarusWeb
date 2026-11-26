@@ -12,6 +12,7 @@ object ConvertPanelForm: TConvertPanelForm
   Position = poScreenCenter
   LCLVersion = '4.8.0.0'
   OnCreate = FormCreate
+  OnShow = FormShow
   object grpProj: TGroupBox
     Left = 18
     Height = 195
@@ -23,125 +24,121 @@ object ConvertPanelForm: TConvertPanelForm
     ClientWidth = 1082
     TabOrder = 0
     object lblSrc: TLabel
+      AnchorSideTop.Control = edSrc
+      AnchorSideTop.Side = asrCenter
       Left = 21
       Height = 24
-      Top = 24
+      Top = 6
       Width = 90
       Caption = '源工程目录'
     end
     object lblOut: TLabel
+      AnchorSideTop.Control = edOut
+      AnchorSideTop.Side = asrCenter
       Left = 21
       Height = 24
-      Top = 72
+      Top = 48
       Width = 72
       Caption = '输出目录'
     end
     object lblRoot: TLabel
+      AnchorSideTop.Control = edRoot
+      AnchorSideTop.Side = asrCenter
+      AnchorSideRight.Control = edRoot
       Left = 21
       Height = 24
-      Top = 120
-      Width = 123
+      Top = 90
+      Width = 129
+      Anchors = [akTop, akLeft, akRight]
       Caption = 'lazarusWeb 根'
     end
     object edSrc: TEdit
+      AnchorSideRight.Control = btnBrowseSrc
       Left = 150
       Height = 32
-      Top = 18
-      Width = 776
+      Top = 2
+      Width = 789
       Anchors = [akTop, akLeft, akRight]
+      BorderSpacing.Right = 5
       TabOrder = 0
       TextHint = '一个普通 Lazarus 工程目录（含 .lpi/.lpr）'
     end
     object btnBrowseSrc: TButton
+      AnchorSideTop.Control = edSrc
+      AnchorSideRight.Control = grpProj
+      AnchorSideRight.Side = asrBottom
+      AnchorSideBottom.Control = lblSrc
+      AnchorSideBottom.Side = asrBottom
       Left = 944
-      Height = 38
-      Top = 16
+      Height = 28
+      Top = 2
       Width = 96
-      Anchors = [akTop, akRight]
+      Anchors = [akTop, akRight, akBottom]
+      BorderSpacing.Right = 42
       Caption = '浏览...'
       TabOrder = 1
       OnClick = btnBrowseSrcClick
     end
     object edOut: TEdit
+      AnchorSideTop.Control = edSrc
+      AnchorSideTop.Side = asrBottom
+      AnchorSideRight.Control = edSrc
+      AnchorSideRight.Side = asrBottom
       Left = 150
       Height = 32
-      Top = 66
-      Width = 776
+      Top = 44
+      Width = 789
       Anchors = [akTop, akLeft, akRight]
+      BorderSpacing.Top = 10
       TabOrder = 2
       TextHint = '留空则自动用「源目录 + _web」'
     end
     object btnBrowseOut: TButton
+      AnchorSideTop.Control = edOut
+      AnchorSideRight.Control = grpProj
+      AnchorSideRight.Side = asrBottom
+      AnchorSideBottom.Control = edOut
+      AnchorSideBottom.Side = asrBottom
       Left = 944
-      Height = 38
-      Top = 64
+      Height = 32
+      Top = 44
       Width = 96
-      Anchors = [akTop, akRight]
+      Anchors = [akTop, akRight, akBottom]
+      BorderSpacing.Right = 42
       Caption = '浏览...'
       TabOrder = 3
       OnClick = btnBrowseOutClick
     end
     object edRoot: TEdit
+      AnchorSideTop.Control = edOut
+      AnchorSideTop.Side = asrBottom
+      AnchorSideRight.Control = edSrc
+      AnchorSideRight.Side = asrBottom
       Left = 150
       Height = 32
-      Top = 114
-      Width = 776
+      Top = 86
+      Width = 789
       Anchors = [akTop, akLeft, akRight]
+      BorderSpacing.Top = 10
       TabOrder = 4
       TextHint = 'lazarusWeb 仓库根目录（含 src/core）'
     end
-  end
-  object btnAnalyze: TButton
-    Left = 18
-    Height = 45
-    Top = 222
-    Width = 165
-    Caption = '支持度分析'
-    TabOrder = 1
-    OnClick = btnAnalyzeClick
-  end
-  object btnConvert: TButton
-    Left = 195
-    Height = 45
-    Top = 222
-    Width = 165
-    Caption = '开始转换'
-    Font.Style = [fsBold]
-    ParentFont = False
-    TabOrder = 2
-    OnClick = btnConvertClick
-  end
-  object btnReport: TButton
-    Left = 372
-    Height = 45
-    Top = 222
-    Width = 165
-    Caption = '打开报告'
-    TabOrder = 3
-    OnClick = btnReportClick
-  end
-  object btnOpenOut: TButton
-    Left = 549
-    Height = 45
-    Top = 222
-    Width = 165
-    Caption = '打开输出目录'
-    TabOrder = 4
-    OnClick = btnOpenOutClick
-  end
-  object memLog: TMemo
-    Left = 18
-    Height = 510
-    Top = 282
-    Width = 1086
-    Anchors = [akTop, akLeft, akRight, akBottom]
-    Font.Height = -27
-    Font.Name = 'Consolas'
-    ParentFont = False
-    ReadOnly = True
-    ScrollBars = ssAutoBoth
-    TabOrder = 5
-    WordWrap = False
+    object btnBrowseRoot: TButton
+      AnchorSideTop.Control = edRoot
+      AnchorSideRight.Control = grpProj
+      AnchorSideRight.Side = asrBottom
+      AnchorSideBottom.Control = edRoot
+      AnchorSideBottom.Side = asrBottom
+      Left = 944
+      Height = 32
+      Top = 86
+      Width = 96
+      Anchors = [akTop, akRight, akBottom]
+      BorderSpacing.Right = 42
+      Caption = '浏览...'
+      TabOrder = 5
+      OnClick = btnBrowseRootClick
+    end
   end
   object sbMain: TStatusBar
     Left = 0
@@ -149,5 +146,94 @@ object ConvertPanelForm: TConvertPanelForm
     Top = 806
     Width = 1140
     Panels = <>
+  end
+  object Panel1: TPanel
+    AnchorSideTop.Control = grpProj
+    AnchorSideTop.Side = asrBottom
+    AnchorSideBottom.Control = sbMain
+    Left = 18
+    Height = 589
+    Top = 212
+    Width = 1086
+    Anchors = [akTop, akLeft, akBottom]
+    BorderSpacing.Top = 5
+    BorderSpacing.Bottom = 5
+    ClientHeight = 589
+    ClientWidth = 1086
+    TabOrder = 2
+    object memLog: TMemo
+      Left = 1
+      Height = 496
+      Top = 92
+      Width = 1084
+      Align = alClient
+      Font.CharSet = ANSI_CHARSET
+      Font.Height = -21
+      Font.Name = 'Consolas'
+      Font.Pitch = fpFixed
+      Font.Quality = fqDraft
+      ParentFont = False
+      ReadOnly = True
+      ScrollBars = ssAutoBoth
+      TabOrder = 0
+      WordWrap = False
+    end
+    object Panel2: TPanel
+      Left = 1
+      Height = 91
+      Top = 1
+      Width = 1084
+      Align = alTop
+      BevelOuter = bvNone
+      ClientHeight = 91
+      ClientWidth = 1084
+      TabOrder = 1
+      object btnAnalyze: TButton
+        AnchorSideTop.Control = Panel2
+        AnchorSideTop.Side = asrCenter
+        Left = 24
+        Height = 45
+        Top = 23
+        Width = 165
+        Caption = '支持度分析'
+        TabOrder = 0
+        OnClick = btnAnalyzeClick
+      end
+      object btnConvert: TButton
+        AnchorSideTop.Control = Panel2
+        AnchorSideTop.Side = asrCenter
+        Left = 201
+        Height = 45
+        Top = 23
+        Width = 165
+        Caption = '开始转换'
+        Font.Style = [fsBold]
+        ParentFont = False
+        TabOrder = 1
+        OnClick = btnConvertClick
+      end
+      object btnReport: TButton
+        AnchorSideTop.Control = Panel2
+        AnchorSideTop.Side = asrCenter
+        Left = 378
+        Height = 45
+        Top = 23
+        Width = 165
+        Caption = '打开报告'
+        TabOrder = 2
+        OnClick = btnReportClick
+      end
+      object btnOpenOut: TButton
+        AnchorSideTop.Control = Panel2
+        AnchorSideTop.Side = asrCenter
+        Left = 555
+        Height = 45
+        Top = 23
+        Width = 165
+        Caption = '打开输出目录'
+        TabOrder = 3
+        OnClick = btnOpenOutClick
+      end
+    end
   end
 end

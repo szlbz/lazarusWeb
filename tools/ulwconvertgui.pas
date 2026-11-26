@@ -54,7 +54,13 @@ type
     destructor Destroy; override;
   end;
 
+  { TConvertPanelForm }
+
   TConvertPanelForm = class(TForm)
+    btnAnalyze: TButton;
+    btnConvert: TButton;
+    btnOpenOut: TButton;
+    btnReport: TButton;
     { ---- 控件：全部来自 ulwconvertgui.lfm ---- }
     grpProj: TGroupBox;
     lblSrc: TLabel;
@@ -65,21 +71,22 @@ type
     edOut: TEdit;
     btnBrowseOut: TButton;
     edRoot: TEdit;
-    btnAnalyze: TButton;
-    btnConvert: TButton;
-    btnReport: TButton;
-    btnOpenOut: TButton;
+    btnBrowseRoot: TButton;
     memLog: TMemo;
+    Panel1: TPanel;
+    Panel2: TPanel;
     sbMain: TStatusBar;
     { ---- 事件：在 .lfm 里按方法名绑定，必须留在 published 段 ---- }
     procedure FormCreate(Sender: TObject);
     procedure btnBrowseSrcClick(Sender: TObject);
     procedure btnBrowseOutClick(Sender: TObject);
+    procedure btnBrowseRootClick(Sender: TObject);
     procedure btnAnalyzeClick(Sender: TObject);
     procedure btnConvertClick(Sender: TObject);
     procedure btnReportClick(Sender: TObject);
     procedure btnOpenOutClick(Sender: TObject);
     procedure FormCloseQuery(Sender: TObject; var CanClose: boolean);
+    procedure FormShow(Sender: TObject);
   private
     FJob: TConvJob;
     FLastReport: string;
@@ -159,7 +166,7 @@ begin
         Lines.Add('  lazbuild -B --ws=nogui ' + IncludeTrailingPathDelimiter(OutDir) +
           Ctx.ProjName + '.lpi');
         Lines.Add('  ' + IncludeTrailingPathDelimiter(OutDir) + Ctx.ProjName +
-          {$IFDEF WINDOWS}'.exe'{$ENDIF} + ' --port=8090');
+          {$IFDEF WINDOWS}'.exe' +{$ENDIF}  ' --port=8090');
         ReportPath := IncludeTrailingPathDelimiter(OutDir) + 'lwconvert-report.md';
       end
       else
@@ -257,6 +264,11 @@ begin
     Log('转换/分析进行中，等任务完成后再关闭窗口。');
 end;
 
+procedure TConvertPanelForm.FormShow(Sender: TObject);
+begin
+  grpProj.ClientHeight:=edRoot.Top+edRoot.Height+10;
+end;
+
 { 等宽字体：LFM 里写的是 Consolas（Windows 默认有），换到 Linux/macOS 时挑一个 }
 procedure TConvertPanelForm.PickMonoFont;
 
@@ -320,6 +332,9 @@ begin
   edSrc.Enabled := not ABusy;
   edOut.Enabled := not ABusy;
   edRoot.Enabled := not ABusy;
+  btnBrowseSrc.Enabled := not ABusy;
+  btnBrowseOut.Enabled := not ABusy;
+  btnBrowseRoot.Enabled := not ABusy;
   if ABusy then
     sbMain.SimpleText := '处理中...'
   else
@@ -345,6 +360,25 @@ begin
   d := Trim(edOut.Text);
   if SelectDirectory('选择输出目录（不存在可先新建）', '', d) then
     edOut.Text := ExcludeTrailingPathDelimiter(d);
+end;
+
+{ 选仓库根：选到 src 或 src/core 也认（自动退回上一级），选错层级给出提示 }
+procedure TConvertPanelForm.btnBrowseRootClick(Sender: TObject);
+var
+  d: string;
+begin
+  d := Trim(edRoot.Text);
+  if not SelectDirectory('选择 lazarusWeb 仓库根目录（含 src/core）', '', d) then Exit;
+  d := ExcludeTrailingPathDelimiter(d);
+  { 用户常直接点进 src 或 src/core，往上退到仓库根 }
+  while (ExtractFileName(d) = 'core') or (ExtractFileName(d) = 'src') do
+    d := ExcludeTrailingPathDelimiter(ExtractFileDir(d));
+  if not DirectoryExists(IncludeTrailingPathDelimiter(d) + 'src' + PathDelim + 'core') then
+    if MessageDlg('确认目录',
+      '该目录下没有 src\core，可能不是 lazarusWeb 仓库根：' + LineEnding + d +
+      LineEnding + LineEnding + '仍然使用这个目录吗？',
+      mtWarning, [mbYes, mbNo], 0) <> mrYes then Exit;
+  edRoot.Text := d;
 end;
 
 { 公共校验 + 起线程；AConvert=True 转换、False 分析 }

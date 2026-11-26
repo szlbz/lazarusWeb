@@ -45,6 +45,8 @@ type
     Warnings: TStringList;
     Skipped: TStringList;         { 未转换的 class(Txxx)（非 TForm 基类） }
     Matrix: TStringList;          { 类名 -> ok/placeholder/...（来自 CONTROL_MATRIX.md） }
+    Pkgs: TStringList;            { 原 .lpi 的 RequiredPackages（按原顺序保留） }
+    NeedDateTimeCtrls: Boolean;   { .lfm 里有 TDateTimePicker（DateTimeCtrls 包） }
     constructor Create;
     destructor Destroy; override;
   end;
@@ -340,9 +342,18 @@ begin
       else
       begin
         if SkipFile(sub) then Continue;
-        ForceDirectories(ExtractFileDir(d));
-        SaveRaw(d, LoadRaw(s));
-        AConv.Copied.Add(sub);
+        { 单个文件失败不能拖垮整次转换：先例是 QF123 工程里嵌套了一份
+          Lazarus 源码副本，其中中文文件名在 ANSI 版 FindFirst 下变成 '?'，
+          LoadRaw 抛 EFOpenError 直接终止 DoConvert —— 输出目录留上一轮的
+          旧文件，用户看到的是「转换成功但窗体没改写」。 }
+        try
+          ForceDirectories(ExtractFileDir(d));
+          SaveRaw(d, LoadRaw(s));
+          AConv.Copied.Add(sub);
+        except
+          on E: Exception do
+            AConv.Warnings.Add('复制失败（已跳过）: ' + s + ' — ' + E.Message);
+        end;
       end;
     until FindNext(sr) <> 0;
   finally
@@ -512,7 +523,7 @@ end;
 function RewritePasBase(AText: RawByteString; ACtx: TConv;
   const ARelName: string; out AClasses: string): RawByteString;
 var
-  scan, p, q, q2, i, cnt: Integer;
+  scan, p, q, q2, q3, i, cnt: Integer;
   s, clsName, low: string;
 begin
   Result := AText;
@@ -529,19 +540,33 @@ begin
     while (q <= Length(s)) and (s[q] = ' ') do Inc(q);
     if LowerCase(Copy(s, q, 5)) <> 'tform' then
     begin
-      scan := q;                              { 不是 TForm（TFormXxx 等），继续往后找 }
+      scan := q;                              { 不是 TForm，继续往后找 }
       Continue;
     end;
-    { 类名在 '=' 之前：TForm1 = class(TForm) }
-    i := Pos('=', Copy(s, 1, p - 1));
-    clsName := '';
-    if i > 0 then
+    { TForm 后面必须紧跟 ')' / ',' / 空白 —— 否则是 TFormXxx 这种自定义
+      祖先类（class(TFormWithGrid)），改成 TLWFormWithGrid 会直接编译不过 }
+    q3 := q + 5;
+    while (q3 <= Length(s)) and (s[q3] in [' ']) do Inc(q3);
+    if (q3 <= Length(s)) and (s[q3] in ['A'..'Z', 'a'..'z', '0'..'9', '_']) then
     begin
-      q2 := i - 1;
-      while (q2 >= 1) and (s[q2] in [' ', #9]) do Dec(q2);
-      i := q2;
-      while (q2 >= 1) and (s[q2] in ['A'..'Z', 'a'..'z', '0'..'9', '_']) do Dec(q2);
-      clsName := Copy(s, q2 + 1, i - q2);
+      scan := q3;
+      Continue;
+    end;
+    { 类名紧贴在 '=' 左边：TForm1 = class(TForm)。不能取"前面第一个等号"
+      —— 前面的类声明、常量里也有等号，取到的是别人（QF123 的 TWorker） }
+    clsName := '';
+    i := p - 1;
+    while (i >= 1) and (s[i] in [' ', #9]) do Dec(i);
+    if (i >= 1) and (s[i] = '=') then
+    begin
+      Dec(i);
+      while (i >= 1) and (s[i] in [' ', #9]) do Dec(i);
+      q2 := i;                                { 标识符的最后一个字符 }
+      if (q2 >= 1) and (s[q2] in ['A'..'Z', 'a'..'z', '0'..'9', '_']) then
+      begin
+        while (i >= 1) and (s[i] in ['A'..'Z', 'a'..'z', '0'..'9', '_']) do Dec(i);
+        clsName := Copy(s, i + 1, q2 - i);
+      end;
     end;
     s := Copy(s, 1, q - 1) + 'TLWForm' + Copy(s, q + 5, MaxInt);
     Inc(cnt);
@@ -737,9 +762,16 @@ begin
     sl.Add('      <FormatVersion Value="2"/>');
     sl.Add('    </RunParams>');
     sl.Add('    <RequiredPackages>');
-    sl.Add('      <Item>');
-    sl.Add('        <PackageName Value="LCL"/>');
-    sl.Add('      </Item>');
+    { 原工程的依赖包按原顺序保留（DateTimeCtrls / fr_lazarus / lazreport …），
+      只把 LCL 保证在里面；缺了它们，工程里 uses 的第三方单元根本找不到 }
+    if ACtx.Pkgs.IndexOf('LCL') < 0 then
+      ACtx.Pkgs.Add('LCL');
+    for i := 0 to ACtx.Pkgs.Count - 1 do
+    begin
+      sl.Add('      <Item>');
+      sl.Add('        <PackageName Value="' + XmlEscape(ACtx.Pkgs[i]) + '"/>');
+      sl.Add('      </Item>');
+    end;
     sl.Add('    </RequiredPackages>');
     sl.Add('    <Units>');
     sl.Add('      <Unit>');
@@ -769,7 +801,7 @@ begin
     sl.Add('    </Target>');
     sl.Add('    <SearchPaths>');
     sl.Add('      <IncludeFiles Value="$(ProjOutDir)"/>');
-    sl.Add('      <UnitOutputDirectory Value="lib\$(TargetCPU)-$(TargetOS)"/>');
+    sl.Add('      <UnitOutputDirectory Value="lib'+DirectorySeparator+'$(TargetCPU)-$(TargetOS)"/>');
     sl.Add('      <OtherUnitFiles Value="' + XmlEscape(AUnitsPath) + '"/>');
     sl.Add('    </SearchPaths>');
     sl.Add('    <Linking>');
@@ -839,17 +871,45 @@ begin
   end;
 end;
 
+{ 读原 .lpi 的 RequiredPackages（<PackageName Value="LCL"/>）。
+  转换后必须原样保留：桌面工程往往依赖一堆第三方包（DateTimeCtrls、
+  fr_lazarus、lazreport…），只写 LCL 的话生成工程一编译就"unit not found" }
+procedure ReadLpiPackages(const ALpiFile: string; AList: TStringList);
+var
+  s: string;
+  p, q: Integer;
+  v: string;
+begin
+  if not FileExists(ALpiFile) then Exit;
+  s := string(LoadRaw(ALpiFile));
+  p := 1;
+  while True do
+  begin
+    p := PosEx('<PackageName Value="', s, p);
+    if p = 0 then Break;
+    p := p + Length('<PackageName Value="');
+    q := PosEx('"', s, p);
+    if q = 0 then Break;
+    v := Trim(Copy(s, p, q - p));
+    if (v <> '') and (AList.IndexOf(v) < 0) then AList.Add(v);
+    p := q;
+  end;
+end;
+
 { 找 .pas 里的基类：Txxx = class(TForm|TDataModule|TOther) }
 procedure ScanUnitClasses(ACtx: TConv; const AFile, ARelFile: string; AInfo: TUnitInfo);
 var
   sl: TStringList;
   i, p: Integer;
   s, lhs, rhs: string;
+  firstCls, firstBase: string;
 begin
   sl := SplitLines(LoadRaw(AFile));
   try
     AInfo.RelFile := ARelFile;
     AInfo.UName := ChangeFileExt(ExtractFileName(AFile), '');
+    firstCls := '';
+    firstBase := '';
     for i := 0 to sl.Count - 1 do
     begin
       s := Trim(sl[i]);
@@ -861,12 +921,25 @@ begin
       if (Length(rhs) > 0) and (rhs[Length(rhs)] = ')') then
         SetLength(rhs, Length(rhs) - 1);
       if Pos(',', rhs) > 0 then rhs := Trim(Copy(rhs, 1, Pos(',', rhs) - 1));
-      if AInfo.FormClass = '' then
+      { 窗体类不一定排在最前面：QF123 的 QFLazarusUnit.pas 先声明 5 个
+        TThread 后代，TQFBuildFrm 在第 6 个。只认第一个类的话整个单元被
+        判成"非 TForm"跳过 —— 表现为 base 不改成 TLWForm、uses 也没补
+        lwform（坑 200）。所以这里优先认第一个 TForm 后代，一个都没有时
+        才退回第一个类（TDataModule / 其它基类的判定保持不变）。 }
+      if SameText(rhs, 'TForm') then
       begin
         AInfo.FormClass := lhs;
         AInfo.BaseClass := rhs;
+        Exit;
+      end;
+      if firstCls = '' then
+      begin
+        firstCls := lhs;
+        firstBase := rhs;
       end;
     end;
+    AInfo.FormClass := firstCls;
+    AInfo.BaseClass := firstBase;
   finally
     sl.Free;
   end;
@@ -889,6 +962,7 @@ begin
     sl.Add('源工程  : `' + ACtx.SrcDir + '`');
     sl.Add('输出目录: `' + ACtx.OutDir + '`');
     sl.Add('转换器  : lwconvert ' + VERSION);
+    sl.Add('依赖包  : ' + ACtx.Pkgs.DelimitedText);
     sl.Add('');
     sl.Add('## 一、源码改写');
     sl.Add('');
@@ -1031,13 +1105,20 @@ begin
           r.Unknown := TStringList.Create;
           CollectCounts(root, r.Counts, r.Unknown, True, ACtx.Matrix);
           reports.Add(r);
+          { DateTimeCtrls 包的 TDateTimePicker：nogui 下能创建、能序列化
+            （由 lwdatetime 登记 kind 与回写），但生成工程必须带上
+            DateTimeCtrls 依赖和 lwdatetime 单元，否则编译期就找不到单元 }
+          if r.Counts.IndexOf('TDateTimePicker') >= 0 then
+            ACtx.NeedDateTimeCtrls := True;
         end
         else
           ACtx.Warnings.Add(rel + ': .lfm 解析失败 (' + err + ')');
       end;
 
-      { 改写：只改 TForm 基类（TDataModule 等保持原样） }
-      if SameText(u.BaseClass, 'TForm') then
+      { 改写：只改 TForm 基类（TDataModule 等保持原样）。
+        基类已经是 TLWForm 的（人工改过，或上一轮漏改 uses 的遗留）也进来，
+        交给下面只补 uses 的分支，否则这类工程永远补不上 lwform。 }
+      if SameText(u.BaseClass, 'TForm') or SameText(u.BaseClass, 'TLWForm') then
       begin
         dst := IncludeTrailingPathDelimiter(ACtx.OutDir) + rel;
         txt := LoadRaw(dst);
@@ -1072,6 +1153,19 @@ begin
             end;
           end;
         end
+        else if PosCI('class(tlwform', string(txt)) > 0 then
+        begin
+          { 输出目录里的副本已经是 TLWForm（重复转换，或旧版本遗留）：
+            基类不用再改，但 uses 必须保证有 lwform —— 原来这里直接走
+            「没找到 class(TForm)」分支跳过，于是重转一次反而把 uses
+            留成缺 lwform 的状态，编译期报找不到单元。 }
+          txt := EnsureUsesUnit(txt, 'lwform', added2);
+          if added2 then
+          begin
+            ACtx.Changed.Add(rel + ': uses + lwform（基类已是 TLWForm）');
+            SaveRaw(dst, txt);
+          end;
+        end
         else
           ACtx.Warnings.Add(rel + ': 有 .lfm 但没找到 class(TForm)，跳过基类改写');
       end
@@ -1097,12 +1191,26 @@ begin
     txt := EnsureUsesUnit(txt, 'lwapp', added2);
     if added2 then
       ACtx.Changed.Add(lprRel + ': uses + lwapp');
+    { .lfm 里有 TDateTimePicker 时把 lwdatetime 带进来：它登记
+      TDateTimePicker 的 kind 与回写（核心包不依赖 DateTimeCtrls，
+      所以只能由用到它的工程自己 uses） }
+    if ACtx.NeedDateTimeCtrls then
+    begin
+      txt := EnsureUsesUnit(txt, 'lwdatetime', added3);
+      if added3 then
+        ACtx.Changed.Add(lprRel + ': uses + lwdatetime（DateTimeCtrls 支持）');
+    end;
     SaveRaw(dst, txt);
 
     { 5) 生成 .lpi }
     projName := ChangeFileExt(ExtractFileName(AProjLpr), '');
     ACtx.ProjName := projName;
     ReadLpiMeta(AProjLpi, title, otherUnits);
+    { 原工程的依赖包整套保留 —— 之前只写 LCL，DateTimeCtrls / fr_lazarus /
+      lazreport 之类的依赖全丢，转换结果自然编译不过 }
+    ReadLpiPackages(AProjLpi, ACtx.Pkgs);
+    if ACtx.NeedDateTimeCtrls and (ACtx.Pkgs.IndexOf('DateTimeCtrls') < 0) then
+      ACtx.Pkgs.Add('DateTimeCtrls');
     if title = '' then title := projName;
     { 搜索路径 = lazarusWeb/src/core + 原工程的额外单元路径 }
     unitsPath := RelPath(ACtx.OutDir, IncludeTrailingPathDelimiter(ACtx.Root) + 'src' + PathDelim + 'core');
@@ -1234,6 +1342,9 @@ begin
   Warnings := TStringList.Create;
   Skipped := TStringList.Create;
   Matrix := TStringList.Create;
+  Pkgs := TStringList.Create;
+  Pkgs.CaseSensitive := False;
+  NeedDateTimeCtrls := False;
 end;
 
 destructor TConv.Destroy;
@@ -1249,6 +1360,7 @@ begin
   Warnings.Free;
   Skipped.Free;
   Matrix.Free;
+  Pkgs.Free;
   inherited Destroy;
 end;
 
