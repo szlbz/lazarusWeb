@@ -39,10 +39,9 @@
       <Unit>
         <Filename Value="uform_dashboard.pas"/>
         <IsPartOfProject Value="True"/>
-      </Unit>
-      <Unit>
-        <Filename Value="uform_dashboard.lfm"/>
-        <Type Value="Text"/>
+        <ComponentName Value="DashboardForm"/>
+        <HasResources Value="True"/>
+        <ResourceBaseClass Value="Form"/>
       </Unit>
     </Units>
   </ProjectOptions>
@@ -53,15 +52,8 @@
     </Target>
     <SearchPaths>
       <IncludeFiles Value="$(ProjOutDir)"/>
-      <UnitOutputDirectory Value="lib/$(TargetCPU)-$(TargetOS)-nogui"/>
       <OtherUnitFiles Value="../../../src/core;../common"/>
+      <UnitOutputDirectory Value="lib/$(TargetCPU)-$(TargetOS)-nogui"/>
     </SearchPaths>
-    <Linking>
-      <Options>
-        <Win32>
-          <GraphicApplication Value="False"/>
-        </Win32>
-      </Options>
-    </Linking>
   </CompilerOptions>
 </CONFIG>

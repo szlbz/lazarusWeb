@@ -39,10 +39,9 @@
       <Unit>
         <Filename Value="umain.pas"/>
         <IsPartOfProject Value="True"/>
-      </Unit>
-      <Unit>
-        <Filename Value="umain.lfm"/>
-        <Type Value="Text"/>
+        <ComponentName Value="MainForm"/>
+        <HasResources Value="True"/>
+        <ResourceBaseClass Value="Form"/>
       </Unit>
       <Unit>
         <Filename Value="../common/upluginproc.pas"/>
@@ -57,15 +56,8 @@
     </Target>
     <SearchPaths>
       <IncludeFiles Value="$(ProjOutDir)"/>
-      <UnitOutputDirectory Value="lib/$(TargetCPU)-$(TargetOS)-nogui"/>
       <OtherUnitFiles Value="../../../src/core;../common"/>
+      <UnitOutputDirectory Value="lib/$(TargetCPU)-$(TargetOS)-nogui"/>
     </SearchPaths>
-    <Linking>
-      <Options>
-        <Win32>
-          <GraphicApplication Value="False"/>
-        </Win32>
-      </Options>
-    </Linking>
   </CompilerOptions>
 </CONFIG>

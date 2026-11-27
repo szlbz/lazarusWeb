@@ -14,6 +14,10 @@ TPageControl 的页签里**：左边是框架的 LCL 侧栏菜单 `TLWSideMenu`�
 - 插件有**用户权限**：先登录（admin / analyst / guest），菜单只列当前角色
   能看的插件，直接敲 `/p/报表/` 也会被宿主路由层回 403 —— 不是只藏菜单。
 
+> **想要「宿主不是 LCL 应用」的版本？** 见 `demos/plugins_lwhyperDemo`：
+> 同一批插件换成 `tools/lwhyper.exe` 当宿主（无 LCL），登录入口由 lwhyper
+> 内置（默认必须登录），管理员改 `users.ini` 即可，不用动 Pascal 代码。
+
 ## 目录
 
 ```

@@ -106,58 +106,17 @@ procedure LWAuthRegister;
 implementation
 
 uses
-  DateUtils, sha1, upluginguard;
+  DateUtils, sha1, lwpluginguard, lwpluginauth;
 
 function LWAuthHasRole(const ARoles, ARole: string): Boolean;
-var
-  s: string;
-  p: Integer;
 begin
-  Result := False;
-  if (ARoles = '') or (ARole = '') then Exit;
-  s := ARoles;
-  while s <> '' do
-  begin
-    p := Pos(',', s);
-    if p > 0 then
-    begin
-      if SameText(Trim(Copy(s, 1, p - 1)), ARole) then Exit(True);
-      s := Copy(s, p + 1, MaxInt);
-    end
-    else
-    begin
-      if SameText(Trim(s), ARole) then Exit(True);
-      s := '';
-    end;
-  end;
+  { 角色解析已上提到 src/core/lwpluginauth.pas，lwhyper 共用同一份判定 }
+  Result := LWPluginHasRole(ARoles, ARole);
 end;
 
 function LWAuthCanOpen(const ARoles, ANeed: string): Boolean;
-var
-  s: string;
-  p: Integer;
 begin
-  { 清单没写 roles=：不算"限制"，只是"任何已登录用户" }
-  if Trim(ANeed) = '' then Exit(True);
-  if Trim(ARoles) = '' then Exit(False);
-  { 管理员通配：加插件时不用回头改 admin 的角色串 }
-  if LWAuthHasRole(ARoles, LWAuthAdminRole) then Exit(True);
-  s := ANeed;
-  while s <> '' do
-  begin
-    p := Pos(',', s);
-    if p > 0 then
-    begin
-      if LWAuthHasRole(ARoles, Trim(Copy(s, 1, p - 1))) then Exit(True);
-      s := Copy(s, p + 1, MaxInt);
-    end
-    else
-    begin
-      if LWAuthHasRole(ARoles, Trim(s)) then Exit(True);
-      s := '';
-    end;
-  end;
-  Result := False;
+  Result := LWPluginCanOpen(ARoles, ANeed);
 end;
 
 function LWAuthRoleName(const ARole: string): string;
@@ -401,8 +360,7 @@ begin
   ATS := IntToStr(DateTimeToUnix(Now, False));
   { 与 upluginidentity.Checked 用同一个 secret、同一个拼接顺序。
     浏览器伪造 X-LW-User 时算不出这个 token，插件侧会直接拒掉 }
-  AToken := LowerCase(SHA1Print(SHA1String(
-    PlugGuardSecret + '|' + AUser + '|' + ARoles + '|' + ATS)));
+  AToken := LWPluginSignIdentity(AUser, ARoles, ATS);
 end;
 
 procedure LWAuthRegister;

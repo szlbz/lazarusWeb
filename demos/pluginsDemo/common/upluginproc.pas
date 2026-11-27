@@ -42,7 +42,8 @@ unit upluginproc;
 interface
 
 uses
-  Classes, SysUtils, Process, Sockets, lwconfig, lwroute, lwrlog, upluginguard;
+  Classes, SysUtils, Process, Sockets, lwconfig, lwroute, lwrlog, upluginguard
+  {$IFDEF UNIX}, BaseUnix{$ENDIF};
 
 type
   TPlugPlugin = class
@@ -160,8 +161,10 @@ begin
     end;
     {$IFDEF UNIX}
     { TFileStream 新建的 .run 副本只有 0644，Linux 下 TProcess 会
-      Permission denied；显式补执行位，Windows 下无此问题 }
-    FileSetAttr(Dst, &755);
+      Permission denied（退出码 127）；显式补执行位。
+      用 fpChmod 而不是 FileSetAttr：实测本机的 FileSetAttr 没生效，
+      复制出来的副本仍是 0644。Windows 下无此问题 }
+    fpChmod(Dst, &755);
     {$ENDIF}
   finally
     fs.Free;
@@ -223,12 +226,23 @@ begin
       exe := ExpandFileName(exe)
     else
       exe := ExpandFileName(IncludeTrailingPathDelimiter(dir) + exe);
-    { Linux 下 FPC 产物没有 .exe 后缀：清单仍写 exe=xxx.exe，
-      找不到时退到同目录的无后缀文件（Windows 下文件在，不走这里） }
-    if (not FileExists(exe)) and (CompareText(ExtractFileExt(exe), '.exe') = 0) then
+    { Linux 下 FPC 产物没有 .exe 后缀：清单仍写 exe=xxx.exe。
+      UNIX 上只要同目录有同名的无后缀文件就优先用它 —— 不能只看
+      "xxx.exe 不存在才退"，因为从 Windows 把构建目录整包传过来时，
+      xxx.exe 会跟着一起上来（PE 文件），宿主 exec 它只会得到退出码 127，
+      而真正的 aarch64/ELF 就在旁边（dashplug）。Windows 上没有无后缀
+      文件，保持原来的"缺了才退"。 }
+    if CompareText(ExtractFileExt(exe), '.exe') = 0 then
     begin
       alt := Copy(exe, 1, Length(exe) - 4);
-      if FileExists(alt) then exe := alt;
+      if FileExists(alt) then
+      begin
+        {$IFDEF UNIX}
+        exe := alt;
+        {$ELSE}
+        if not FileExists(exe) then exe := alt;
+        {$ENDIF}
+      end;
     end;
 
     ic := Trim(cfg.Str(['icon'], ''));
@@ -538,6 +552,13 @@ begin
         LWLog('[pluginsDemo] 插件进程启动后立即退出: ' + p.Name +
           '（退出码 ' + IntToStr(p.Proc.ExitCode) + '；被启动守卫拦下时是 ' +
           IntToStr(PlugGuardExitCode) + '，见插件目录 plugin-guard.log）');
+        {$IFDEF UNIX}
+        { 126/127 是系统根本没执行起来（不是本机架构的可执行文件 / 没有执行位），
+          与启动守卫无关（守卫拦下是 3）。最常见的原因是 exe= 指到了 Windows 的 PE }
+        if p.Proc.ExitCode in [126, 127] then
+          LWLog('[pluginsDemo] 提示: 退出码 ' + IntToStr(p.Proc.ExitCode) +
+            ' = 系统无法执行该文件（不是本机架构 ELF 或缺执行位）: ' + p.RunExe);
+        {$ENDIF}
         Exit;
       end;
       Sleep(100);

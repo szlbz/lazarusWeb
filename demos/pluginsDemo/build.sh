@@ -9,6 +9,11 @@
 # Override tool: LAZBUILD=/path/to/lazbuild ./build.sh
 set -e
 
+# bash-only ${BASH_SOURCE[0]} below: re-exec under bash when called via sh/dash
+if [ -z "${BASH_VERSION:-}" ]; then
+  exec bash "$0" "$@"
+fi
+
 HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 LAZBUILD="${LAZBUILD:-lazbuild}"
 
