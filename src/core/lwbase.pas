@@ -20,10 +20,10 @@ uses
   Classes, SysUtils, Graphics, Controls, Forms, TypInfo, fpjson;
 
 const
-  LW_VERSION = '0.9.6';
+  LW_VERSION = '0.9.8';
   { Alpine.js 客户端外壳引用的 alpine.min.js 版本（src\client\alpine.min.js）。
     换文件时同步改这里，横幅显示用 }
-  ALPINE_VERSION = '3.14.9';
+  ALPINE_VERSION = '3.17.5';
   { 单个表格最多序列化的行数，防止超大表格把 JSON 撑爆 }
   LW_MAX_GRID_ROWS = 2000;
 
@@ -38,9 +38,14 @@ type
     FAuthenticated: Boolean;
     { 本会话的登录窗体（ApiSession 创建时登记，注销时重新 Show 它）}
     FLoginForm: TCustomForm;
+    { 会话来源 IP：lwhttp 建会话时从请求写入（反代下取 X-Forwarded-For 首段）。
+      放基类是为了让 lwlogin 只依赖 lwbase 就能做"按 IP 的登录失败锁定" ——
+      lwlogin 不能反向引用 lwsession（会形成循环单元引用）。 }
+    FRemoteIP: string;
     property RequireAuth: Boolean read FRequireAuth write FRequireAuth;
     property Authenticated: Boolean read FAuthenticated write FAuthenticated;
     property LoginForm: TCustomForm read FLoginForm write FLoginForm;
+    property RemoteIP: string read FRemoteIP write FRemoteIP;
     { 模态显示一个窗体：推送渲染指令给浏览器，然后阻塞当前请求线程等待结果 }
     function ShowModalInSession(AForm: TCustomForm): Integer; virtual; abstract;
     { 窗体被关闭（含 ModalResult 设定） }
