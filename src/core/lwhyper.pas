@@ -51,6 +51,7 @@ interface
 uses
   Classes, SysUtils, DateUtils, SyncObjs, fphttpserver, httpdefs, httpprotocol,
   fpjson, jsonparser, ssockets, fphttpclient, Process, lwrlog, lwwebsocket, lwbase,
+  lwroute, lwpluginauth, lwhyperplugin, lwhyperauth, lwhyperui,
   opensslsockets;
 
 type
@@ -72,6 +73,17 @@ type
       worker 的命令行，热更新前 POST /lw/shutdown 让它自己收尾。
       不对外暴露参数（运维不需要知道，也不该手工指定） }
     ShutdownToken: string;
+    { 插件宿主模式：扫描 <PluginRoot>\<插件目录>\*.plugin.ini，按 /p/<名>/
+      反代到独立插件 exe。False = 原有"单 exe 多 worker"模式。
+      两种模式互斥使用同一监听端口，但代码共用 TLWHyperServer。 }
+    PluginMode: Boolean;
+    PluginRoot: string;
+    { 插件模式的登录入口。默认开：未登录只能看到 /login，/p/ 一律送回登录。
+      AuthEnabled=False 是显式的逃生开关（--no-auth），只给本机调试用。 }
+    AuthEnabled: Boolean;
+    UsersFile: string;     { 用户表 ini（每节 [用户名]：pass=/roles=/display=） }
+    SessionMin: Integer;   { 会话空闲超时（分钟），缺省 480 }
+    LoginHint: string;     { 登录页脚注（演示账号提示），可空 }
     { TLS（纯 FPC）：只在外层监听终结，worker 间仍明文转发 }
     UseSSL: Boolean;
     SSLHost: string;
@@ -180,6 +192,9 @@ type
   private
     FCfg: TLWHyperConfig;
     FWorkers: array of TLWWorker;
+    FPlugins: TLWHyperPluginManager;  { 仅 PluginMode 下创建 }
+    FLookup: TLWPluginIdentityLookup; { 宿主注入的 sid -> 身份查询 }
+    FAuth: TLWHyperAuth;              { 仅 PluginMode + AuthEnabled 下创建 }
     FHTTP: TFPHttpServer;
     FMap: TStringList;             { sid -> worker 下标 }
     FMapLock: TRTLCriticalSection;
@@ -225,8 +240,25 @@ type
       var AResponse: TFPHTTPConnectionResponse; AIndex: Integer): Boolean;
     procedure Reply(const AText, AMime: string; ACode: Integer;
       var AResponse: TFPHTTPConnectionResponse);
+    { 插件模式：宿主直出框架静态资源（/lw/*.js|css、/ext/*、favicon） }
+    procedure ServeLocalAsset(const ARelativePath: string;
+      var AResponse: TFPHTTPConnectionResponse);
     procedure ApiHealth(var AResponse: TFPHTTPConnectionResponse);
     procedure ApiStatus(var AResponse: TFPHTTPConnectionResponse);
+    { ---- 插件模式的登录入口（/、/login、/lw/login、/lw/logout、/p/ 闸门） ---- }
+    procedure LoadAuthUsers;   { Start 时读用户表；失败直接抛异常，配置错误不静默 }
+    function HandleAuthRoute(const APath, AMethod: string;
+      var ARequest: TFPHTTPConnectionRequest;
+      var AResponse: TFPHTTPConnectionResponse): Boolean;
+    { True = 已拦截（重定向 / 401）；False = 已登录，调用方继续走插件路由 }
+    function PluginGate(var ARequest: TFPHTTPConnectionRequest;
+      var AResponse: TFPHTTPConnectionResponse; const APath: string): Boolean;
+    procedure BuildUIItems(const ARoles: string; out AItems: TLWHyperUIItems;
+      out ATotal: Integer);
+    procedure ReplyPage(const AHTML: string; ACode: Integer;
+      var AResponse: TFPHTTPConnectionResponse);
+    procedure RedirectTo(const ALocation: string;
+      var AResponse: TFPHTTPConnectionResponse);
     { WebSocket }
     procedure WSHandlesUpgrade(aRequest: TFPHTTPConnectionRequest;
       var aHandles: Boolean);
@@ -243,7 +275,11 @@ type
     destructor Destroy; override;
     procedure Start;
     procedure Stop;
+    { 插件模式注入身份查询回调。注入后自动开启 /p/ 鉴权与身份头签名；
+      不注入则插件路由沿用 lwroute 默认行为（不鉴权、不传身份）。 }
+    procedure SetIdentityLookup(ALookup: TLWPluginIdentityLookup);
     property Cfg: TLWHyperConfig read FCfg;
+    property Plugins: TLWHyperPluginManager read FPlugins;
     { worker 明细 JSON（/lw/hyper/status 响应体同源）。
       GUI 面板（lwhyper_gui）在主线程定时调它刷 ListView；
       与 HTTP 线程读写同一组字段，粒度同 ApiStatus（良性读竞争） }
@@ -263,6 +299,45 @@ const
   POLL_MS = 2000;   { healthz 巡检间隔 }
   HU_POLL_MS = 2000;   { 新版本文件轮询间隔 }
   HU_READY_MS = 30000; { 单个 worker 换上新品后等待就绪的上限 }
+
+{ lwroute 的回调是全局函数指针；TLWHyperServer 通常一进程一实例，
+  这里用一个"当前实例"间接层把回调转给注入的 FLookup。 }
+var
+  GHyperPluginServer: TLWHyperServer = nil;
+
+function LWHyperPluginAuthGuard(const AName, ASid: string;
+  out AUser, AReason: string): Boolean;
+var
+  p: TLWHyperPlugin;
+  roles, dummy: string;
+begin
+  AUser := '';
+  AReason := '';
+  Result := False;
+  if (GHyperPluginServer = nil) or (GHyperPluginServer.FPlugins = nil) or
+     (not Assigned(GHyperPluginServer.FLookup)) then
+    Exit(True);   { 没注入身份查询 = 不启用鉴权，与旧 lwroute 行为一致 }
+  p := GHyperPluginServer.FPlugins.ByName(AName);
+  if p = nil then roles := '' else roles := p.Roles;
+  Result := LWPluginAuthorize(GHyperPluginServer.FLookup, ASid, roles,
+    AUser, dummy, AReason);
+end;
+
+function LWHyperPluginIdentity(const ASid: string;
+  out AUser, ARoles, AToken, ATS: string): Boolean;
+begin
+  AUser := '';
+  ARoles := '';
+  AToken := '';
+  ATS := '';
+  Result := False;
+  if (GHyperPluginServer = nil) or
+     (not Assigned(GHyperPluginServer.FLookup)) then Exit;
+  Result := GHyperPluginServer.FLookup(ASid, AUser, ARoles);
+  if not Result then Exit;
+  ATS := IntToStr(DateTimeToUnix(Now, False));
+  AToken := LWPluginSignIdentity(AUser, ARoles, ATS);
+end;
 
 { hop-by-hop 头：代理必须剥掉（RFC 7230 6.1）+ 由两端各自生成的头 }
 function IsHopByHop(const AName: string): Boolean;
@@ -965,12 +1040,43 @@ begin
   FUpdating := False;
   FUpdateCount := 0;
   FStartedAt := Now;
-  SetLength(FWorkers, FCfg.WorkerCount);
-  for i := 0 to FCfg.WorkerCount - 1 do
+  FPlugins := nil;
+  FLookup := nil;
+  FAuth := nil;
+  if FCfg.PluginMode then
   begin
-    FWorkers[i] := TLWWorker.Create(FCfg.BasePort + i);
-    FWorkers[i].LogPath := IncludeTrailingPathDelimiter(FCfg.LogDir) +
-      'worker' + IntToStr(i + 1) + '.log';
+    { 插件模式不拉起旧 worker 池 / 不跑换壳 updater；插件进程由
+      TLWHyperPluginManager 管，各自独立端口与清单热更新 }
+    SetLength(FWorkers, 0);
+    FCfg.PluginRoot := LWResolveExeRelativePath(FCfg.PluginRoot);
+    FPlugins := TLWHyperPluginManager.Create(FCfg.PluginRoot);
+    GHyperPluginServer := Self;
+    { 登录入口：默认开。会话表由本实例持有，lwroute 的 /p/ 鉴权通过
+      HyperAuthLookup（全局，因为那个回调类型是普通函数指针）查它 }
+    if FCfg.AuthEnabled then
+    begin
+      FAuth := TLWHyperAuth.Create(FCfg.SessionMin);
+      GHyperAuth := FAuth;
+      FLookup := @HyperAuthLookup;
+      SetIdentityLookup(@HyperAuthLookup);
+    end
+    else
+    begin
+      { 显式关掉鉴权（--no-auth）：别留下上一轮的 /p/ 回调，
+        否则旧回调会拿空会话把请求全拒掉 }
+      LWRouteSetAuth(nil);
+      LWRouteSetIdentity(nil);
+    end;
+  end
+  else
+  begin
+    SetLength(FWorkers, FCfg.WorkerCount);
+    for i := 0 to FCfg.WorkerCount - 1 do
+    begin
+      FWorkers[i] := TLWWorker.Create(FCfg.BasePort + i);
+      FWorkers[i].LogPath := IncludeTrailingPathDelimiter(FCfg.LogDir) +
+        'worker' + IntToStr(i + 1) + '.log';
+    end;
   end;
 end;
 
@@ -988,6 +1094,15 @@ begin
   { FHTTP 在这里收：Stop 只负责唤醒 accept 循环，
     调用方必须先 WaitFor 启动线程再 Free 本对象 }
   FreeAndNil(FHTTP);
+  FreeAndNil(FPlugins);
+  if GHyperPluginServer = Self then GHyperPluginServer := nil;
+  if (FAuth <> nil) and (GHyperAuth = FAuth) then
+  begin
+    GHyperAuth := nil;
+    LWRouteSetAuth(nil);
+    LWRouteSetIdentity(nil);
+  end;
+  FreeAndNil(FAuth);
   for i := 0 to High(FWorkers) do
     FWorkers[i].Free;
   SetLength(FWorkers, 0);
@@ -1002,22 +1117,35 @@ procedure TLWHyperServer.Start;
 var
   i: Integer;
 begin
-  { 先拉 worker 再开监听；没就绪的 worker 会被探针标成 dead（代理回 502），
-    不用阻塞等 }
-  for i := 0 to High(FWorkers) do
-    FWorkers[i].Launch(FCfg, i);
-  { 守护线程必须在 FHTTP.Active := True 之前启动：
-    trunk 的 SetActive -> StartAccepting 进入 accept 循环永不返回
-    （与 nogui worker 同一行为），之后的代码永远执行不到 }
-  FMonitor := TLWHyperMonitor.Create(True);
-  FMonitor.FHyper := Self;
-  FMonitor.Start;
-  { 热更新线程同样要在 accept 循环之前起来（理由同上）。
-    监听开关在配置里，关掉时不建线程 }
-  if FCfg.HotUpdate then
+  if FCfg.PluginMode then
   begin
-    FUpdater := TLWHyperUpdater.Create(Self);
-    FUpdater.Start;
+    { 插件模式：先读用户表（配置错就当场报出来，别等到有人访问登录页
+      才发现没有账号），再清单发现 -> 注册 /p/ 路由 -> 拉起插件 -> 巡检。 }
+    LoadAuthUsers;
+    FPlugins.Discover;
+    FPlugins.RegisterRoutes;
+    FPlugins.LaunchAll;
+    FPlugins.StartMonitor;
+  end
+  else
+  begin
+    { 先拉 worker 再开监听；没就绪的 worker 会被探针标成 dead（代理回 502），
+      不用阻塞等 }
+    for i := 0 to High(FWorkers) do
+      FWorkers[i].Launch(FCfg, i);
+    { 守护线程必须在 FHTTP.Active := True 之前启动：
+      trunk 的 SetActive -> StartAccepting 进入 accept 循环永不返回
+      （与 nogui worker 同一行为），之后的代码永远执行不到 }
+    FMonitor := TLWHyperMonitor.Create(True);
+    FMonitor.FHyper := Self;
+    FMonitor.Start;
+    { 热更新线程同样要在 accept 循环之前起来（理由同上）。
+      监听开关在配置里，关掉时不建线程 }
+    if FCfg.HotUpdate then
+    begin
+      FUpdater := TLWHyperUpdater.Create(Self);
+      FUpdater.Start;
+    end;
   end;
   FHTTP := TFPHttpServer.Create(nil);
   FHTTP.Port := FCfg.Port;
@@ -1057,6 +1185,16 @@ procedure TLWHyperServer.Stop;
 var
   i: Integer;
 begin
+  if FCfg.PluginMode then
+  begin
+    if FPlugins <> nil then
+    begin
+      FPlugins.StopMonitor;
+      FPlugins.StopAll;
+    end;
+    if FHTTP <> nil then FHTTP.Active := False;
+    Exit;
+  end;
   { 先停热更新线程：它可能正在重启 worker，晚停会和下面的 Kill 抢同一个进程 }
   if FUpdater <> nil then
   begin
@@ -1080,6 +1218,274 @@ begin
   end;
   for i := 0 to High(FWorkers) do
     FWorkers[i].Kill;
+end;
+
+procedure TLWHyperServer.SetIdentityLookup(ALookup: TLWPluginIdentityLookup);
+begin
+  FLookup := ALookup;
+  GHyperPluginServer := Self;
+  if Assigned(ALookup) then
+  begin
+    LWRouteSetAuth(@LWHyperPluginAuthGuard);
+    LWRouteSetIdentity(@LWHyperPluginIdentity);
+  end
+  else
+  begin
+    LWRouteSetAuth(nil);
+    LWRouteSetIdentity(nil);
+  end;
+end;
+
+{ ---------------- 插件模式的登录入口 ---------------- }
+
+procedure TLWHyperServer.ReplyPage(const AHTML: string; ACode: Integer;
+  var AResponse: TFPHTTPConnectionResponse);
+begin
+  Reply(AHTML, 'text/html; charset=utf-8', ACode, AResponse);
+  AResponse.SetCustomHeader('Cache-Control', 'no-store');
+end;
+
+procedure TLWHyperServer.RedirectTo(const ALocation: string;
+  var AResponse: TFPHTTPConnectionResponse);
+begin
+  { 302 而不是 301：登录态是会变的，别让浏览器把跳转永久缓存下来 }
+  AResponse.Code := 302;
+  AResponse.CodeText := 'Found';
+  AResponse.SetCustomHeader('Location', ALocation);
+  AResponse.SetCustomHeader('Cache-Control', 'no-store');
+  AResponse.Content := '';
+end;
+
+procedure TLWHyperServer.LoadAuthUsers;
+var
+  err: string;
+begin
+  if (not FCfg.PluginMode) or (not FCfg.AuthEnabled) then Exit;
+  if FAuth = nil then Exit;
+  if not FAuth.LoadUsers(FCfg.UsersFile, err) then
+    raise Exception.Create(
+      '插件模式已启用登录（缺省行为），但用户表不可用：' + err +
+      '。用 --users=<用户表.ini> 指定，或显式 --no-auth 关闭鉴权（仅本机调试）');
+end;
+
+procedure TLWHyperServer.BuildUIItems(const ARoles: string;
+  out AItems: TLWHyperUIItems; out ATotal: Integer);
+var
+  i, n: Integer;
+  p: TLWHyperPlugin;
+begin
+  SetLength(AItems, 0);
+  ATotal := 0;
+  if FPlugins = nil then Exit;
+  ATotal := FPlugins.Count;
+  for i := 0 to FPlugins.Count - 1 do
+  begin
+    p := FPlugins.Item(i);
+    if p = nil then Continue;
+    { 工作台只列当前角色能打开的：菜单不骗人；真正的强制点仍是路由层 }
+    if not LWPluginCanOpen(ARoles, p.Roles) then Continue;
+    n := Length(AItems);
+    SetLength(AItems, n + 1);
+    AItems[n].Name := p.Name;
+    AItems[n].Title := p.Title;
+    AItems[n].Group := p.Group;
+    AItems[n].Roles := p.Roles;
+    AItems[n].Port := p.Port;
+    AItems[n].Alive := p.Alive;
+  end;
+end;
+
+{ /p/ 闸门：没登录就别把请求放进插件路由（那里只会回 403 页面，
+  用户看不出该去登录）。页面导航回登录页，插件内部的 /lw/* 调用给 401 JSON，
+  免得把一段 HTML 塞进 fetch 的响应里。 }
+function TLWHyperServer.PluginGate(var ARequest: TFPHTTPConnectionRequest;
+  var AResponse: TFPHTTPConnectionResponse; const APath: string): Boolean;
+
+  function UrlEnc(const S: string): string;
+  var
+    i: Integer;
+    c: Char;
+  begin
+    Result := '';
+    for i := 1 to Length(S) do
+    begin
+      c := S[i];
+      if ((c >= 'a') and (c <= 'z')) or ((c >= 'A') and (c <= 'Z')) or
+         ((c >= '0') and (c <= '9')) or (c = '-') or (c = '_') or
+         (c = '.') or (c = '/') or (c = '?') or (c = '=') or (c = '&') then
+        Result := Result + c
+      else
+        Result := Result + '%' + IntToHex(Ord(c), 2);
+    end;
+  end;
+
+var
+  u, r, d, tok, rest, sub, target: string;
+  slashIdx: Integer;
+begin
+  Result := True;
+  try
+    if HyperAuthOf(FAuth, ARequest, u, r, d, tok) then Exit(False);
+  except
+    Exit(False);   { 鉴权自身出错时别把整站锁死，交给路由层判定 }
+  end;
+
+  rest := Copy(APath, Length('/p/') + 1, MaxInt);
+  slashIdx := Pos('/', rest);
+  if slashIdx > 0 then
+    sub := Copy(rest, slashIdx, MaxInt)
+  else
+    sub := '/';
+
+  if Copy(sub, 1, 4) = '/lw/' then
+  begin
+    { 插件页面里的接口调用：401 + JSON，前端好处理 }
+    AResponse.Code := 401;
+    AResponse.CodeText := 'Unauthorized';
+    AResponse.ContentType := 'application/json; charset=utf-8';
+    AResponse.Content := '{"ok":false,"err":"unauthenticated",' +
+      '"msg":"会话不存在或已过期，请回到工作台重新登录"}';
+    AResponse.SetCustomHeader('Cache-Control', 'no-store');
+    Exit;
+  end;
+
+  target := '/login?next=' + UrlEnc(ARequest.URL);
+  RedirectTo(target, AResponse);
+end;
+
+{ 返回 True = 这个请求已经处理完（页面/跳转/401），Route 直接返回。
+  返回 False = 与登录无关或已登录放行，交给后面的插件路由。 }
+function TLWHyperServer.HandleAuthRoute(const APath, AMethod: string;
+  var ARequest: TFPHTTPConnectionRequest;
+  var AResponse: TFPHTTPConnectionResponse): Boolean;
+var
+  u, r, d, tok, next, user, pass, err, brand: string;
+  items: TLWHyperUIItems;
+  total: Integer;
+begin
+  Result := True;
+  brand := HYPER_BRAND;
+
+  { 工作台首页 }
+  if (APath = '/') or (APath = '/index.html') or (APath = '/workbench') then
+  begin
+    if not HyperAuthOf(FAuth, ARequest, u, r, d, tok) then
+    begin
+      RedirectTo('/login?next=/', AResponse);
+      Exit;
+    end;
+    BuildUIItems(r, items, total);
+    ReplyPage(HyperWorkbenchPage(u, d, r, LWPluginRoleText(r), items, total, brand),
+      200, AResponse);
+    Exit;
+  end;
+
+  { 登录页（GET） }
+  if APath = '/login' then
+  begin
+    if HyperAuthOf(FAuth, ARequest, u, r, d, tok) then
+    begin
+      RedirectTo('/', AResponse);
+      Exit;
+    end;
+    next := '';
+    if Assigned(ARequest.QueryFields) then
+      next := ARequest.QueryFields.Values['next'];
+    ReplyPage(HyperLoginPage('', next, FCfg.LoginHint, brand), 200, AResponse);
+    Exit;
+  end;
+
+  { 登录提交 }
+  if APath = '/lw/login' then
+  begin
+    if AMethod <> 'POST' then
+    begin
+      RedirectTo('/login', AResponse);
+      Exit;
+    end;
+    user := Trim(ARequest.ContentFields.Values['user']);
+    pass := ARequest.ContentFields.Values['pass'];
+    { 登录页把 next 放在 form action 的 query 里（百分号编码），所以先读
+      QueryFields —— 表单 body 里未编码的 '/' 在 fcl-web 的解析里会丢，
+      用它当权威来源不可靠。hidden 字段只作兜底（老页面/直接 POST 的客户端） }
+    next := '';
+    if Assigned(ARequest.QueryFields) then
+      next := ARequest.QueryFields.Values['next'];
+    if next = '' then
+      next := ARequest.ContentFields.Values['next'];
+    err := '';
+    if FAuth.Login(user, pass, tok, r, d, err) then
+    begin
+      { Cookie 落 Path=/：插件 iframe 里的子资源请求也自动带上，
+        lwroute 的 RouteReqSid 从同一个 Cookie 名取到会话令牌 }
+      HyperSetCookie(AResponse, HYPER_SID_COOKIE, tok, '/', FAuth.TTLMin * 60);
+      LWLogFmt('[hyper-auth] 会话建立 user=%s from %s',
+        [user, ARequest.RemoteAddress]);
+      RedirectTo(HyperSafeNext(next), AResponse);
+    end
+    else
+    begin
+      LWLogFmt('[hyper-auth] 登录失败 user=%s from %s：%s',
+        [user, ARequest.RemoteAddress, err]);
+      ReplyPage(HyperLoginPage(err, next, FCfg.LoginHint, brand), 200, AResponse);
+    end;
+    Exit;
+  end;
+
+  { 注销 }
+  if (APath = '/lw/logout') or (APath = '/logout') then
+  begin
+    tok := HyperRequestToken(ARequest);
+    if tok <> '' then
+    begin
+      FAuth.Logout(tok);
+      LWLog('[hyper-auth] 注销 token=' + Copy(tok, 1, 8) + '…');
+    end;
+    HyperClearCookie(AResponse, HYPER_SID_COOKIE, '/');
+    RedirectTo('/login', AResponse);
+    Exit;
+  end;
+
+  { 状态接口：暴露插件端口/进程信息，登录后才给看 }
+  if APath = '/lw/hyper/status' then
+  begin
+    if not HyperAuthOf(FAuth, ARequest, u, r, d, tok) then
+    begin
+      AResponse.Code := 401;
+      AResponse.CodeText := 'Unauthorized';
+      AResponse.ContentType := 'application/json; charset=utf-8';
+      AResponse.Content := '{"ok":false,"err":"unauthenticated"}';
+      AResponse.SetCustomHeader('Cache-Control', 'no-store');
+      Exit;
+    end;
+    ApiStatus(AResponse);
+    Exit;
+  end;
+
+  { 工作台自身的静态资源（/lw/lw.js 等）。只给登录用户，避免未登录时
+    也能从宿主批量拉前端文件 }
+  if Copy(APath, 1, 4) = '/lw/' then
+  begin
+    if not HyperAuthOf(FAuth, ARequest, u, r, d, tok) then
+    begin
+      AResponse.Code := 401;
+      AResponse.CodeText := 'Unauthorized';
+      AResponse.ContentType := 'text/plain; charset=utf-8';
+      AResponse.Content := '401 unauthorized';
+      Exit;
+    end;
+    ServeLocalAsset(APath, AResponse);
+    Exit;
+  end;
+
+  { 插件路由闸门：已登录返回 False 让 Route 继续走 lwroute }
+  if Copy(APath, 1, 3) = '/p/' then
+  begin
+    Result := PluginGate(ARequest, AResponse, APath);
+    Exit;
+  end;
+
+  Result := False;
 end;
 
 function TLWHyperServer.DoHealthProbe(APort: Word; out ASessions: Integer): Boolean;
@@ -1367,8 +1773,11 @@ end;
 procedure TLWHyperServer.Route(var ARequest: TFPHTTPConnectionRequest;
   var AResponse: TFPHTTPConnectionResponse);
 var
-  p, method, sid, iconPath: string;
+  p, method, sid, iconPath, localPath: string;
   idx: Integer;
+  uiItems: TLWHyperUIItems;
+  uiTotal: Integer;
+  routeResult: TLWRouteHandled;
   ms: TMemoryStream;
 begin
   method := UpperCase(ARequest.Method);
@@ -1386,6 +1795,15 @@ begin
     ApiHealth(AResponse);
     Exit;
   end;
+
+  { 插件模式 + 登录：工作台、登录、注销、状态、宿主静态资源、/p/ 闸门。
+    健康探针 /lw/healthz 保持公开（LB/k8s 探针不登录）；其余在
+    HandleAuthRoute 里判。未启用鉴权时整块跳过，行为与旧版一致。 }
+  if FCfg.PluginMode and FCfg.AuthEnabled then
+  begin
+    if HandleAuthRoute(p, method, ARequest, AResponse) then Exit;
+  end;
+
   if p = '/lw/hyper/status' then
   begin
     ApiStatus(AResponse);
@@ -1417,6 +1835,31 @@ begin
     else
       AResponse.Code := 204;
     Exit;
+  end;
+
+  { 插件模式但显式关了登录（--no-auth，仅本机调试）：/ 给一个直链页。
+    不处理的话它会落到下面的 worker 代理分支，插件模式没有 worker，回 502 }
+  if FCfg.PluginMode and (not FCfg.AuthEnabled) and
+     ((p = '/') or (p = '/index.html') or (p = '/workbench')) then
+  begin
+    BuildUIItems('', uiItems, uiTotal);
+    ReplyPage(HyperOpenIndexPage(uiItems, uiTotal, HYPER_BRAND), 200, AResponse);
+    Exit;
+  end;
+
+  { 插件宿主模式：/p/<名>/ 走 lwroute 的插件路由（清单路由、鉴权、
+    身份头、X-Forwarded-Prefix、301 补斜杠、502 页面都已在那里实现）。
+    框架静态资源由宿主直出，不转发给插件。 }
+  if FCfg.PluginMode and (Copy(p, 1, 3) = '/p/') then
+  begin
+    localPath := LWRouteStaticLocal(p);
+    if localPath <> '' then
+    begin
+      ServeLocalAsset(localPath, AResponse);
+      Exit;
+    end;
+    routeResult := LWRouteDispatch(ARequest, AResponse, p);
+    if routeResult <> rrNotPlugin then Exit;
   end;
 
   idx := PickWorker(sid);
@@ -1589,17 +2032,113 @@ begin
   end;
 end;
 
+function HyperLocalMime(const APath: string): string;
+var
+  ext: string;
+begin
+  ext := LowerCase(ExtractFileExt(APath));
+  if ext = '.js' then Result := 'application/javascript; charset=utf-8'
+  else if ext = '.css' then Result := 'text/css; charset=utf-8'
+  else if ext = '.html' then Result := 'text/html; charset=utf-8'
+  else if ext = '.json' then Result := 'application/json; charset=utf-8'
+  else if ext = '.ico' then Result := 'image/x-icon'
+  else if ext = '.png' then Result := 'image/png'
+  else if ext = '.jpg' then Result := 'image/jpeg'
+  else if ext = '.svg' then Result := 'image/svg+xml'
+  else Result := 'application/octet-stream';
+end;
+
+{ /p/<名>/lw/lw.js 由 LWRouteStaticLocal 归一成 /lw/lw.js；
+  这里按 lazarusWeb 既有惯例找 root\lw\、exe\lw\、root\src\client\ }
+function HyperFindLocalFile(const ARelativePath, ARoot: string): string;
+var
+  rel, nm, d, cand: string;
+  i: Integer;
+begin
+  Result := '';
+  if (ARelativePath = '') or (ARelativePath[1] <> '/') then Exit;
+  rel := Copy(ARelativePath, 2, MaxInt);   { 去开头 '/' }
+  nm := ExtractFileName(rel);
+
+  if ARoot <> '' then
+  begin
+    cand := IncludeTrailingPathDelimiter(ARoot) + rel;
+    if FileExists(cand) then Exit(cand);
+    cand := IncludeTrailingPathDelimiter(ARoot) + 'lw' + PathDelim + nm;
+    if FileExists(cand) then Exit(cand);
+    d := IncludeTrailingPathDelimiter(ARoot);
+    for i := 0 to 4 do
+    begin
+      cand := d + 'src' + PathDelim + 'client' + PathDelim + nm;
+      if FileExists(cand) then Exit(cand);
+      cand := ExcludeTrailingPathDelimiter(d);
+      d := IncludeTrailingPathDelimiter(ExtractFileDir(cand));
+      if (d = '') or (ExcludeTrailingPathDelimiter(d) = cand) then Break;
+    end;
+  end;
+
+  cand := IncludeTrailingPathDelimiter(ExtractFilePath(ParamStr(0))) + rel;
+  if FileExists(cand) then Exit(cand);
+  cand := IncludeTrailingPathDelimiter(ExtractFilePath(ParamStr(0))) +
+    'lw' + PathDelim + nm;
+  if FileExists(cand) then Exit(cand);
+end;
+
+procedure TLWHyperServer.ServeLocalAsset(const ARelativePath: string;
+  var AResponse: TFPHTTPConnectionResponse);
+var
+  path: string;
+  ms: TMemoryStream;
+begin
+  if (FCfg.Root = '') and FCfg.PluginMode then
+    path := HyperFindLocalFile(ARelativePath, FCfg.PluginRoot)
+  else
+    path := HyperFindLocalFile(ARelativePath, FCfg.Root);
+  if path = '' then
+  begin
+    AResponse.Code := 404;
+    AResponse.CodeText := 'Not Found';
+    AResponse.ContentType := 'text/plain; charset=utf-8';
+    AResponse.Content := '404 static asset not found: ' + ARelativePath;
+    Exit;
+  end;
+  ms := TMemoryStream.Create;
+  try
+    ms.LoadFromFile(path);
+    AResponse.Code := 200;
+    AResponse.CodeText := 'OK';
+    AResponse.ContentType := HyperLocalMime(path);
+    AResponse.SetCustomHeader('Cache-Control', 'public, max-age=86400');
+    AResponse.ContentStream := ms;
+    AResponse.FreeContentStream := True;
+    ms := nil;
+  finally
+    ms.Free;
+  end;
+end;
+
 procedure TLWHyperServer.ApiHealth(var AResponse: TFPHTTPConnectionResponse);
 var
   j: TJSONObject;
 begin
   j := TJSONObject.Create;
   try
-    j.Add('ok', AliveCount > 0);
-    j.Add('role', 'hyper');
-    j.Add('workers', Length(FWorkers));
-    j.Add('alive', AliveCount);
-    j.Add('sessions', SessionsTotal);
+    if FCfg.PluginMode then
+    begin
+      j.Add('ok', (FPlugins <> nil) and (FPlugins.Count > 0));
+      j.Add('role', 'hyper-plugin');
+      j.Add('workers', 0);
+      if FPlugins = nil then j.Add('alive', 0) else j.Add('alive', FPlugins.Count);
+      j.Add('sessions', 0);
+    end
+    else
+    begin
+      j.Add('ok', AliveCount > 0);
+      j.Add('role', 'hyper');
+      j.Add('workers', Length(FWorkers));
+      j.Add('alive', AliveCount);
+      j.Add('sessions', SessionsTotal);
+    end;
     j.Add('uptime', SecondsBetween(Now, FStartedAt));
     Reply(j.AsJSON, 'application/json; charset=utf-8', 200, AResponse);
   finally
@@ -1612,11 +2151,32 @@ var
   j: TJSONObject;
   w: TJSONObject;
   arr: TJSONArray;
+  pj: TJSONData;
   i: Integer;
 begin
   j := TJSONObject.Create;
   try
     j.Add('ok', True);
+    if FCfg.PluginMode then
+    begin
+      j.Add('mode', 'plugin');
+      j.Add('pluginroot', FCfg.PluginRoot);
+      { 登录入口的可观测性：auth=false 表示 /p/ 匿名放行（显式 --no-auth） }
+      j.Add('auth', FCfg.AuthEnabled);
+      if FCfg.AuthEnabled then
+      begin
+        j.Add('users', FAuth.UserCount);
+        j.Add('sessions', FAuth.SessionCount);
+        j.Add('sessionmin', FAuth.TTLMin);
+      end;
+      if FPlugins <> nil then
+      begin
+        pj := GetJSON(FPlugins.StatusJSON);
+        j.Add('plugins', pj);
+      end;
+    end
+    else
+      j.Add('mode', 'worker');
     j.Add('listen', FCfg.Port);
     j.Add('exe', FCfg.WorkerExe);
     { 热更新可观测性：updating 表示正在滚动换版，updates 是累计成功次数 }
@@ -1821,9 +2381,25 @@ begin
   LWLogRaw('  lazarusWeb Hyper Server ' + LW_VERSION);
   LWLogRaw('  --------------------------------------------------');
   LWLogRaw('  Listen    : ' + scheme + '://127.0.0.1:' + IntToStr(ACfg.Port) + '/');
-  LWLogRaw('  Workers   : ' + IntToStr(ACfg.WorkerCount) + ' x ' + ACfg.WorkerExe);
-  for i := 0 to ACfg.WorkerCount - 1 do
-    LWLogRaw('              #' + IntToStr(i + 1) + ' -> :' + IntToStr(ACfg.BasePort + i));
+  if ACfg.PluginMode then
+  begin
+    LWLogRaw('  Mode      : plugin（/p/<名>/ 反代到独立插件 exe）');
+    LWLogRaw('  PluginRoot: ' + ACfg.PluginRoot);
+    LWLogRaw('  Routes    : /p/<name>/  （插件路由由清单 *.plugin.ini 自动生成）');
+    if ACfg.AuthEnabled then
+    begin
+      LWLogRaw('  Login     : 开（未登录只能看到 /login）；用户表 ' + ACfg.UsersFile);
+      LWLogRaw('  入口      : ' + scheme + '://127.0.0.1:' + IntToStr(ACfg.Port) + '/');
+    end
+    else
+      LWLogRaw('  Login     : 关（--no-auth：/p/ 匿名放行，仅限本机调试）');
+  end
+  else
+  begin
+    LWLogRaw('  Workers   : ' + IntToStr(ACfg.WorkerCount) + ' x ' + ACfg.WorkerExe);
+    for i := 0 to ACfg.WorkerCount - 1 do
+      LWLogRaw('              #' + IntToStr(i + 1) + ' -> :' + IntToStr(ACfg.BasePort + i));
+  end;
   if ACfg.Root <> '' then
     LWLogRaw('  Root      : ' + ACfg.Root);
   if ACfg.HotUpdate then
@@ -1835,7 +2411,10 @@ begin
   if ACfg.UseSSL then
     LWLogRaw('  TLS       : 开（自签证书浏览器会告警，点“继续访问”；相机取景需 https）');
   LWLogRaw('  --------------------------------------------------');
-  LWLogRaw('  Ctrl+C 退出（worker 一并停止）');
+  if ACfg.PluginMode then
+    LWLogRaw('  Ctrl+C 退出宿主（插件是独立进程：收尾用 stop-all.bat 或任务管理器）')
+  else
+    LWLogRaw('  Ctrl+C 退出（worker 一并停止）');
   LWLogRaw('');
 end;
 
@@ -1875,8 +2454,21 @@ begin
     else if key = '--logdir' then ACfg.LogDir := val
     else if key = '--worker-args' then ACfg.ExtraArgs := val
     else if key = '--verbose' then ACfg.Verbose := True
+    else if key = '--plugin' then ACfg.PluginMode := True
+    else if key = '--no-plugin' then ACfg.PluginMode := False
+    else if key = '--plugin-root' then
+    begin
+      ACfg.PluginRoot := val;
+      ACfg.PluginMode := True;
+    end
     else if key = '--hot-update' then ACfg.HotUpdate := True
     else if key = '--no-hot-update' then ACfg.HotUpdate := False
+    else if key = '--no-auth' then ACfg.AuthEnabled := False
+    else if key = '--auth' then ACfg.AuthEnabled := True
+    else if key = '--users' then ACfg.UsersFile := val
+    else if key = '--session-min' then
+      ACfg.SessionMin := StrToIntDef(val, ACfg.SessionMin)
+    else if key = '--login-hint' then ACfg.LoginHint := val
     else if key = '--update-dir' then ACfg.UpdateDir := val
     else if key = '--ssl' then ACfg.UseSSL := True
     else if key = '--ssl-host' then ACfg.SSLHost := val
@@ -1893,25 +2485,37 @@ begin
     end
     else
     begin
-      WriteLn('未知参数: ', arg);
+      LWLog('未知参数: ' + arg);
       Result := False;
     end;
   end;
 
-  { 证书相对路径以 exe 目录为基准；参数不成对或文件不存在时立即失败，
-    不等浏览器握手时才报 SSL library 错。 }
+  { 证书相对路径以 exe 目录为基准。证书/私钥不成对或文件不存在时不再失败
+    退出 —— 改为打警告并回退 HTTP：INI 里 ssl=1 但 crt/key 没放好是常见
+    部署失误，直接退出会"负载器根本起不来"，GUI 构建下裸 WriteLn 还会弹
+    I/O 103 "File not open"。降级后照常用 HTTP 起来，日志里说清楚。 }
   if Result and ACfg.UseSSL then
   begin
     ACfg.SSLCertFile := LWResolveExeRelativePath(ACfg.SSLCertFile);
     ACfg.SSLKeyFile := LWResolveExeRelativePath(ACfg.SSLKeyFile);
     if not LWValidateTLSFiles(ACfg.SSLCertFile, ACfg.SSLKeyFile, err) then
     begin
-      WriteLn('错误: ', err);
-      Result := False;
+      LWLog('警告: ' + err + '；lwhyper 已关闭 HTTPS，回退 HTTP 启动（请检查证书路径或改回 ssl=0）');
+      ACfg.UseSSL := False;
+      ACfg.SSLCertFile := '';
+      ACfg.SSLKeyFile := '';
     end;
   end;
 
-  { 投放目录同样按 exe 目录解析（服务方式启动时 cwd 常是 System32） }
+  { 插件根目录与投放目录同样按 exe 目录解析（服务方式启动时 cwd 常是 System32） }
+  if Result and (ACfg.PluginMode) and (ACfg.PluginRoot <> '') then
+    ACfg.PluginRoot := LWResolveExeRelativePath(ACfg.PluginRoot);
+  if Result and (ACfg.UsersFile <> '') then
+    ACfg.UsersFile := LWResolveExeRelativePath(ACfg.UsersFile);
+  { 没写 --users= 时按惯例找 exe 同目录的 hyper.users.ini；
+    找不到留给 Start 报错（"用户表不存在"比"匿名放行"安全得多） }
+  if Result and ACfg.PluginMode and ACfg.AuthEnabled and (ACfg.UsersFile = '') then
+    ACfg.UsersFile := LWResolveExeRelativePath('hyper.users.ini');
   if Result and (ACfg.UpdateDir <> '') then
     ACfg.UpdateDir := LWResolveExeRelativePath(ACfg.UpdateDir);
 end;

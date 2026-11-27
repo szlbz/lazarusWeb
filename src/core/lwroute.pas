@@ -93,6 +93,9 @@ procedure LWRouteRemove(const AName: string);
 function LWRouteGet(const AName: string; out AUpstream: string): Boolean;
 { 逗号分隔的插件名清单（注册表为空返回 ''） }
 function LWRouteNames: string;
+{ 已登记插件数量。lwhttp 用它决定要不要把 /p/ 当插件前缀拦下来：
+  一个插件都没登记的工程（绝大多数）不占用 /p/，原有 /p/xxx 路由照旧走 }
+function LWRouteCount: Integer;
 
 { /p/<名>/<框架静态资源> -> 本地路径（宿主直出）；非框架静态资源返回 ''。
   框架运行时（客户端 JS/CSS、alpine.min.js、favicon、Ext 资源）属于
@@ -120,6 +123,7 @@ type
     procedure RemoveItem(const AName: string);
     function GetItem(const AName: string; out AUpstream: string): Boolean;
     function Names: string;
+    function Count: Integer;
   end;
 
 var
@@ -130,6 +134,10 @@ var
   GRouteIdentity: TLWRouteIdentityFunc = nil;
 
 const
+  { 插件路由前缀。这是框架的**保留前缀**：/p/ 归插件（清单自动生成路由），
+    /lw/ 归框架自身（协议、运行时、探针、登录）。业务路由不要用它们。
+    改这个常量要同步 lwhttp / lwhyper / upluginproc 与客户端拼接处，
+    一般不建议改；lwhttp 只在 LWRouteCount > 0 时拦 /p/ }
   LW_PLUGIN_PREFIX = '/p/';
 
 procedure LWRouteSetAuth(AFunc: TLWRouteAuthFunc);
@@ -449,6 +457,16 @@ begin
   end;
 end;
 
+function TLWRouteTable.Count: Integer;
+begin
+  FLock.Enter;
+  try
+    Result := FItems.Count;
+  finally
+    FLock.Leave;
+  end;
+end;
+
 { ---------------- 公开 API ---------------- }
 
 procedure LWRouteSet(const AName, AUpstream: string);
@@ -483,6 +501,14 @@ end;
 function LWRouteNames: string;
 begin
   Result := GetTable.Names;
+end;
+
+function LWRouteCount: Integer;
+begin
+  { 没登记过插件时不要为了数 0 去建表：这里每个 /p/ 请求都会问一次，
+    顺手也免掉"首次并发建表"的竞态 }
+  if GTable = nil then Exit(0);
+  Result := GTable.Count;
 end;
 
 { 框架静态资源白名单：宿主直出，不进插件（非业务功能由主程序处理）。

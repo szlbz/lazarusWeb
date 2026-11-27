@@ -74,6 +74,11 @@ type
     { 登录窗体名（'' = 未启用登录）。非空时每个新会话先显示登录窗体，
       认证通过才创建默认主窗体（lwlogin / TLWApp.SetLogin）}
     LoginForm: string;
+    { 登录失败锁定（lwlogin 读取）：同一 IP 连续失败 LoginFailMax 次后锁定
+      LoginLockMin 分钟，期间不再校验口令；任一项 <= 0 = 关闭该防线。
+      默认 5 次 / 15 分钟；成功登录即清零该 IP 的失败计数。 }
+    LoginFailMax: Integer;
+    LoginLockMin: Integer;
     { /lw/ajax/* 回 Access-Control-Allow-Origin: *（给第三方站点直接调）}
     AjaxCORS: Boolean;
     { 部署在 nginx / Caddy 反代后面：客户端 IP 取 X-Forwarded-For 的第一段 }
@@ -2325,12 +2330,14 @@ begin
     LWLog(Format('[lw] %s %s', [method, p]));
 
   { 进程级插件：/p/<名>/... 反向代理到独立 exe 上游（lwroute）。
-    放在所有自身路由之前 —— /p/ 前缀不与任何现有路径冲突。
+    放在所有自身路由之前 —— 启用插件时 /p/ 归插件路由，这是保留前缀。
+    但只有**登记过插件**才拦：一个插件都没有的工程直接跳过，业务里
+    自建的 /p/xxx 路由照旧可用（不为没用到的功能占用命名空间）。
     Dispatch 未命中（rrNotPlugin，理论上只有 /p/ 单独出现）落到自身路由。
     例外：框架静态资源（客户端 JS/CSS、alpine.min.js、favicon、Ext 资源）
     改写成本地路径由宿主直出 —— 插件只负责业务，非业务功能由主程序处理，
     升级客户端运行时只换宿主一处 }
-  if Copy(p, 1, 3) = '/p/' then
+  if (Copy(p, 1, 3) = '/p/') and (LWRouteCount > 0) then
   begin
     lp := LWRouteStaticLocal(p);
     if lp <> '' then
@@ -2347,8 +2354,16 @@ begin
       base：外壳资源前缀。经代理（X-Forwarded-Prefix: /p/<名>/）时
       资源 URL 生成到代理前缀下；直接访问为 '/'，与旧行为一致 }
     base := Trim(ARequest.GetCustomHeader('X-Forwarded-Prefix'));
+    { 只接受 /xxx/ 这种站内相对前缀。挡掉几类越界写法：
+        //evil.com/  协议相对 URL，浏览器会把外壳资源指到外站
+        /p// …      连写斜杠（含开头 //）
+        \  :  %     反斜杠 / scheme 注入 / 百分号编码绕过
+      这个头正常由 lwroute 代理时自己写（会覆盖客户端同名头），直连时
+      客户端能塞什么就不可信，保持严格 }
     if (Length(base) < 2) or (base[1] <> '/') or
-       (base[Length(base)] <> '/') or (Pos('..', base) > 0) then
+       (base[Length(base)] <> '/') or (Pos('..', base) > 0) or
+       (Pos('//', base) > 0) or (Pos('\', base) > 0) or
+       (Pos(':', base) > 0) or (Pos('%', base) > 0) then
       base := '/';
     if SameText(QueryP(ARequest, 'client', FCfg.DefaultClient), 'alpine') then
       ServeAlpineIndex(QueryP(ARequest, 'form', FCfg.DefaultForm), base, AResponse)
