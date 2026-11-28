@@ -17,6 +17,13 @@
     未写进任何分组的列自己占一格、上下贯通两行。分组按"可见列"编号
     （Columns[i].Visible=False 的列不占号），所以隐藏列不影响书写。
 
+  树形网格（对应 EhLib 的 MemTableEh.TreeList + DBGridEh 首列树）：
+    grd.TreeKeyField    := 'id';
+    grd.TreeParentField := 'parent_id';   // 根节点留空或指向不存在的键
+    grd.TreeIndent      := 18;            // 每层缩进像素
+    TreeKeyField 非空即启用：lwwriter 输出 lv/hc/pid，浏览器首列
+    缩进 + 展开折叠。树形模式自动停用分页（分页会切断父子关系）。
+
   运行时状态（不 published，框架自己维护）：
     CurrentPage  当前页（1 起）；浏览器端分页条触发 OnPageChange 时改写
     FilterText   过滤关键字；触发 OnFilter 时改写（显示层过滤，
@@ -51,6 +58,11 @@ type
     FCurrentPage: Integer;
     FFilterText: string;
     FHeaderGroups: TStrings;
+    FMultiTitle: Boolean;
+    FTreeKeyField: string;
+    FTreeParentField: string;
+    FTreeIndent: Integer;
+    FTreeDefaultExpanded: Boolean;
     FMatches: array of TBytes;   { 最近一次序列化的匹配行书签（TBookmark = TBytes）}
     function GetCurrentPage: Integer;
     procedure SetHeaderGroups(AValue: TStrings);
@@ -68,6 +80,8 @@ type
     function MatchAt(AIndex: Integer): TBytes;
     property CurrentPage: Integer read GetCurrentPage write FCurrentPage;
     property FilterText: string read FFilterText write FFilterText;
+    { 是否按树形网格序列化（供 lwwriter / 设计期转换判断）}
+    function IsTreeGrid: Boolean;
   published
     property PageSize: Integer read FPageSize write FPageSize;   { 0 = 关闭分页 }
     property ShowFilter: Boolean read FShowFilter write FShowFilter;
@@ -76,6 +90,24 @@ type
     { 两级表头：每行 '标题|起-止'，起/止是"可见列"下标（0 起、含止）。
       Count=0（默认）时表头与普通 TDBGrid 完全一致 }
     property HeaderGroups: TStrings read FHeaderGroups write SetHeaderGroups;
+    { 多级表头：列标题用 '|' 分层（与 EhLib 的 UseMultiTitle 同一套写法），
+      如 '基本信息|姓名'。打开后 lwwriter 下发 hrows/htree，前端按
+      colspan/rowspan 渲染任意层级；HeaderGroups 不再生效。 }
+    property MultiTitle: Boolean read FMultiTitle write FMultiTitle default False;
+    { ---- 树形网格（对应 EhLib 的 MemTableEh.TreeList + DBGridEh 树列）----
+      TreeKeyField 非空即开启：writer 按 TreeParentField 把行组织成层级，
+      首列画缩进/展开标记，前端维护展开状态。
+      与 EhLib 的对应关系：TreeKeyField <- TreeList.KeyFieldName，
+      TreeParentField <- TreeList.RefParentFieldName，
+      TreeDefaultExpanded <- TreeList.DefaultNodeExpanded。
+      父键为空串或找不到父行时按根节点处理（层级 0）。
+      树形模式下分页自动停用（PageSize 视为 0）—— 只发一页会导致父子
+      关系断裂，层级无从计算。 }
+    property TreeKeyField: string read FTreeKeyField write FTreeKeyField;
+    property TreeParentField: string read FTreeParentField write FTreeParentField;
+    property TreeIndent: Integer read FTreeIndent write FTreeIndent default 18;
+    property TreeDefaultExpanded: Boolean read FTreeDefaultExpanded
+      write FTreeDefaultExpanded default True;
     { TDBGrid 的常规 published 属性原样继承（Options/Columns/DataSource...）}
   end;
 
@@ -88,6 +120,11 @@ begin
   FCurrentPage := 1;
   FSummaryType := gsNone;
   FHeaderGroups := TStringList.Create;
+  FMultiTitle := False;
+  FTreeKeyField := '';
+  FTreeParentField := '';
+  FTreeIndent := 18;
+  FTreeDefaultExpanded := True;
 end;
 
 destructor TLWDBGrid.Destroy;
@@ -102,6 +139,11 @@ procedure TLWDBGrid.SetHeaderGroups(AValue: TStrings);
 begin
   if AValue = FHeaderGroups then Exit;
   FHeaderGroups.Assign(AValue);
+end;
+
+function TLWDBGrid.IsTreeGrid: Boolean;
+begin
+  Result := Trim(FTreeKeyField) <> '';
 end;
 
 procedure TLWDBGrid.MatchClear;

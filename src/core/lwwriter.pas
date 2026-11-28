@@ -60,6 +60,10 @@ type
     function StatusInfo(SB: TStatusBar; AForm: TCustomForm): TJSONObject;
     { 两级表头分组（TLWDBGrid.HeaderGroups）序列化为 t/a/n 三项的对象数组 }
     function HeaderGroupsJson(G: TLWDBGrid; AVisibleCols: Integer): TJSONArray;
+    { 多级表头（TLWDBGrid.MultiTitle）：按 Caption 的 '|' 分层，
+      生成 hrows（行矩阵，Alpine 用）与 htree（嵌套树，Ext 用） }
+    procedure MultiTitleJson(G: TLWDBGrid; AVisibleCols: Integer;
+      out ARows, ATree: TJSONArray);
     procedure WriteKindProps(C: TControl; const AKind: string; O: TJSONObject);
     procedure WriteKindPropsBody(C: TControl; const AKind: string; O: TJSONObject);
     function MakeBase(C: TControl; const AKind: string): TJSONObject;
@@ -132,6 +136,152 @@ type
     property ButtonCaption;
     property ButtonWidth;
   end;
+
+{ ---- 多级表头（TLWDBGrid.MultiTitle）----
+  EhLib 的 UseMultiTitle 用列标题里的 '|' 分层（'基本信息|姓名'），
+  相邻同前缀的列自动合并。这里用同一套写法建树：
+    hrows = [[{t,cs,rs,a}...]...]  每行一组单元格（Alpine 按行拼 <tr>）
+    htree = [{t,a,n,c:[...]}]      嵌套结构（Ext 直接做 columns 嵌套） }
+
+type
+  TLWStringArray = array of string;
+
+  TLWMTNode = class
+  public
+    Text: string;
+    Leaf: Boolean;
+    ColStart: Integer;
+    ColCount: Integer;
+    Children: TList;
+    constructor Create(const AText: string);
+    destructor Destroy; override;
+    function AddChild(const AText: string): TLWMTNode;
+    function LastChild: TLWMTNode;
+  end;
+
+constructor TLWMTNode.Create(const AText: string);
+begin
+  inherited Create;
+  Text := AText;
+  Children := TList.Create;
+  ColStart := -1;
+  ColCount := 0;
+end;
+
+destructor TLWMTNode.Destroy;
+var
+  i: Integer;
+begin
+  for i := 0 to Children.Count - 1 do
+    TLWMTNode(Children[i]).Free;
+  Children.Free;
+  inherited Destroy;
+end;
+
+function TLWMTNode.AddChild(const AText: string): TLWMTNode;
+begin
+  Result := TLWMTNode.Create(AText);
+  Children.Add(Result);
+end;
+
+function TLWMTNode.LastChild: TLWMTNode;
+begin
+  if Children.Count = 0 then Result := nil
+  else Result := TLWMTNode(Children[Children.Count - 1]);
+end;
+
+function SplitMTitle(const S: string; out AParts: TLWStringArray): Integer;
+var
+  p, start, n: Integer;
+begin
+  SetLength(AParts, 0);
+  n := 0;
+  start := 1;
+  for p := 1 to Length(S) + 1 do
+    if (p > Length(S)) or (S[p] = '|') then
+    begin
+      if Trim(Copy(S, start, p - start)) <> '' then
+      begin
+        SetLength(AParts, n + 1);
+        AParts[n] := Trim(Copy(S, start, p - start));
+        Inc(n);
+      end;
+      start := p + 1;
+    end;
+  Result := n;
+end;
+
+function LastMTitlePart(const S: string): string;
+var
+  parts: TLWStringArray;
+begin
+  if SplitMTitle(S, parts) = 0 then Result := Trim(S)
+  else Result := parts[High(parts)];
+end;
+
+function MTCountLeaves(N: TLWMTNode): Integer;
+var
+  i: Integer;
+begin
+  if N = nil then Exit(0);
+  if N.Leaf then Exit(1);
+  Result := 0;
+  for i := 0 to N.Children.Count - 1 do
+    Inc(Result, MTCountLeaves(TLWMTNode(N.Children[i])));
+end;
+
+procedure LayoutMTNode(N: TLWMTNode; ALevel, ADepth: Integer;
+  var ACol: Integer; const ARows: array of TJSONArray);
+var
+  i, start: Integer;
+  o: TJSONObject;
+begin
+  if N = nil then Exit;
+  start := ACol;
+  if N.Leaf then
+  begin
+    N.ColStart := ACol;
+    N.ColCount := 1;
+    o := TJSONObject.Create;
+    o.Add('t', LWLangText(N.Text));
+    o.Add('a', ACol);
+    o.Add('cs', 1);
+    o.Add('rs', ADepth - ALevel);
+    ARows[ALevel].Add(o);
+    Inc(ACol);
+    Exit;
+  end;
+  N.ColCount := MTCountLeaves(N);
+  if (N.Text <> '') and (N.ColCount > 0) and (ALevel < ADepth) then
+  begin
+    o := TJSONObject.Create;
+    o.Add('t', LWLangText(N.Text));
+    o.Add('cs', N.ColCount);
+    o.Add('rs', 1);
+    ARows[ALevel].Add(o);
+  end;
+  for i := 0 to N.Children.Count - 1 do
+    LayoutMTNode(TLWMTNode(N.Children[i]), ALevel + 1, ADepth, ACol, ARows);
+  N.ColStart := start;
+end;
+
+function MTNodeJson(N: TLWMTNode): TJSONObject;
+var
+  i: Integer;
+  arr: TJSONArray;
+begin
+  Result := TJSONObject.Create;
+  Result.Add('t', LWLangText(N.Text));
+  Result.Add('a', N.ColStart);
+  Result.Add('n', N.ColCount);
+  if not N.Leaf then
+  begin
+    arr := TJSONArray.Create;
+    for i := 0 to N.Children.Count - 1 do
+      arr.Add(MTNodeJson(TLWMTNode(N.Children[i])));
+    Result.Add('c', arr);
+  end;
+end;
 
 { ---- 临时剖析：按 kind 累计 WriteKindProps 的耗时（LW_KIND_PROF=1 打开）---- }
 var
@@ -967,6 +1117,77 @@ begin
   end;
 end;
 
+procedure TLWWriter.MultiTitleJson(G: TLWDBGrid; AVisibleCols: Integer;
+  out ARows, ATree: TJSONArray);
+var
+  root: TLWMTNode;
+  i, j, vis, depth, colIdx: Integer;
+  col: TColumn;
+  cap: string;
+  parts: TLWStringArray;
+  node, child: TLWMTNode;
+  rows: array of TJSONArray;
+begin
+  ARows := nil;
+  ATree := nil;
+  if (G = nil) or (AVisibleCols <= 0) then Exit;
+  root := TLWMTNode.Create('');
+  try
+    depth := 1;
+    vis := 0;
+    for i := 0 to G.Columns.Count - 1 do
+    begin
+      col := TColumn(G.Columns[i]);
+      if not col.Visible then Continue;
+      cap := col.Title.Caption;
+      if cap = '' then
+      begin
+        if col.Field <> nil then cap := col.Field.DisplayLabel
+        else cap := col.FieldName;
+      end;
+      if SplitMTitle(cap, parts) = 0 then
+      begin
+        SetLength(parts, 1);
+        parts[0] := cap;
+      end;
+      if Length(parts) > depth then depth := Length(parts);
+      node := root;
+      for j := 0 to High(parts) - 1 do
+      begin
+        child := node.LastChild;
+        if (child <> nil) and (not child.Leaf) and
+           (child.Text = parts[j]) then
+          node := child
+        else
+          node := node.AddChild(parts[j]);
+      end;
+      child := node.AddChild(parts[High(parts)]);
+      child.Leaf := True;
+      child.ColStart := vis;
+      Inc(vis);
+    end;
+    if vis = 0 then Exit;
+
+    SetLength(rows, depth);
+    for i := 0 to depth - 1 do
+      rows[i] := TJSONArray.Create;
+    colIdx := 0;
+    for i := 0 to root.Children.Count - 1 do
+      LayoutMTNode(TLWMTNode(root.Children[i]), 0, depth, colIdx, rows);
+
+    ARows := TJSONArray.Create;
+    for i := 0 to depth - 1 do
+      ARows.Add(rows[i]);
+    rows := nil;
+
+    ATree := TJSONArray.Create;
+    for i := 0 to root.Children.Count - 1 do
+      ATree.Add(MTNodeJson(TLWMTNode(root.Children[i])));
+  finally
+    root.Free;
+  end;
+end;
+
 procedure TLWWriter.WriteDBGrid(G: TDBGrid; O: TJSONObject);
 var
   ds: TDataSet;
@@ -993,6 +1214,20 @@ var
   sumField: TField;
   visible: Boolean;
   hg: TJSONArray;
+  hrows, htree: TJSONArray;
+  cap: string;
+  { 树形网格（TLWDBGrid.TreeKeyField）}
+  treeMode: Boolean;
+  keyF, parF: TField;
+  tkeys, tpids: TStringList;
+  thas: array of Boolean;
+  tlevel: array of Integer;
+  tparent: array of Integer;
+  idxMap: TStringList;
+  keysJson, lvJson, hcJson, pidJson: TJSONArray;
+  treeObj: TJSONObject;
+  n, j, lvl, cur, guard: Integer;
+  pkey: string;
 begin
   lwg := nil;
   if G is TLWDBGrid then lwg := TLWDBGrid(G);
@@ -1017,11 +1252,15 @@ begin
     col := TColumn(G.Columns[i]);
     if not col.Visible then Continue;
     if col.Title.Caption <> '' then
-      JArrAddStr(cols, LWLangText(col.Title.Caption))
+      cap := col.Title.Caption
     else if col.Field <> nil then
-      JArrAddStr(cols, LWLangText(col.Field.DisplayLabel))
+      cap := col.Field.DisplayLabel
     else
-      JArrAddStr(cols, col.FieldName);
+      cap := col.FieldName;
+    { 多级表头：cols 里只放叶子文本，层级交给 hrows/htree }
+    if (lwg <> nil) and lwg.MultiTitle then
+      cap := LastMTitlePart(cap);
+    JArrAddStr(cols, LWLangText(cap));
     JArrAddStr(fields, col.FieldName);
     cw.Add(lwDbColWidth(col));
     { 单元格可编辑：整表开了 dgEditing，且这一列没有单独只读
@@ -1071,11 +1310,21 @@ begin
     end;
   end;
   O.Add('cols', cols);
-  { 两级表头：仅当业务代码写了 HeaderGroups 才下发，普通网格一个字节不多 }
+  { 表头：MultiTitle 优先（任意层级）；否则沿用两级 HeaderGroups。
+    普通网格一个字节不多。 }
   if lwg <> nil then
   begin
-    hg := HeaderGroupsJson(lwg, cols.Count);
-    if hg <> nil then O.Add('hg', hg);
+    if lwg.MultiTitle then
+    begin
+      MultiTitleJson(lwg, cols.Count, hrows, htree);
+      if hrows <> nil then O.Add('hrows', hrows);
+      if htree <> nil then O.Add('htree', htree);
+    end
+    else
+    begin
+      hg := HeaderGroupsJson(lwg, cols.Count);
+      if hg <> nil then O.Add('hg', hg);
+    end;
   end;
   O.Add('fields', fields);
   O.Add('colwidths', cw);
@@ -1128,6 +1377,29 @@ begin
     所以编辑态下干脆不输出行，浏览器沿用上一次拿到的数据 }
   if ds.State <> dsBrowse then Exit;
 
+  { 树形网格：EhLib 的 DBGridEh 靠 MemTableEh.TreeList 在首列画树，
+    这里用 key/parent 两列在序列化时算层级（运行时不需要 EhLib）。
+    分页会切断父子关系，树形模式下强制单页。 }
+  treeMode := False;
+  keyF := nil;
+  parF := nil;
+  tkeys := nil;
+  tpids := nil;
+  if (lwg <> nil) and lwg.IsTreeGrid then
+  begin
+    keyF := ds.FindField(lwg.TreeKeyField);
+    if keyF <> nil then
+    begin
+      treeMode := True;
+      parF := ds.FindField(lwg.TreeParentField);
+      tkeys := TStringList.Create;
+      tpids := TStringList.Create;
+      tkeys.CaseSensitive := False;
+      tpids.CaseSensitive := False;
+    end;
+  end;
+  try
+
   sumField := nil;
   if (lwg <> nil) and (lwg.SummaryType <> gsNone) and (lwg.SummaryField <> '') then
     sumField := ds.FindField(lwg.SummaryField);
@@ -1147,6 +1419,12 @@ begin
   begin
     pageStart := (lwg.CurrentPage - 1) * lwg.PageSize;
     pageEnd := pageStart + lwg.PageSize;
+  end;
+  { 树形网格不分页：只发一页会让父节点落在页外，层级算不出来 }
+  if treeMode then
+  begin
+    pageStart := 0;
+    pageEnd := MaxInt;
   end;
   lwgMatchesInit(lwg);
 
@@ -1168,6 +1446,16 @@ begin
 
         if visible then
         begin
+          { 树形：先记 key/parent，层级等全部行收齐后再算
+            （父行可能排在子行后面，不能在遍历中就地定层级） }
+          if treeMode then
+          begin
+            tkeys.Add(keyF.AsString);
+            if parF <> nil then
+              tpids.Add(parF.AsString)
+            else
+              tpids.Add('');
+          end;
           Inc(filtered);
           Inc(matchIdx);
           { 只有 TLWDBGrid 才需要匹配行书签。原来是先建书签再判空 ——
@@ -1222,10 +1510,94 @@ begin
   O.Add('count', cnt);
   O.Add('truncated', filtered >= LW_MAX_GRID_ROWS);
 
+  { ---- 树形网格：算层级 / 有无子节点，随行数组一起下发 ----
+    只发扁平的行数组，层级放 keys/lv/hc 三个平行数组里：
+    行结构（cell 文本矩阵）保持不变，旧前端不认识 tree 就按平表渲染。 }
+  if treeMode and (tkeys.Count > 0) then
+  begin
+    n := tkeys.Count;
+    SetLength(thas, n);
+    SetLength(tlevel, n);
+    SetLength(tparent, n);
+    FillChar(thas[0], n * SizeOf(Boolean), 0);
+
+    idxMap := TStringList.Create;
+    try
+      idxMap.Sorted := True;
+      idxMap.CaseSensitive := False;
+      idxMap.Duplicates := dupIgnore;
+      { key -> 行下标（存 i+1，0 留给"没找到"）}
+      for i := 0 to n - 1 do
+        if (tkeys[i] <> '') and (idxMap.IndexOf(tkeys[i]) < 0) then
+          idxMap.AddObject(tkeys[i], TObject(PtrInt(i + 1)));
+
+      { 有子节点：父键能对上本表某一行，父行才画展开箭头 }
+      for i := 0 to n - 1 do
+      begin
+        pkey := tpids[i];
+        if pkey = '' then Continue;
+        j := idxMap.IndexOf(pkey);
+        if j < 0 then Continue;
+        j := PtrInt(idxMap.Objects[j]) - 1;
+        if (j >= 0) and (j <> i) then
+          thas[j] := True;
+      end;
+
+      { 层级：沿父链上溯。找不到父 / 自引用 / 成环 / 超过行数都当根 }
+      for i := 0 to n - 1 do
+      begin
+        lvl := 0;
+        cur := i;
+        guard := 0;
+        tparent[i] := -1;
+        while (guard < n) and (tpids[cur] <> '') do
+        begin
+          j := idxMap.IndexOf(tpids[cur]);
+          if j < 0 then Break;
+          j := PtrInt(idxMap.Objects[j]) - 1;
+          if j = cur then Break;
+          if guard = 0 then tparent[i] := j;
+          Inc(lvl);
+          cur := j;
+          Inc(guard);
+        end;
+        tlevel[i] := lvl;
+      end;
+    finally
+      idxMap.Free;
+    end;
+
+    treeObj := TJSONObject.Create;
+    treeObj.Add('k', lwg.TreeKeyField);
+    treeObj.Add('p', lwg.TreeParentField);
+    treeObj.Add('ind', lwg.TreeIndent);
+    treeObj.Add('exp', lwg.TreeDefaultExpanded);
+    O.Add('tree', treeObj);
+
+    keysJson := TJSONArray.Create;
+    lvJson := TJSONArray.Create;
+    hcJson := TJSONArray.Create;
+    pidJson := TJSONArray.Create;
+    for i := 0 to n - 1 do
+    begin
+      keysJson.Add(tkeys[i]);
+      lvJson.Add(tlevel[i]);
+      if thas[i] then hcJson.Add(1) else hcJson.Add(0);
+      { 父行下标（-1 = 根）：前端折叠时 O(1) 找父，不依赖行的排列顺序 }
+      pidJson.Add(tparent[i]);
+    end;
+    O.Add('keys', keysJson);
+    O.Add('lv', lvJson);
+    O.Add('hc', hcJson);
+    O.Add('pid', pidJson);
+  end;
+
   if lwg = nil then Exit;
 
   { ---- TLWDBGrid 专属：页信息 / recno 映射 / 汇总 ---- }
   pages := lwg.PageOf(filtered);
+  { 树形网格只发一页：分页条这里恒为 1，前端不会出现翻页按钮 }
+  if treeMode then pages := 1;
   if lwg.CurrentPage > pages then lwg.CurrentPage := pages;
   if lwg.CurrentPage < 1 then lwg.CurrentPage := 1;
   O.Delete('page');
@@ -1233,7 +1605,16 @@ begin
   O.Add('pages', pages);
   O.Add('total', filtered);
   { 浏览器端的"选中行"是页内行号：当前记录不在本页时发 0（取消选中）}
-  if (lwg.PageSize > 0) then
+  if treeMode then
+  begin
+    { 树形不分页，行号就是匹配序号（过滤后仍是同一套编号）}
+    O.Delete('recno');
+    if curMatch >= 0 then
+      O.Add('recno', curMatch + 1)
+    else
+      O.Add('recno', 0);
+  end
+  else if (lwg.PageSize > 0) then
   begin
     pageStart := (lwg.CurrentPage - 1) * lwg.PageSize;
     if (curMatch >= pageStart) and (curMatch < pageStart + lwg.PageSize) then
@@ -1263,6 +1644,10 @@ begin
         sumObj.Add('value', Format('%.2f', [sumVal]));
       O.Add('summary', sumObj);
     end;
+  finally
+    tkeys.Free;
+    tpids.Free;
+  end;
 end;
 
 { 取 DB 控件的绑定字段，非 DB 控件返回 nil }

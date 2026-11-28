@@ -83,7 +83,8 @@ type
     FLog: TStringList;
     FRefCount: Integer;
     FMarked: Boolean;
-    FRemoteIP: string;
+    { FRemoteIP 上移到 TLWSessionBase(lwbase)：lwlogin 只依赖 lwbase，
+      按来源 IP 做失败锁定时要能从 LWCurrentSession 直接读到 }
     { 浏览器对话框（消息框 / 输入框 / 选文件）}
     FDlgDone: TEvent;
     FDlgActive: Boolean;
@@ -203,7 +204,7 @@ type
     property LastAccess: TDateTime read FLastAccess;
     property RefCount: Integer read FRefCount write FRefCount;
     property Marked: Boolean read FMarked write FMarked;
-    property RemoteIP: string read FRemoteIP;
+    { RemoteIP 继承 TLWSessionBase，不再在此重复声明 }
     { WebSocket 直推钩子：赋值后 SessionPushCommand 不再进 outbox，
       而是同步调用本钩子（由 WS 连接线程在处理事件时执行，socket
       所有权就在本线程 —— 线程安全）。PushSock 是该会话的 WS 连接
