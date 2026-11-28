@@ -66,7 +66,7 @@ lwdispatch.LWApplyValue / LWInvokeEvent  → 写回 LCL 属性 → 触发业务�
 
    参考 `src/core/lwdbnav.pas:207`。
 
-   ⚠️ **`RegisterClassAlias` 不能顶替已注册的类名**（`docs/MAPPING.md` 坑 29/41 已推翻
+   ⚠️ **`RegisterClassAlias` 不能顶替已注册的类名**（`docs/lazarusWeb控件属性映射表.md` 坑 29/41 已推翻
    早期 alias 方案）。若 lfm 里存的是第三方类名，就让那个类名本身可注册；若想用一个
    子类接管，lfm 必须改写真实子类名。
 
@@ -222,7 +222,7 @@ DB 族控件排在 `TEdit` 族前、`TLWCamera` 排在 `TLWFileUpload` 前、`TL
 2. 跑 `tools/build_audit.bat` → 重新生成 `docs/CONTROL_MATRIX.md`，确认该控件不再是
    🔶 / ⛔；
 3. 跑 `tests/` 回归（控件行为用 `tests/t_controls.py`，涉及布局的加 CDP 探针）；
-4. 把映射行写进 `docs/MAPPING.md`（LCL / kind / 浏览器端 / 事件 四列）；
+4. 把映射行写进 `docs/lazarusWeb控件属性映射表.md`（LCL / kind / 浏览器端 / 事件 四列）；
 5. 若窗体配了模板，确认新控件在 `.lfm` 里有明确的 `Left/Top/Width/Height`：
    当前模板只是背景装饰层，不搬动控件、也不改控件高度，位置完全由设计期
    坐标决定（见 `MANUAL.md` §16）。
@@ -242,7 +242,7 @@ DB 族控件排在 `TEdit` 族前、`TLWCamera` 排在 `TLWFileUpload` 前、`TL
 | 7 | `src/client/lw-alpine.js` `FIELD_KINDS` / `collectVal` | 输入类才需要 |
 | 8 | `src/core/lwdispatch.pas` `LWApplyValue` | 加回写分支（兜底之前） |
 | 9 | `src/client/lw.js`（可选） | Ext 层同 kind 分支 |
-| 10 | `docs/MAPPING.md`、`docs/CONTROL_MATRIX.md` | 留档 + 重跑审计 |
+| 10 | `docs/lazarusWeb控件属性映射表.md`、`docs/CONTROL_MATRIX.md` | 留档 + 重跑审计 |
 
 ---
 
@@ -252,7 +252,7 @@ DB 族控件排在 `TEdit` 族前、`TLWCamera` 排在 `TLWFileUpload` 前、`TL
 
 服务端是 `LCLWidgetType=nogui` 的**无头 widgetset**。依赖 Win32 句柄、`TImageList`、
 `LCLGlyphs` 标准字形的控件会**构造即抛异常**——原生 `TDBNavigator` 就是
-`FPImageException`，框架只能用子类 `TLWDBNavigator` 替代（`docs/MAPPING.md`「创建失败」）。
+`FPImageException`，框架只能用子类 `TLWDBNavigator` 替代（`docs/lazarusWeb控件属性映射表.md`「创建失败」）。
 
 **接入前先跑这个 20 行验证**，比改完六处再调试便宜得多：
 
@@ -326,7 +326,7 @@ ECharts / Select2 / DataTables 之类整块嵌进窗体，绕开控件树协议�
 | 内容 | 位置 |
 |---|---|
 | 官方扩展流程 | `docs/MANUAL.md` §15 |
-| 控件/属性映射总表 | `docs/MAPPING.md` |
+| 控件/属性映射总表 | `docs/lazarusWeb控件属性映射表.md` |
 | 实测覆盖率矩阵 | `docs/CONTROL_MATRIX.md`（`tools/build_audit.bat` 生成） |
 | kind 判定 | `src/core/lwwriter.pas` `KindOf` |
 | 属性下发 | `src/core/lwwriter.pas` `WriteKindPropsBody` |
@@ -336,4 +336,4 @@ ECharts / Select2 / DataTables 之类整块嵌进窗体，绕开控件树协议�
 | 节点创建/几何 | `src/client/lw-alpine.js` `createNode` / `placeNode` |
 | 增量更新 | `src/client/lw-alpine.js` `patchNode` |
 | Ext 层渲染 | `src/client/lw.js`（`case 'edit'` 起的 `switch`） |
-| 无头构造失败的既有案例 | `docs/MAPPING.md`「创建失败」/ `src/core/lwdbnav.pas` |
+| 无头构造失败的既有案例 | `docs/lazarusWeb控件属性映射表.md`「创建失败」/ `src/core/lwdbnav.pas` |

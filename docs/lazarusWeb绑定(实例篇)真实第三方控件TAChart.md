@@ -138,7 +138,7 @@ initialization
 end.
 ```
 
-⚠️ 不要指望 `RegisterClassAlias` 顶替——`docs/MAPPING.md` 坑 29/41 已推翻早期 alias
+⚠️ 不要指望 `RegisterClassAlias` 顶替——`docs/lazarusWeb控件属性映射表.md` 坑 29/41 已推翻早期 alias
 方案：lfm 存的是哪个类名，就得让那个类名本身可注册。
 
 ---
@@ -298,7 +298,7 @@ Series 的类即可（TAChart 里 `TLineSeries`/`TBarSeries`/`TPieSeries` 均定
    避免默认值掩盖问题。
 3. **重跑审计**：`tools/build_audit.bat` 重新生成 `docs/CONTROL_MATRIX.md`，确认
    `TChart` 不再是 unknown 灰框。
-4. **映射留档**：在 `docs/MAPPING.md` 加一行：
+4. **映射留档**：在 `docs/lazarusWeb控件属性映射表.md` 加一行：
 
    | LCL 控件 | kind | 浏览器端 | 事件 |
    |---|---|---|---|

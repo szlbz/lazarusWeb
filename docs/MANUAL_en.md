@@ -92,7 +92,10 @@ TLWApp.Run;                         // Start the HTTP service
 - Login: `TLWApp.SetLogin(TXxxLoginForm)` enables it in one line; see `demos/login/`; for the graphical CAPTCHA on the login form see "Graphical CAPTCHA on the Login Form (TLWCaptcha)" below;
 - Charts `TLWChart`, reports `lwreport` (HTML/CSV/XLSX), rich content `TLWHTMLFrame` / `TLWPDFFrame`, gauge `TLWGauge`, and color picker `TLWColorPicker` are all controls built into the framework;
 - Use **TFPTimer** for timers (you must set `UseTimerThread=True`) — TTimer is unavailable under nogui.
-- To package features as plugins: put pages and AJAX in `plugins/umod_*.pas`, declare `procedure RegisterModule;` in the unit, run `python tools/lwplugins.py` to generate a registration summary, and have the main program call only `RegisterAllModules` — adding features later no longer requires touching the main program. Design form UIs with **`.lfm`** as usual (write `{$R *.lfm}` in the unit; put fields and event methods in the default section of the class declaration; `.lpi` needs no separate resource registration); if you prefer not to use `.lfm`, you can also build a form purely in code. See `demos/plugindemo` (the main program has zero business forms; `umod_notes.lfm` and `umod_dashboard.pas` demonstrate the two approaches respectively). **See `docs/PLUGIN_GUIDE_en.md` for the steps** (including integrating into your own project, `.lfm` caveats, and common problems); for principles and a comparison of approaches see `docs/PLUGIN_FEASIBILITY_en.md`; regression test `tests/t_plugin.py`.
+- There are two plugin flavors (**the wizard's "plugin mode" generates the second one**):
+  - **Legacy same-process flavor (kept for reference)**: put pages and AJAX in `plugins/umod_*.pas`, declare `procedure RegisterModule;` in the unit, run `python tools/lwplugins.py` to generate a registration summary, and have the main program call only `RegisterAllModules`; see `demos/plugindemo`.
+  - **Current multi-process plugin mode (recommended)**: the host and each plugin are separate exes; manifest scanning, process launch, hot reload, role checks and identity headers are all generated for you. See `demos/pluginsDemo/README.md` and the flavor comparison at the top of `docs/PLUGIN_GUIDE_en.md`.
+  Design form UIs with **`.lfm`** as usual (write `{$R *.lfm}` in the unit; put fields and event methods in the default section of the class declaration; `.lpi` needs no separate resource registration); if you prefer not to use `.lfm`, you can also build a form purely in code. **See `docs/PLUGIN_GUIDE_en.md` for the steps** (both flavors, `.lfm` caveats and common problems); for principles and a comparison see `docs/PLUGIN_FEASIBILITY_en.md`.
 
 > **Security / SQL injection**: The framework layer does not touch SQL and has no SQL endpoint; the browser only sends control values. Injection risk lies in business code — any value coming from a control/AJAX/URL must go through `ParamByName` before entering SQL (use a whitelist or numeric conversion for `ORDER BY`/`LIMIT`). For the complete trust boundary, demo examples, and a self-check list, see `docs/SECURITY_en.md`.
 
@@ -107,20 +110,21 @@ What it rewrites: `.pas` base classes and uses clauses, `.lpr` startup code, `.l
 
 ### Create a New Project with the IDE Wizard (From Scratch)
 
-**Prerequisite: install the three packages into the IDE in order** (only once; redo after upgrading to a new package version)
+**Prerequisite: install the four packages into the IDE in order** (only once; redo after upgrading to a new package version)
 
-The three packages have a dependency chain, and the **order cannot be reversed**: `lwcore` → `lwserver` → `lwdesign` (`lwserver` depends on `lwcore`, and `lwdesign` depends on the first two plus IDEIntf). Skipping a step will cause `Can't find unit lwcore / lwserver` when you Install `lwdesign`.
+The four packages have a dependency chain, and the **order cannot be reversed**: `lwcore` → `lwserver` → `lwvst` → `lwdesign` (`lwserver` and `lwvst` both depend on `lwcore`, and `lwdesign`, the design-time package, depends on the first three plus IDEIntf). Skipping a step will cause `Can't find unit lwcore / lwserver / lwvst` when you Install `lwdesign`.
 
 | Order | Package | Type | IDE action |
 |---|---|---|---|
 | 1 | `src\lwcore.lpk` | RunAndDesignTime | Only **Compile**, do not Install |
 | 2 | `src\lwserver.lpk` | RunAndDesignTime | Only **Compile**, do not Install |
-| 3 | `src\design\lwdesign.lpk` | DesignTime | **Compile → Use → Install** → rebuild → restart |
+| 3 | `src\lwvst.lpk` | RunAndDesignTime | Only **Compile**, do not Install (GUI chain: `TLWDBVirtualTreeView`, requires real GDI; compile with the target IDE's native widgetset, not `--ws=nogui`) |
+| 4 | `src\design\lwdesign.lpk` | DesignTime | **Compile → Use → Install** → rebuild → restart |
 
-0. First register the three packages from the command line (otherwise New Project reports "package not found"):
-   `tools\install_design.bat`. `--add-package-link` only registers without installing, which is normal.
+0. First register the four packages from the command line (otherwise New Project reports "package not found"):
+   `tools\install_design.bat` (equivalently `lazbuild --add-package-link` for `src\lwcore.lpk`, `src\lwserver.lpk`, `src\lwvst.lpk` and `src\design\lwdesign.lpk`). `--add-package-link` only registers without installing, which is normal.
 1. Open Lazarus and, **in the order of the table above**, open each package with `Package → Open Package File → <package>.lpk`:
-   for the first two click only **Compile**; for the third click **Compile → Use → Install**, choose "Yes" in the dialog asking whether to rebuild the IDE, and after the rebuild finishes **restart Lazarus**.
+   for the first three click only **Compile**; for the fourth click **Compile → Use → Install**, choose "Yes" in the dialog asking whether to rebuild the IDE, and after the rebuild finishes **restart Lazarus**.
 2. Note: do not Compile `lwserver.lpk` in the IDE (the nogui units are not on the IDE search path, giving `Can't find unit noguiint`; see pitfall 15 in `NOTES.md`); leave that to the command-line `lazbuild`. For the `Descriptor.Name empty` dialog when installing the design-time package, see pitfall 16.
 
 Only after installation will a template named **lazarusWeb** appear under **File → New → Project** (selecting it pops up the three dialogs below). If it is not installed (or an old version is installed), you will not see it in the New dialog. The Tools menu item "**Generate lazarusWeb Form Template (Current Unit LFM)**" also comes from the `lwdesign` package — this is a **different feature** (generating an HTML template from the current form's .lfm, see 16.0) and has nothing to do with the New Project wizard. After changing a package's source you must recompile → Install → restart the IDE, otherwise the menu still runs the old logic.
@@ -148,9 +152,9 @@ The third dialog (3/3), the project template:
 | Option | `.lpr` generated |
 |---|---|
 | **Normal mode** | Normal project: `uses lwapp, umain`, `TLWApp.Register(TMainForm)` |
-| **Plugin mode** | Plugin project: `uses` additionally includes `lwmodules` and calls `RegisterAllModules`; also generates an empty `lwmodules.pas` skeleton (the main form is kept as usual; for module registration see `tools/lwplugins.py`) |
+| **Plugin mode** | **Multi-process plugin framework**: host project (`uses upluginproc, upluginauth, ulogin, umain`; startup calls `TLWApp.SetLogin(TLoginForm)` + `LWAuthRegister` → `PlugDiscover` → `PlugRegisterRoutes` → `PlugLaunchAll`, with a sidebar menu + `TPageControl` plugin workbench as the main form) + `common\upluginproc.pas` + `common\upluginguard.pas` (startup guard: token + parent-process check, so a plugin exe cannot run on its own) + `common\upluginauth.pas` (role checks, menu filtering, 403 on `/p/`, identity signing) + `common\upluginidentity.pas` (plugin-side signature verification to read the "current user") + `ulogin.pas` (graphic captcha on by default) + `plugins\hello\` sample plugin project (a standalone exe) + `build-all.bat` / `stop-all.bat` (Windows) and `build-all.sh` / `stop-all.sh` (Linux/macOS, LF line endings) + `README.md`. On Linux the manifest still says `exe=xxx.exe`; `upluginproc` automatically falls back to the extensionless artifact and sets the execute bit on the `.run\` copy. The host `.lpi`'s `OtherUnitFiles` points at `common` automatically; the plugin manifest root is `<host exe dir>\plugins`. Demo accounts `admin` / `analyst` / `guest`, password `123456`; a manifest's `roles=admin,analyst` controls access. If you do not need login, remove the `SetLogin` / `LWAuthRegister` lines from the `.lpr`; removing only the menu filter but not the route guard leaves unauthorized access open |
 
-After all three dialogs are answered, **nothing is written to disk**: the project is "virtual" at this moment, with the source of `.lpr` / `umain.pas` / `.lfm` (plus `lwmodules.pas` in plugin mode, and `uDaemon.pas` / `uMapper.pas` / `lazarusWeb.ini` in service mode) all in memory, and the title bar reads `LWApp1 (*lpi)`. This is completely consistent with the flow of Lazarus's own templates.
+After all three dialogs are answered, **nothing is written to disk**: the project is "virtual" at this moment, with the source of `.lpr` / `umain.pas` / `.lfm` (plus `uDaemon.pas` / `uMapper.pas` / `lazarusWeb.ini` in service mode) all in memory, and the title bar reads `LWApp1 (*lpi)`. In plugin mode the whole `common\` / `plugins\` tree is **not** part of the host project's units — it is written by the save hook after the project files are saved (existing files are not overwritten). This is completely consistent with the flow of Lazarus's own templates.
 
 > In service mode those three extra files are **already complete and correct before anything is written to disk** — they do not depend on a save hook patching them afterwards. `uMapper.pas` builds its `DaemonDefs` in code and therefore needs **no `.lfm` resource** (see pitfall 195 in `NOTES.md`).
 
@@ -174,7 +178,7 @@ opens a tab for each of them so you can tweak the service name / port right away
 
 ```
        uDaemon.pas    ← daemon class + worker thread (RunService / Halt on non-SCM stop)
-       uMapper.pas    ← TDaemonMapper descendant; service name is always LWApp1Service (the wizard generates with a placeholder name), stAuto; only CLI `lwnew --name=MyApp` produces MyAppService — see SERVICE_NAMING.md
+       uMapper.pas    ← TDaemonMapper descendant, stAuto; the service name follows the project name entered at Ctrl+S (rewritten before the files are written) — see SERVICE_NAMING_en.md
        lazarusWeb.ini ← port= / log= / client= (fixed name, found automatically at runtime)
 ```
 
@@ -451,7 +455,7 @@ The small icon on the browser tab is not drawn by the framework — **just place
 | Selected window mode but the whole page still displays | An old `<form name>.flat.html` remains in `tpl\`; delete it and force-refresh; or the `.html` header says `lw-tpl-mode:flat` |
 | A service started from an AI terminal/script disappears after a while with no logs | The command runs in a kill-on-job-close Job Object and gets reclaimed; a background task may also be collected when the turn ends → start it with `Start-Process` (detached from the Job) or from a real user terminal (pitfalls 108/145) |
 
-For more cases and debugging methodology: `docs/DEBUGGING_en.md`; search the 167 pitfalls by number in `docs/NOTES.md` (older conclusions in pitfalls 23/66/108 and others have been revised by later pitfalls — follow the annotations).
+For more cases and debugging methodology: `docs/DEBUGGING_en.md`; search the 212 pitfalls by number in `docs/NOTES.md` (older conclusions in pitfalls 23/66/108 and others have been revised by later pitfalls — follow the annotations).
 
 ## 9. Known Limitations
 

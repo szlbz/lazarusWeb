@@ -3,7 +3,7 @@
 > Version 0.9.6 · Updated 2026-11-16
 > Companion documents: `README.md` (quick start), `docs/COMPARISON_unigui_en.md` (comparison with uniGUI),
 > `docs/CONTROL_MATRIX_en.md` / `docs/DB_AWARE_MATRIX_en.md` (measured control-support matrices),
-> `docs/NOTES.md` (a record of 163 pitfalls; outdated conclusions such as pitfalls 23/66/108 have been revised by later pitfalls), `deploy/README.md` (HTTPS / reverse proxy / clustering).
+> `docs/NOTES.md` (a record of 212 pitfalls; outdated conclusions such as pitfalls 23/66/108 have been revised by later pitfalls), `deploy/README.md` (HTTPS / reverse proxy / clustering).
 
 ---
 
@@ -282,7 +282,7 @@ Business code is **unchanged**, and LCL dialogs are rerouted on the server to "b
 | `lwhyper.pas` | Dedicated load balancer (equivalent to uniGUI Hyper Server): one process launches N workers (multiple instances of the same exe), automatic restart on crash, HTTP reverse proxy + sid session stickiness, WebSocket TCP-level passthrough, healthz checks; `tools/lwhyper.exe` is the entry point, with its own endpoints `/lw/healthz` (aggregate) and `/lw/hyper/status` (worker details) |
 | `lwpanel.pas` + `lwrlog.pas` | GUI server panel (equivalent to uniGUI's standalone server window) and unified logging (see below) |
 | `lwconfig.pas` | INI parsing layer: key normalization (case, `-`/`_`/space), sections ignored, UTF-8 BOM, `--config=`. The unit itself reads `Port` / `Theme` / `ExtDir`; `log` / `language` / `patch` / `ssl*` / `client` / `plugin.*` are read from the same INI by `lwapp.pas`'s `ApplyConfigFile` (see 3.2.1). Command line always wins |
-| `lwnewproject.pas` + `src/design/lwdesign.lpk` | IDE wizard (New Project has one `lazarusWeb` template; three prompts: (1/3) normal application / service(daemon) mode, (2/3) project tier GUI/nogui determining the .lpi's `LCLWidgetType`, (3/3) template normal/plugin determining whether the .lpr does `uses lwmodules` + `RegisterAllModules`; service mode adds `uDaemon.pas` / `uMapper.pas` / `lazarusWeb.ini`, see `SERVICE_NAMING_en.md`) / New Form / component palette, sharing the same template with the `tools/lwnew.exe` command line (`--plugin` / `--service`); lwdesign registers all custom controls into the IDE, so only forms containing them can be opened in the designer; it also registers "Generate lazarusWeb Form Template" in the Tools menu (`lwdsgntplcore` parses the .lfm + `lwdsgntplgen` writes to disk; choose window/flat mode, generating a mode-marked desktop `<form name>.html` and mobile `<form name>.m.html`, see 2.14 and pitfall 154). These are two separate entry points: the New Project wizard creates projects, while the Tools menu generates form templates — don't confuse them |
+| `lwnewproject.pas` + `src/design/lwdesign.lpk` | IDE wizard (New Project has one `lazarusWeb` template; three prompts: (1/3) normal application / service(daemon) mode, (2/3) project tier GUI/nogui determining the .lpi's `LCLWidgetType`, (3/3) template normal/plugin: plugin mode generates a multi-process framework — host exe (`uses upluginproc, upluginauth, ulogin, umain`, with `TLWApp.SetLogin(TLoginForm)` + `LWAuthRegister` → `PlugDiscover` → `PlugRegisterRoutes` → `PlugLaunchAll`) + `common\upluginproc.pas` / `upluginguard.pas` / `upluginauth.pas` / `upluginidentity.pas` + `ulogin.pas` + `plugins\hello\` standalone plugin exe + `build-all.bat/.sh` / `stop-all.bat/.sh` / `README.md`, with host login (admin / analyst / guest, password `123456`, captcha on by default), manifest `roles=` route auth and signed identity headers; the old in-process `lwmodules` / `RegisterAllModules` approach remains only in `demos/plugindemo`; service mode adds `uDaemon.pas` / `uMapper.pas` / `lazarusWeb.ini`, see `SERVICE_NAMING_en.md`) / New Form / component palette, sharing the same template with the `tools/lwnew.exe` command line (`--plugin` / `--service`); lwdesign registers all custom controls into the IDE, so only forms containing them can be opened in the designer; it also registers "Generate lazarusWeb Form Template" in the Tools menu (`lwdsgntplcore` parses the .lfm + `lwdsgntplgen` writes to disk; choose window/flat mode, generating a mode-marked desktop `<form name>.html` and mobile `<form name>.m.html`, see 2.14 and pitfall 154). These are two separate entry points: the New Project wizard creates projects, while the Tools menu generates form templates — don't confuse them |
 | `lwconvert.exe` | **LCL → Web converter**: rewrites `.pas` base classes and uses clauses, rewrites `.lpr` startup code, regenerates the `.lpi` as a nogui project, with a support report attached |
 
 ### 2.12 GUI Server Panel (lwpanel + lwrlog, equivalent to uniGUI Standalone Server)
@@ -501,7 +501,7 @@ full run of `tests/run_with_server.py`). The CDP scripts drive headless Edge for
 
 ### 3.8 Pitfall Records
 
-As of 2026-11-16, all 163 pitfalls are recorded in `docs/NOTES.md`
+As of 2026-11-28, all 212 pitfalls are recorded in `docs/NOTES.md`
 (nogui infrastructure → fpjson/encoding → SQLite/WAL → design-time packages → multipart security →
 dialog hooks → WebSocket → multi-tab cursors → GUI panel → lfm-ification refactoring → performance profiling →
 load-test troubleshooting), the most valuable asset of this framework — each pitfall comes with root-cause analysis and verification methods.

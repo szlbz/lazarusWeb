@@ -2,7 +2,7 @@
 
 > 面向第一次读这套代码的人：把"LCL 控件 + 服务端 + 浏览器渲染"这三件事讲成一条线。
 > 编写日期 2026-11-11 · 依据当时代码快照（`src/core` 27 个单元 13226 行；行数仅为快照，不在文档里持续更新）
-> 配套文档：`ARCHITECTURE.md`（模块清单，默认 Alpine 层 + 可选 Ext 层，含 2.14 移动端自适应）、`NOTES.md`（163 个坑的踩坑实录）、`MAPPING.md`（控件映射表）
+> 配套文档：`ARCHITECTURE.md`（模块清单，默认 Alpine 层 + 可选 Ext 层，含 2.14 移动端自适应）、`NOTES.md`（212 个坑的踩坑实录）、`lazarusWeb控件属性映射表.md`（控件映射表）
 > **本文以默认 Alpine.js 层（`src/client/lw-alpine.js`）为主线讲解**。
 > 可选 Ext 层（`lw.js`）走完全相同的 JSON 协议、reconcile 与事件/推送通道，
 > 仅在 DOM 构建和样式体系上不同：`--client=ext` 显式启用，不指定时优先 Alpine。

@@ -630,7 +630,7 @@ Ext JS 渲染层为**可选**（默认不部署）：需要时把 `ext-x.x.x\` �
 | 选了窗口模式却仍整页显示 | `tpl\` 里残留旧 `<窗体名>.flat.html`，删除它后强刷；或 `.html` 文件头写的是 `lw-tpl-mode:flat` |
 | 从 AI 终端/脚本启动的服务跑一会儿就消失、无日志 | 命令跑在 kill-on-job-close 的 Job Object 里被回收；后台任务方式也可能在轮次结束后被收走 → 用 `Start-Process`（脱离 Job）或真实用户终端启动（坑 108/145） |
 
-更多案例与调试方法论：`docs/DEBUGGING.md`；167 个坑按编号检索
+更多案例与调试方法论：`docs/DEBUGGING.md`；212 个坑按编号检索
 `docs/NOTES.md`（坑 23/66/108 等旧结论已被后续坑修订，以标注为准）。
 
 ## 9. 已知限制
@@ -696,7 +696,7 @@ src/
 6. 浏览器 `lw.js` 按 id reconcile 增量更新；`--patch=1` 时服务端先 diff
    （lwdiff）只发 ops，客户端 `tver` 不匹配自动退回全量自愈。
 
-深读：`docs/HOW_IT_WORKS.md`（含关键源码行号）；
+深读：`docs/lazarusWeb工作原理详解.md`（含关键源码行号）；
 为什么不能全量 RTTI dump、KindOf 顺序敏感性等设计约束也在那里。
 
 ## 12. 线程模型（改动前必读）
@@ -748,10 +748,10 @@ python tests/run_with_server.py <exe路径> <测试脚本> [端口] [exe额外�
 3. `lw.js`（及 lw-alpine.js，如需双端一致）加渲染分支与回写分支；
 4. `demos/audit` 或 `demos/controls` 摆一个实例；
 5. 重跑 `lwaudit` 更新矩阵 + `tests/t_controls.py` 回归；
-6. 映射写进 `docs/MAPPING.md`。
+6. 映射写进 `docs/lazarusWeb控件属性映射表.md`。
 
 前端协议字段（payload/ops/tver/seq 游标）见 `docs/SCALE.md` §2 与
-`docs/HOW_IT_WORKS.md`；改 lwproxyws 相关内容必须走 `gen_proxyws.py`
+`docs/lazarusWeb工作原理详解.md`；改 lwproxyws 相关内容必须走 `gen_proxyws.py`
 重新生成。
 
 ## 16. 窗体模板开发指南（窗口 + 平面）

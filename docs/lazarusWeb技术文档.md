@@ -3,7 +3,7 @@
 > 版本 0.9.6 · 更新日期 2026-11-16
 > 配套文档：`README.md`（快速上手）、`docs/COMPARISON_unigui.md`（与 uniGUI 对照）、
 > `docs/CONTROL_MATRIX.md` / `docs/DB_AWARE_MATRIX.md`（控件支持度实测矩阵）、
-> `docs/NOTES.md`（163 个坑的踩坑实录，坑 23/66/108 等旧结论已被后续坑修订）、`deploy/README.md`（HTTPS/反向代理/集群）。
+> `docs/NOTES.md`（212 个坑的踩坑实录，坑 23/66/108 等旧结论已被后续坑修订）、`deploy/README.md`（HTTPS/反向代理/集群）。
 
 ---
 
@@ -122,7 +122,7 @@ nogui widgetset 缺显示器、缺画布，直接 `TForm.Create` 就 AV（坑 1�
 
 反射遍历窗体的控件树，把每个控件序列化成 `{id, kind, props, children}`：
 
-- 属性按**白名单映射表**输出（不是全量 RTTI dump），映射关系见 `docs/MAPPING.md`；
+- 属性按**白名单映射表**输出（不是全量 RTTI dump），映射关系见 `docs/lazarusWeb控件属性映射表.md`；
 - 事件能力用类引用表声明（Click/Change/DblClick/KeyPress…）；
 - 增量输出：树带 `seq`，浏览器按 id diff，只更新变化的节点（reconcile）；
 - 特殊控件有专门序列化分支：`TRadioGroup/TCheckGroup/TValueListEditor` 的
@@ -521,7 +521,7 @@ TMainForm = class(TLWForm)   // 原来是 class(TForm)
 
 ### 3.8 踩坑实录
 
-截至 2026-11-16 共 163 个坑全部沉淀在 `docs/NOTES.md`
+截至 2026-11-28 共 212 个坑全部沉淀在 `docs/NOTES.md`
 （nogui 基础设施 → fpjson/编码 → SQLite/WAL → 设计期包 → multipart 安全 →
 对话框钩子 → WebSocket → 多页签游标 → GUI 面板 → lfm 化改造 → 性能剖析 →
 压测排障），是这份框架最贵的资产——每个坑都带根因分析和验证手段。

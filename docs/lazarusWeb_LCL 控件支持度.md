@@ -5,7 +5,7 @@
 >
 > 时效提示：本表是 2026-11-09 快照，晚于该日期的能力变化（坑 95 TStringGrid 就地编辑、
 > 坑 96 TDrawGrid 表头行高、坑 97 五类控件回写）未反映在下表状态列里；能力现状以
-> `docs/MAPPING.md` 与 `docs/NOTES.md` 为准。
+> `docs/lazarusWeb控件属性映射表.md` 与 `docs/NOTES.md` 为准。
 
 ## 汇总
 
