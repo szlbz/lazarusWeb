@@ -127,12 +127,12 @@ On a Linux host, just run `lazbuild` on each demo's `.lpi`; `build.sh` and
 | `demos/dbaware` | **DB-aware control full set** (TDBText/TDBListBox/TDBRadioGroup/TDBLookup*/TDBImage data-aware testing; main form has 87 objects, `uAwareMain.lfm` 866 lines) |
 | `demos/dialogs` | **Dialog example** (ShowMessage/MessageDlg/InputQuery/QuestionDlg/MessageBox/OpenDialog/SaveDialog) |
 | `demos/gallery` | **Full-featured gallery** (benchmarked against uniGUI full-featured Demo: 12 pages, 60+ controls — standard controls/buttons/extended input/containers/grids/toolbars/charts/HTML·PDF·upload/dialogs/timers/DB-aware/large table pagination, `tests/t_gallery.py` 50-item regression) |
-| `docs/MAPPING.md` | Control/property mapping table |
+| `docs/MAPPING_en.md` | Control/property mapping table |
 | `docs/CONTROL_MATRIX.md` | **Tested support matrix for 66 visual controls** (auto-generated) |
 | `docs/DB_AWARE_MATRIX.md` | **Tested matrix for 12 DB-aware controls** (binding/display/sync/write-back, auto-generated) |
 | `docs/SECURITY.md` | **Security notes**: SQL injection and trust boundaries (framework has no SQL channel, demo parameterized examples, business code self-check list) |
-| `docs/NOTES.md` | nogui porting pitfall record, pitfalls 1–108 accumulated over time (important; old conclusions like pitfalls 23/66 have been revised by later pitfalls, refer to annotations) |
-| `docs/HOW_IT_WORKS.md` | **Working principles in detail** (for first-time code readers: the complete round trip of one click, why full RTTI dump is not possible) |
+| `docs/NOTES.md` | nogui porting pitfall record, pitfalls 1–212 accumulated over time (important; old conclusions like pitfalls 23/66 have been revised by later pitfalls, refer to annotations) |
+| `docs/HOW_IT_WORKS_en.md` | **Working principles in detail** (for first-time code readers: the complete round trip of one click, why full RTTI dump is not possible) |
 | `docs/MANUAL.md` | **User manual** (usage + development) |
 | `docs/FEATURES.md` | **Features and highlights** (one page to understand strengths and boundaries: eleven capabilities / seven decisions done right / number snapshot / comparison with uniGUI) |
 | `docs/INDEX.md` | Documentation navigation index (find docs by scenario) |
@@ -178,6 +178,17 @@ Open `http://127.0.0.1:8090/` in your browser. Command-line options:
 --nogui               Do not show server panel even in GUI build (service deployment)
 --patch=1             Incremental patch (events return only changed ops, default off; old frontend auto-falls back to full)
 --log=path            Append server logs to file
+--pwa                 Enable PWA (manifest + Service Worker + installable + offline cache; off by default)
+--pwa-name=name       Installed app name (defaults to --title=)
+--pwa-short-name=name Home-screen short name (defaults to the first 12 chars of the name)
+--pwa-theme=#RRGGBB   Browser toolbar color (default #1e88e5)
+--pwa-bg=#RRGGBB      manifest background color (default #ffffff)
+--pwa-vapid-public=   Web Push VAPID public key (push disabled if unset)
+--pwa-vapid-private=  VAPID EC private key PEM path (relative paths resolved from exe directory)
+--pwa-vapid-subject=  VAPID sub, e.g. mailto:admin@example.com
+--pwa-push-token=     Token for /lw/pwa/push; requests must send X-LW-PWA-Token
+--pwa-push-file=      Subscription store (default <root>\pwa-subscriptions.json)
+--pwa-message-file=   Broadcast message file (default <root>\pwa-message.json)
 --help                Help
 ```
 
@@ -356,7 +367,7 @@ After `src/design/lwdesign.lpk` is installed, three additional things appear in 
 Install (only once):
 
 ```
-tools\install_design.bat        :: Register the three packages first
+tools\install_design.bat        :: Register the four packages first (lwcore / lwserver / lwvst / lwdesign)
 ```
 
 Then follow its prompts in the IDE: `Package → Open Package File → lwdesign.lpk → Use → Install`,
@@ -545,7 +556,7 @@ end;
 | `GET /lw/ws?sid=` | WebSocket upgrade (RFC6455): **only carries event requests/responses** (events go through WS frames when WS connected); pushes do not go through WS, always delivered by long-poll cursor above, auto-falls back to HTTP on disconnect |
 | `GET /lw/api/log?sid=` | Session log (Show/ShowModal/EndModal all recorded) |
 | `POST /lw/api/close` | End session |
-| `POST /lw/api/dlg` / `POST /lw/api/dlgfile` | Browser modal (ShowMessage/MessageDlg/InputQuery/TOpenDialog…) reply endpoints (see `docs/MAPPING.md` dialog section) |
+| `POST /lw/api/dlg` / `POST /lw/api/dlgfile` | Browser modal (ShowMessage/MessageDlg/InputQuery/TOpenDialog…) reply endpoints (see `docs/MAPPING_en.md` dialog section) |
 | `POST /lw/api/upload?sid=&id=` | File upload (`multipart/form-data`, any field name, multiple files allowed) |
 | `GET /lw/download?t=` | Download (`t` is one-time token registered by `lwdownload`, discarded after use) |
 | `GET /lw/ajax/<name>` | **Custom AJAX endpoint**: registered by `TLWApp.AddAjax(name, handler)`, third-party JS can fetch directly |
@@ -603,7 +614,7 @@ mobile layout (≥1100px exits, hysteresis in between prevents jitter), phones/t
   LAN http works (no HTTPS needed), see README "Capture (TLWCamera)" section;
 - Usage see `docs/MANUAL.md` usage section "Mobile", template development guide see
   `MANUAL.md` Part Two "16. Form Template Development Guide (Desktop + Mobile)", mechanism and
-  testing see `docs/MOBILE.md` §8, runnable example `demos/mobile_demo`
+  testing see `docs/MOBILE_en.md` §8, runnable example `demos/mobile_demo`
   (same form configured with desktop + mobile templates).
 
 ## Known Limitations
