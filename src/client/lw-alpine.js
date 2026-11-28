@@ -995,6 +995,15 @@ var LW = (function () {
         if (k === 'dbgrid') {
             r.pgtext = pagerTextOf(node);
             r.sumtext = node.summary ? summaryTextOf(node.summary) : '';
+            /* 树形网格：层级/父行/展开状态。topen 只存"用户改过"的节点，
+               没记录的按服务端 TreeDefaultExpanded 处理，刷新后不丢。 */
+            r.treeinfo = node.tree || null;
+            r.tkeys = node.keys || [];
+            r.lv = node.lv || [];
+            r.hc = node.hc || [];
+            r.pid = node.pid || [];
+            r.topen = {};
+            r.ttgl = 0;
         }
         if (k === 'valeditor') {
             r.values = (node.values || []).slice();
@@ -1392,12 +1401,102 @@ var LW = (function () {
             '</td>';
     }
 
+    /* 树形网格的单元格：首列多一层缩进 + 展开箭头，其余列与普通网格一致。
+       箭头只在 j===0 且该行有子节点时出现；展开/折叠纯客户端，
+       不发请求（服务端只负责层级与父行）。 */
+    function dbCellTdTree(dgid) {
+        return '<td @click.stop="$lwDbCell(\'' + dgid + '\', i, j, $event)">' +
+            '<span class="lw-tcell"' +
+            ' :style="j===0 ? (\'padding-left:\' + $lwTreePad(\'' + dgid + '\', i) + \'px\') : \'\'">' +
+            '<button type="button" class="lw-tgl" tabindex="-1"' +
+            /* 首列即使没有子节点也占住箭头宽度（visibility:hidden），
+               否则叶子行比同级有子节点的行少缩进 18px，层级看起来是错的；
+               其它列直接 display:none，不占宽 */
+            ' :style="j===0 ? ($lwTreeHas(\'' + dgid + '\', i) ? \'\' : \'visibility:hidden\') : \'display:none\'"' +
+            ' @click.stop="$lwTreeTgl(\'' + dgid + '\', i)"' +
+            ' x-text="$lwTreeArrow(\'' + dgid + '\', i)"></button>' +
+            '<template x-if="$lwChk(\'' + dgid + '\', j)">' +
+            '<input type="checkbox" class="lw-chk"' +
+            ' :checked="cell === \'1\' || cell === true"' +
+            ' @click.stop="$lwChkTap(\'' + dgid + '\', i, j, $event)"/>' +
+            '</template>' +
+            '<template x-if="!$lwChk(\'' + dgid + '\', j)"><span x-text="cell"></span></template>' +
+            '</span></td>';
+    }
+
     /* 网格 <table> 的 class：配了分组表头时多带一个 lw-hg ——
        该修饰类把 border-collapse 换成 separate（见 CSS：collapse 下
        sticky 表头会让数据行文字从表头里透出来） */
     function tableCls(n) {
-        return 'lw-table' + ((n.hg && n.hg.length) ? ' lw-hg' : '');
+        return 'lw-table' + (((n.hg && n.hg.length) || (n.hrows && n.hrows.length)) ? ' lw-hg' : '');
     }
+
+    /* ---------------- 树形网格（TLWDBGrid.TreeKeyField） ----------------
+       服务端发扁平 rows + 四个平行数组：keys/lv（层级）/hc（有子节点）/
+       pid（父行下标，-1 根）。层级只用于缩进，折叠沿 pid 上溯，
+       不假设父行一定排在子行前面。
+       展开状态纯客户端：S.R[id].topen[key]，没记录就取 node.tree.exp。 */
+    function treeNode(id) {
+        var n = S.ND[id];
+        return (n && n.tree) ? n : null;
+    }
+
+    function treeOpenAt(r, i) {
+        var k = (r.tkeys || [])[i];
+        var def = !(r.treeinfo && r.treeinfo.exp === false);
+        if (r.topen && k != null &&
+            Object.prototype.hasOwnProperty.call(r.topen, k))
+            return !!r.topen[k];
+        return def;
+    }
+
+    window.$lwTreeLv = function (id, i) {
+        var r = S.R[id];
+        return (r && r.lv && typeof r.lv[i] === 'number') ? r.lv[i] : 0;
+    };
+
+    window.$lwTreePad = function (id, i) {
+        var r = S.R[id];
+        if (!r) return 0;
+        var ind = (r.treeinfo && r.treeinfo.ind > 0) ? r.treeinfo.ind : 18;
+        return $lwTreeLv(id, i) * ind;
+    };
+
+    window.$lwTreeHas = function (id, i) {
+        var r = S.R[id];
+        return !!(r && r.hc && r.hc[i] === 1);
+    };
+
+    window.$lwTreeArrow = function (id, i) {
+        var r = S.R[id];
+        if (!r) return '';
+        /* 读一下 ttgl，让 Alpine 追踪这个节点的展开状态变化 */
+        void r.ttgl;
+        return treeOpenAt(r, i) ? '▾' : '▸';
+    };
+
+    window.$lwTreeVis = function (id, i) {
+        var r = S.R[id];
+        if (!r) return true;
+        void r.ttgl;
+        var p = (r.pid || [])[i];
+        var guard = 0;
+        while (typeof p === 'number' && p >= 0 && guard++ < 4096) {
+            if (!treeOpenAt(r, p)) return false;
+            p = (r.pid || [])[p];
+        }
+        return true;
+    };
+
+    window.$lwTreeTgl = function (id, i) {
+        var r = S.R[id];
+        if (!r || !$lwTreeHas(id, i)) return;
+        var k = (r.tkeys || [])[i];
+        if (k == null) return;
+        if (!r.topen) r.topen = {};
+        r.topen[k] = !treeOpenAt(r, i);
+        r.ttgl++;
+    };
 
     /* DBGrid 表头（两级表头 TLWDBGrid.HeaderGroups）：
        没有分组时沿用老的 x-for 模板（Excel 风格，列变化走补丁重建）；
@@ -1407,12 +1506,30 @@ var LW = (function () {
        叶子格照旧挂 OnTitleClick（col 仍是"可见列下标"，与 hg 同一套编号）。 */
     function dbHeadHtml(node, r, id) {
         var cols = node.cols || [], hg = node.hg || [], i, j;
-        /* 无分组：叶子格在 x-for 里，j 是循环变量 */
         var click = evAttr(id, 'OnTitleClick', '{col:j}');
         /* 有分组：表头是静态拼的，不在任何 x-for 作用域里，
            事件里的列号必须烧成字面量，否则点表头就 "j is not defined" */
         function leafClick(ci) {
             return evAttr(id, 'OnTitleClick', '{col:' + ci + '}');
+        }
+        /* 多级表头（MultiTitle）：服务端已经算好每个格子的 colspan/rowspan，
+           按行拼 <tr> 即可；带 a（叶列下标）的格子才挂排序/筛选点击。 */
+        if (node.hrows && node.hrows.length) {
+            var hr = '', ri, ci, c, th;
+            for (ri = 0; ri < node.hrows.length; ri++) {
+                hr += '<tr>';
+                for (ci = 0; ci < node.hrows[ri].length; ci++) {
+                    c = node.hrows[ri][ci];
+                    th = '<th';
+                    if (c.cs > 1) th += ' colspan="' + (c.cs | 0) + '"';
+                    if (c.rs > 1) th += ' rowspan="' + (c.rs | 0) + '"';
+                    if (typeof c.a === 'number')
+                        th += ' @click="' + leafClick(c.a) + '"';
+                    hr += th + '>' + esc(c.t) + '</th>';
+                }
+                hr += '</tr>';
+            }
+            return '<thead class="lw-thead-hg">' + hr + '</thead>';
         }
         if (!hg.length) {
             return '<thead><tr><template x-for="(c,j) in ' + r + '.cols" :key="j">' +
@@ -1747,6 +1864,10 @@ var LW = (function () {
 
             case 'dbgrid': {
                 var dgid = id;
+                var isTree = !!node.tree;
+                var cellTpl = isTree ? dbCellTdTree(dgid) : dbCellTd(dgid);
+                /* 树形行：祖先折叠时整行不显示（纯客户端 x-show） */
+                var rowShow = isTree ? ' x-show="$lwTreeVis(\'' + dgid + '\', i)"' : '';
                 var filterBar = node.showfilter
                     ? '<div class="lw-grid-filter"><span>' + lwT('过滤:') + '</span><input type="text" class="lw-input" placeholder="' + lwT('输入关键字后回车…') + '" ' + dis +
                       ' x-model="' + r + '.ftext" @keydown.enter.prevent="' + evAttr(dgid, 'OnFilter', '{val:' + r + '.ftext}') + '"/></div>'
@@ -1767,9 +1888,9 @@ var LW = (function () {
                     '<div class="lw-grid lw-boxed lw-dbgrid-body"><table class="' + tableCls(node) + '">' + dbHeadHtml(node, r, dgid) +
                     '<tbody>' +
                     '<template x-for="(row,i) in ' + r + '.rows" :key="i">' +
-                    '<tr :class="i === ' + r + '.recno - 1 ? \'lw-sel\' : \'\'" @click="$lwDbRow(\'' + dgid + '\', i, $event)">' +
+                    '<tr' + rowShow + ' :class="i === ' + r + '.recno - 1 ? \'lw-sel\' : \'\'" @click="$lwDbRow(\'' + dgid + '\', i, $event)">' +
                     '<template x-for="(cell,j) in row" :key="j">' +
-                    dbCellTd(dgid) +
+                    cellTpl +
                     '</template></tr></template></tbody></table></div>' + pagerBar + '</div>';
             }
 
@@ -3161,6 +3282,15 @@ var LW = (function () {
         r.recno = n.recno || 0;
         r.pgtext = pagerTextOf(n);
         r.sumtext = n.summary ? summaryTextOf(n.summary) : '';
+        /* 树形网格：平行数组必须跟 rows 一起换，否则缩进/父子会错位。
+           topen 按 key 存，行刷新后用户已经展开的节点保持原状。 */
+        if (n.tree && n.rows && n.keys) {
+            r.treeinfo = n.tree;
+            r.tkeys = n.keys || [];
+            r.lv = n.lv || [];
+            r.hc = n.hc || [];
+            r.pid = n.pid || [];
+        }
         /* 选中行滚进可视区 */
         var el = S.E[id];
         if (el && r.recno > 0) {
@@ -4066,8 +4196,11 @@ var LW = (function () {
                 }
             } else if (n.kind === 'dbgrid') {
                 var dsig = JSON.stringify(n.rows || null) + '#' + JSON.stringify(n.cols || null) +
-                    '#' + JSON.stringify(n.hg || null);
-                var csig2 = JSON.stringify(n.cols || null) + '|' + JSON.stringify(n.hg || null);
+                    '#' + JSON.stringify(n.hg || null) +
+                    '#' + JSON.stringify(n.htree || null) +
+                    '#' + JSON.stringify(n.hrows || null);
+                var csig2 = JSON.stringify(n.cols || null) + '|' + JSON.stringify(n.hg || null) +
+                    '|' + JSON.stringify(n.htree || null);
                 if (prev.__dbSig !== dsig) {
                     if (n.rows) {
                         /* 就地编辑中：整表重灌行会把刚建出来的编辑器拆掉，
@@ -4378,16 +4511,26 @@ var LW = (function () {
         var r = S.R[id];
         r.cols = n.cols || [];
         r.rows = n.rows || [];
+        if (n.tree) {
+            r.treeinfo = n.tree;
+            r.tkeys = n.keys || [];
+            r.lv = n.lv || [];
+            r.hc = n.hc || [];
+            r.pid = n.pid || [];
+        }
         var keep = host.querySelectorAll('.lw-grid-filter,.lw-grid-pager');
         var gridBox = host.querySelector('.lw-dbgrid-body');
         if (gridBox) {
+            var isTree = !!n.tree;
+            var cellTpl = isTree ? dbCellTdTree(id) : dbCellTd(id);
+            var rowShow = isTree ? ' x-show="$lwTreeVis(\'' + id + '\', i)"' : '';
             var fresh = document.createElement('div');
             fresh.className = 'lw-grid lw-boxed lw-dbgrid-body';
             fresh.innerHTML = '<table class="' + tableCls(n) + '">' + dbHeadHtml(n, '$lwN(\'' + id + '\')', id) + '<tbody>' +
                 '<template x-for="(row,i) in $lwN(\'' + id + '\').rows" :key="i">' +
-                '<tr :class="i === $lwN(\'' + id + '\').recno - 1 ? \'lw-sel\' : \'\'" @click="$lwDbRow(\'' + id + '\', i, $event)">' +
+                '<tr' + rowShow + ' :class="i === $lwN(\'' + id + '\').recno - 1 ? \'lw-sel\' : \'\'" @click="$lwDbRow(\'' + id + '\', i, $event)">' +
                 '<template x-for="(cell,j) in row" :key="j">' +
-                dbCellTd(id) +
+                cellTpl +
                 '</template></tr></template></tbody></table>';
             gridBox.parentNode.replaceChild(fresh, gridBox);
             try { if (window.Alpine) Alpine.initTree(fresh); } catch (e) { }

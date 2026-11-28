@@ -1646,12 +1646,31 @@ var LW = (function () {
         cfg.selType = 'rowmodel';
         cfg.multiSelect = false;
         cfg.viewConfig = { stripeRows: true, markDirty: !node.readonly };
-        cfg.store = buildGridStore(node);
-        if (!node.readonly) {
+        if (node.tree) {
+            /* 树形网格：Ext 端用 tree.Panel + TreeStore。首列必须是顶层的
+               treecolumn（画展开箭头/缩进），其余列仍按多级表头分组。 */
+            cfg.columns = dbColumnsTree(node);
+            cfg.store = buildGridTreeStore(node);
+            cfg.viewConfig = { stripeRows: true, markDirty: !node.readonly, useArrows: true };
+            /* Ext 的树默认显示根节点（Root）、用文件夹图标 + 虚线连接；
+               与服务端"根就是第一层数据"的模型对齐：隐藏根、用三角箭头、
+               关闭展开动画（动画会让补丁刷新时节点位置跳动） */
+            cfg.rootVisible = false;
+            cfg.animate = false;
+            cfg.singleExpand = false;
+            if (!node.readonly) {
+                cfg.plugins = [Ext.create('Ext.grid.plugin.CellEditing', { clicksToEdit: 1 })];
+                cfg.columns = dbEditColumnsTree(node);
+            }
+        } else {
+            cfg.store = buildGridStore(node);
+        }
+        if (!node.readonly && !node.tree) {
             /* 服务端开了 dgEditing：挂 CellEditing，可编辑列（cedit=1）
                挂文本编辑器，编辑完成后回发 OnSetFieldValue 让服务端
                写进数据集。列编辑器统一 textfield，类型校验交给字段本身。
-               编辑器在 dbEditColumns 里挂 —— 补丁路径 reconfigure 必须带同样的 */
+               编辑器在 dbEditColumns 里挂 —— 补丁路径 reconfigure 必须带同样的
+               树形分支已在上面用 dbEditColumnsTree 配好，不能再覆盖。 */
             cfg.plugins = [Ext.create('Ext.grid.plugin.CellEditing', { clicksToEdit: 1 })];
             cfg.columns = dbEditColumns(node);
         }
@@ -1703,7 +1722,8 @@ var LW = (function () {
             }
             cfg.bbar = { border: false, items: bar };
         }
-        var grid = Ext.create('Ext.grid.Panel', cfg);
+        var grid = Ext.create(node.tree ? 'Ext.tree.Panel' : 'Ext.grid.Panel', cfg);
+        if (node.tree) grid.__lwTree = true;
         grid.__lwSig = dbSig(node);
         grid.__lwColSig = dbColSig(node);
 
@@ -1801,8 +1821,41 @@ var LW = (function () {
         return out;
     }
 
+    /* 多级表头（TLWDBGrid.MultiTitle 下发的 htree = [{t,a,n,c}]）：
+       Ext 的 columns 本身支持嵌套，按树递归还原即可。叶节点 t.a 是
+       "可见列下标"，与 flat 数组同一套编号。
+       offset 用于树形网格：首列被单独提出来当 treecolumn，剩下列在
+       新数组里的下标整体左移一位，分组结构也要跟着重排。 */
+    function mtColsOffset(flat, tree, offset) {
+        var out = [], i, t, kids;
+        for (i = 0; i < tree.length; i++) {
+            t = tree[i];
+            if (t.c && t.c.length) {
+                kids = mtColsOffset(flat, t.c, offset);
+                if (kids.length) {
+                    out.push({
+                        text: esc(t.t),
+                        menuDisabled: true,
+                        sortable: false,
+                        columns: kids
+                    });
+                }
+            } else if (typeof t.a === 'number') {
+                var k = t.a - offset;
+                if (flat[k]) out.push(flat[k]);
+            }
+        }
+        return out;
+    }
+
+    function mtCols(flat, tree) {
+        return mtColsOffset(flat, tree, 0);
+    }
+
     function dbColumns(n) {
-        return dbGroupCols(dbFlatCols(n), n);
+        var flat = dbFlatCols(n);
+        if (n.htree && n.htree.length) return mtCols(flat, n.htree);
+        return dbGroupCols(flat, n);
     }
 
     /* 行数据 -> store 记录。布尔列（cedit=4）必须转成真正的 boolean：
@@ -1822,13 +1875,19 @@ var LW = (function () {
     /* 行数据 + 列定义的指纹；服务端在编辑态下不发 rows，指纹保持不变 */
     function dbSig(n) {
         return JSON.stringify(n.rows || null) + '#' + JSON.stringify(n.cols || null) +
-            '#' + JSON.stringify(n.hg || null);
+            '#' + JSON.stringify(n.hg || null) +
+            '#' + JSON.stringify(n.htree || null) +
+            '#' + JSON.stringify(n.hrows || null) +
+            '#' + JSON.stringify(n.lv || null) +
+            '#' + JSON.stringify(n.hc || null) +
+            '#' + JSON.stringify(n.pid || null);
     }
 
     /* 列定义指纹（补丁路径判断"列没变"用；dbSig 里 rows 文本可能含 '#'，
        不能用 split 取列部分） */
     function dbColSig(n) {
-        return JSON.stringify(n.cols || null) + '|' + JSON.stringify(n.hg || null);
+        return JSON.stringify(n.cols || null) + '|' + JSON.stringify(n.hg || null) +
+            '|' + JSON.stringify(n.htree || null);
     }
 
     /* 坑79：行数据直接灌进现有 store。reconfigure 会复用列实例但销毁
@@ -1845,7 +1904,7 @@ var LW = (function () {
        坑79：必须首建和补丁共用 —— 编辑回发后的树补丁走 reconfigure 重建
        列，若这里不带 editor，第一次编辑完成后 CellEditing 就再也起不来
        （只能改一个单元格）。 */
-    function dbEditColumns(n) {
+    function dbEditColsFlat(n) {
         var cols = dbFlatCols(n);
         if (!n.readonly) {
             var eds = n.cedit || [];
@@ -1873,7 +1932,40 @@ var LW = (function () {
                 }
             }
         }
+        return cols;
+    }
+
+    function dbEditColumns(n) {
+        var cols = dbEditColsFlat(n);
+        /* 多级表头编辑列同样要还原层级（mtCols），否则 dgEditing 一开
+           表头就退回平铺 —— 树形网格 / MultiTitle 都受影响 */
+        if (n.htree && n.htree.length) return mtCols(cols, n.htree);
         return dbGroupCols(cols, n);
+    }
+
+    /* 树形网格的列：首列必须是顶层的 treecolumn。
+       Ext 的 TreePanel 会把树列强制放在最前；若它原本在分组里（如
+       '组织架构|名称'），分组会被拆开，只剩其余列。所以这里主动把
+       首列提出来，其余列按 htree 分组时下标整体左移一位 —— 结果与
+       Ext 自己的行为一致，但表头结构可预期。
+       （Alpine 端不做这个处理：它的表头来自服务端 hrows，树列在组里
+       也能正常显示缩进。） */
+    function dbColumnsTree(n) {
+        var flat = dbFlatCols(n);
+        flat[0].xtype = 'treecolumn';
+        if (!flat[0].width) flat[0].flex = 1;
+        if (n.htree && n.htree.length)
+            return [flat[0]].concat(mtColsOffset(flat.slice(1), n.htree, 1));
+        return flat;
+    }
+
+    function dbEditColumnsTree(n) {
+        var cols = dbEditColsFlat(n);
+        cols[0].xtype = 'treecolumn';
+        if (!cols[0].width) cols[0].flex = 1;
+        if (n.htree && n.htree.length)
+            return [cols[0]].concat(mtColsOffset(cols.slice(1), n.htree, 1));
+        return cols;
     }
 
     function selectDBRow(grid, node) {
@@ -1881,6 +1973,21 @@ var LW = (function () {
             var sm = grid.getSelectionModel();
             var store = grid.getStore();
             var idx = (node.recno || 0) - 1;
+            if (grid.__lwTree) {
+                /* 树形：recno 是"匹配行序号"，store 的扁平下标受展开状态
+                   影响，只能按 lwRow 找节点 */
+                var found = null;
+                store.getRootNode().cascadeBy(function (nd) {
+                    if (!found && nd.get('lwRow') === idx) found = nd;
+                });
+                if (found) {
+                    try { grid.ensureVisible(found); } catch (x1) { }
+                    sm.select(found);
+                } else {
+                    sm.deselectAll(true);
+                }
+                return;
+            }
             if (idx >= 0 && idx < store.getCount()) {
                 sm.select(idx, false, true);
                 try { grid.getView().scrollRowIntoView(idx); } catch (x) { }
@@ -2683,7 +2790,17 @@ var LW = (function () {
                         var st = (csig === cmp.__lwColSig) && cmp.getStore();
                         cmp.__lwSig = dsig;
                         cmp.__lwColSig = csig;
-                        if (st) fillGridRows(st, n);
+                        if (cmp.__lwTree) {
+                            /* 树形：展开状态按 key 保留，store 必须整棵重建
+                               （扁平 loadData 会丢掉 children 结构） */
+                            var openState = captureTreeOpen(cmp);
+                            if (st) {
+                                cmp.setStore(buildGridTreeStore(n));
+                            } else {
+                                cmp.reconfigure(buildGridTreeStore(n), dbEditColumnsTree(n));
+                            }
+                            applyTreeOpen(cmp, openState);
+                        } else if (st) fillGridRows(st, n);
                         else cmp.reconfigure(buildGridStore(n), dbEditColumns(n));
                         /* 两级表头出现/消失时同步表头居中类（hg 变化必走这里） */
                         if ((n.hg || []).length) cmp.addCls('lw-hg-grid');
@@ -2788,6 +2905,61 @@ var LW = (function () {
             fields: [{ name: 'lwRow', type: 'int' }].concat((n.cols || []).map(function (_, i) { return 'c' + i; })),
             data: data
         });
+    }
+
+    /* ---- 树形网格（TLWDBGrid.TreeKeyField）----
+       服务端发扁平 rows + keys/lv/hc/pid，这里还原成嵌套节点交给
+       Ext.data.TreeStore。叶子判定用服务端的 hc（本页里有没有子行），
+       不靠 children 是否为空 —— 子节点被过滤掉时父节点仍应有展开箭头。 */
+    function buildGridTreeStore(n) {
+        var rows = n.rows || [], keys = n.keys || [], pid = n.pid || [], hc = n.hc || [];
+        var objs = [], i;
+        for (i = 0; i < rows.length; i++) {
+            var o = gridRowObj(n, rows[i], i);
+            o.tkey = keys[i] != null ? String(keys[i]) : ('r' + i);
+            o.leaf = (hc[i] !== 1);
+            o.expanded = !(n.tree && n.tree.exp === false);
+            o.children = [];
+            objs[i] = o;
+        }
+        var roots = [];
+        for (i = 0; i < rows.length; i++) {
+            var p = pid[i];
+            if (typeof p === 'number' && p >= 0 && p < objs.length && p !== i)
+                objs[p].children.push(objs[i]);
+            else
+                roots.push(objs[i]);
+        }
+        return Ext.create('Ext.data.TreeStore', {
+            fields: [{ name: 'lwRow', type: 'int' }]
+                .concat((n.cols || []).map(function (_, i2) { return 'c' + i2; }))
+                .concat(['tkey']),
+            root: { id: '__lwroot', expanded: true, children: roots }
+        });
+    }
+
+    /* 重建 store 前记下展开状态（按 key），重建后按 key 还原：
+       数据刷新不应该把用户展开的节点全收回去 */
+    function captureTreeOpen(grid) {
+        var open = {};
+        try {
+            grid.getStore().getRootNode().cascadeBy(function (nd) {
+                var k = nd.get('tkey');
+                if (k) open[k] = nd.isExpanded();
+            });
+        } catch (e) { }
+        return open;
+    }
+
+    function applyTreeOpen(grid, open) {
+        if (!open) return;
+        try {
+            grid.getStore().getRootNode().cascadeBy(function (nd) {
+                var k = nd.get('tkey');
+                if (k && Object.prototype.hasOwnProperty.call(open, k))
+                    nd.set('expanded', open[k]);
+            });
+        } catch (e) { }
     }
 
     function destroyNode(id) {

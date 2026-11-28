@@ -1380,7 +1380,8 @@ html[data-lw-layout="mobile"] .lw-theme-fab {
 .lw-spark { display: inline-block; vertical-align: middle; }
 
 /* DBGrid 布尔列（服务端 cedit=4）：单元格内常驻勾选框，点一下即写回 */
-.lw-table td > .lw-chk {
+.lw-table td > .lw-chk,
+.lw-table td .lw-tcell > .lw-chk {
     display: block;
     margin: 2px auto;
     width: 14px;
@@ -1388,6 +1389,24 @@ html[data-lw-layout="mobile"] .lw-theme-fab {
     cursor: pointer;
     accent-color: var(--lw-accent);
 }
+
+/* 树形网格（TLWDBGrid.TreeKeyField）：首列缩进 + 展开箭头 */
+.lw-tcell { display: inline-flex; align-items: center; gap: 4px; }
+.lw-tgl {
+    flex: 0 0 14px;
+    width: 14px;
+    height: 14px;
+    padding: 0;
+    border: 0;
+    background: transparent;
+    color: var(--lw-fg3);
+    font-size: 11px;
+    line-height: 14px;
+    text-align: center;
+    cursor: pointer;
+    user-select: none;
+}
+.lw-tgl:hover { color: var(--lw-accent); }
 
 .lw-dbgrid {
     width: 100%;
