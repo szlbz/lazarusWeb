@@ -15,7 +15,7 @@ unit lwhyperui;
 interface
 
 uses
-  Classes, SysUtils;
+  Classes, SysUtils, lwpwa;
 
 type
   { 工作台里的一行插件。由 TLWHyperServer 从 TLWHyperPluginManager 填充，
@@ -139,7 +139,7 @@ begin
     '.err{margin:0 0 4px;padding:9px 12px;border-radius:8px;font-size:13px;' +
     'color:var(--danger);background:rgba(192,57,43,.08);border:1px solid rgba(192,57,43,.25)}' +
     '.hint{margin:16px 0 0;font-size:12px;color:var(--muted);line-height:1.7}' +
-    '</style></head><body><form class="card" method="post" action="/lw/login?next=' +
+    '</style>' + LWPWAHeadHtml('/') + '</head><body><form class="card" method="post" action="/lw/login?next=' +
     HyperURLEnc(HyperSafeNext(ANext)) + '" autocomplete="off">' +
     '<div class="brand">' + HyperHTMLEsc(ABrand) + '</div>' +
     '<h1>登录</h1>' +
@@ -159,7 +159,7 @@ begin
   Result := Result +
     '<p class="hint">权限在插件清单 <code>roles=</code> 里声明；' +
     '未登录时直接访问 <code>/p/&lt;名&gt;/</code> 会被送回本页。</p>' +
-    '</form></body></html>';
+    '</form>' + LWPWAScriptHtml('/') + '</body></html>';
 end;
 
 { 角色串转中文，工作台顶栏用；未知角色原样显示 }
@@ -308,7 +308,7 @@ begin
     '.tip{font-size:12px;color:var(--muted);padding:6px 18px;' +
     'border-top:1px solid var(--line);background:var(--panel)}' +
     '@media (max-width:720px){aside{width:168px}.who{display:none}}' +
-    '</style></head><body>' +
+    '</style>' + LWPWAHeadHtml('/') + '</head><body>' +
     '<header><div class="logo">lw</div>' +
     '<div class="brand">' + HyperHTMLEsc(ABrand) + '</div><div class="grow"></div>' +
     '<div class="who">' + HyperHTMLEsc(who) + '</div>' +
@@ -332,7 +332,7 @@ begin
     'document.getElementById("welcome").style.display="none";' +
     'var f=document.getElementById("view");f.style.display="block";' +
     'f.src="/p/"+n+"/";return false;}' +
-    '</script></body></html>';
+    '</script>' + LWPWAScriptHtml('/') + '</body></html>';
 end;
 
 { --no-auth（仅本机调试）时的首页：没有登录态可展示，就不装工作台，
@@ -368,12 +368,12 @@ begin
     'margin-bottom:8px}' +
     'li a{font-weight:600}' +
     '.p{color:var(--muted);font-size:12px}' +
-    '</style></head><body>' +
+    '</style>' + LWPWAHeadHtml('/') + '</head><body>' +
     '<h1>' + HyperHTMLEsc(ABrand) + '</h1>' +
     '<p class="sub">插件模式 · 共 ' + IntToStr(ATotal) + ' 个插件</p>' +
     '<p class="warn">已用 <code>--no-auth</code> 关闭登录：任何能访问本端口的人' +
     '都能直接打开下面的插件。只在本机调试时这样跑。</p><ul>' + links + '</ul>' +
-    '</body></html>';
+    LWPWAScriptHtml('/') + '</body></html>';
 end;
 
 end.

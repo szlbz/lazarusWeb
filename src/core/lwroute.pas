@@ -516,9 +516,10 @@ end;
   此列 —— 状态在插件会话里，必须代理回插件 }
 function LWRouteStaticLocal(const APath: string): string;
 const
-  STATIC_ASSETS: array[0..4] of string = (
+  STATIC_ASSETS: array[0..9] of string = (
     '/lw/lw.js', '/lw/lw.css', '/lw/lw-alpine.js', '/lw/lw-alpine.css',
-    '/lw/alpine.min.js');
+    '/lw/alpine.min.js', '/lw/manifest.webmanifest', '/lw/sw.js',
+    '/lw/pwa.js', '/lw/icon-192.png', '/lw/icon-512.png');
 var
   rest: string;
   slash, i: Integer;
@@ -534,6 +535,9 @@ begin
   if rest = '/favicon.ico' then
     Exit('/favicon.ico');
   if Copy(rest, 1, 5) = '/ext/' then
+    Exit(rest);
+  { PWA 端点由宿主直出：订阅/消息状态属于宿主进程，不能转发给插件 worker }
+  if Copy(rest, 1, 8) = '/lw/pwa/' then
     Exit(rest);
   for i := Low(STATIC_ASSETS) to High(STATIC_ASSETS) do
     if rest = STATIC_ASSETS[i] then

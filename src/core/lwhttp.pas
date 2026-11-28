@@ -45,7 +45,7 @@ interface
 uses
   Classes, SysUtils, DateUtils, fphttpserver, httpdefs, httpprotocol, fpjson, jsonparser,
   ssockets, Sockets, Forms, Controls, lwbase, lwsession, lwdispatch, lwform, lwupload, lwdownload,
-  lwajax, lwwebsocket, lwrlog, lwcaptcha, lwroute, lwlang, opensslsockets;
+  lwajax, lwwebsocket, lwrlog, lwcaptcha, lwroute, lwlang, lwpwa, opensslsockets;
 
 type
   TLWServerConfig = record
@@ -110,6 +110,20 @@ type
     { 实际加载的 ini 路径（'' = 没找到配置文件）。启动横幅里报出来，
        但要等语言定了以后再打 —— 否则 --lang=en 时这一行仍是中文 }
     IniPath: string;
+    { PWA（默认关闭）：开启后宿主直出 manifest/Service Worker/图标，
+      并在两种客户端外壳注入相应 head/script。名称留空时取 GCfg.Title。
+      推送需要 VAPID 密钥对；私钥路径、订阅/消息文件相对 exe 目录解析。 }
+    PWAEnabled: Boolean;
+    PWAName: string;
+    PWAShortName: string;
+    PWAThemeColor: string;
+    PWABackgroundColor: string;
+    PWAVapidPublic: string;
+    PWAVapidPrivate: string;
+    PWAVapidSubject: string;
+    PWAPushToken: string;
+    PWAPushFile: string;
+    PWAMessageFile: string;
   end;
 
   { 由 lwapp 提供：按名字创建窗体实例 }
@@ -971,7 +985,8 @@ begin
   begin
     { Alpine.js 渲染层：样式内置（lw-alpine.css），不依赖 ext-<版本> 目录 }
     if FCfg.ClientExplicit then
-      LWLogRaw(LWLangFmt('  Client    : alpine（Alpine.js %s，无需 ext 目录）   (切换: /?client=ext)',
+       LWLogRaw(LWLangFmt('  Client    : alpine（Alpine.js %s）   (切换: /?client=ext)',
+      //LWLogRaw(LWLangFmt('  Client    : alpine（Alpine.js %s，无需 ext 目录）   (切换: /?client=ext)',
         [ALPINE_VERSION]))
     else
       LWLogRaw(LWLangFmt('  Client    : alpine（Alpine.js %s，自动探测优先）   (切换: /?client=ext)',
@@ -1316,6 +1331,7 @@ begin
     经 lwroute 代理时为 /p/<插件名>/（X-Forwarded-Prefix），
     资源 URL 落在代理前缀下再被剥前缀转发回本进程 }
   Result := Result + LineEnding + '<link rel="icon" href="' + ABase + 'favicon.ico" type="image/x-icon">';
+  Result := Result + LWPWAHeadHtml(ABase);
   Result := Result + LineEnding + '<link rel="stylesheet" href="' + ABase + 'ext/' + ver + '/build/classic/theme-' + th + '/resources/theme-' + th + '-all.css">';
   if hasChartCss then
   begin
@@ -1335,6 +1351,7 @@ begin
   Result := Result + LineEnding + '<div id="lw-splash"><div class="lw-splash-box">' +
     LWLangText('正在连接 lazarusWeb 服务端…') + '</div></div>';
   Result := Result + LineEnding + '<script>LW.start({form:' + QuotedStr(AForm) + ',ext:' + QuotedStr(ver) + '});</script>';
+  Result := Result + LWPWAScriptHtml(ABase);
   Result := Result + LineEnding + '</body></html>';
 end;
 
@@ -1362,6 +1379,7 @@ begin
   s := s + LineEnding + '<meta name="viewport" content="width=device-width, initial-scale=1">';
   s := s + LineEnding + '<title>' + FCfg.Title + '</title>';
   s := s + LineEnding + '<link rel="icon" href="' + ABase + 'favicon.ico" type="image/x-icon">';
+  s := s + LWPWAHeadHtml(ABase);
   s := s + LineEnding + '<link rel="stylesheet" href="' + ABase + 'lw/lw.css?v=' + LW_VERSION + '">';
   s := s + LineEnding + '<link rel="stylesheet" href="' + ABase + 'lw/lw-alpine.css?v=' + LW_VERSION + '">';
   s := s + LineEnding + '<script src="' + ABase + 'lw/alpine.min.js" defer></script>';
@@ -1431,6 +1449,7 @@ begin
   s := s + LineEnding + '</div>';
   s := s + LineEnding + '<script>LW.start({form:' + QuotedStr(AForm) +
     ',lang:' + QuotedStr(lang) + '});</script>';
+  s := s + LWPWAScriptHtml(ABase);
   s := s + LineEnding + '</body></html>';
   Result := s;
 end;
@@ -2345,6 +2364,10 @@ begin
     else if LWRouteDispatch(ARequest, AResponse, p) <> rrNotPlugin then
       Exit;
   end;
+
+  { PWA：manifest / Service Worker / 图标 / 订阅与推送端点由框架直出。
+    放在插件路由之后、业务路由之前；关闭时 LWPWAHandle 立即返回 False。 }
+  if LWPWAHandle(ARequest, AResponse) then Exit;
 
   if (p = '/') or (p = '/index.html') then
   begin

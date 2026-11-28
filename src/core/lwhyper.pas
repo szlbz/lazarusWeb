@@ -51,7 +51,7 @@ interface
 uses
   Classes, SysUtils, DateUtils, SyncObjs, fphttpserver, httpdefs, httpprotocol,
   fpjson, jsonparser, ssockets, fphttpclient, Process, lwrlog, lwwebsocket, lwbase,
-  lwroute, lwpluginauth, lwhyperplugin, lwhyperauth, lwhyperui,
+  lwroute, lwpluginauth, lwhyperplugin, lwhyperauth, lwhyperui, lwpwa,
   opensslsockets;
 
 type
@@ -89,6 +89,18 @@ type
     SSLHost: string;
     SSLCertFile: string;
     SSLKeyFile: string;
+    { PWA：宿主直出静态资源与订阅端点，同时把开关透传给 worker 外壳 }
+    PWAEnabled: Boolean;
+    PWAName: string;
+    PWAShortName: string;
+    PWAThemeColor: string;
+    PWABackgroundColor: string;
+    PWAVapidPublic: string;
+    PWAVapidPrivate: string;
+    PWAVapidSubject: string;
+    PWAPushToken: string;
+    PWAPushFile: string;
+    PWAMessageFile: string;
   end;
 
   TLWHyperServer = class;
@@ -485,6 +497,21 @@ begin
       停服流程退出，热更新就不必强杀。空则不加，worker 上也就没有该端点 }
     if ACfg.ShutdownToken <> '' then
       args.Add('--shutdown-token=' + ACfg.ShutdownToken);
+    { PWA：worker 外壳也要注入 head/script，参数与宿主保持一致 }
+    if ACfg.PWAEnabled then
+    begin
+      args.Add('--pwa');
+      if ACfg.PWAName <> '' then args.Add('--pwa-name=' + ACfg.PWAName);
+      if ACfg.PWAShortName <> '' then args.Add('--pwa-short-name=' + ACfg.PWAShortName);
+      if ACfg.PWAThemeColor <> '' then args.Add('--pwa-theme=' + ACfg.PWAThemeColor);
+      if ACfg.PWABackgroundColor <> '' then args.Add('--pwa-bg=' + ACfg.PWABackgroundColor);
+      if ACfg.PWAVapidPublic <> '' then args.Add('--pwa-vapid-public=' + ACfg.PWAVapidPublic);
+      if ACfg.PWAVapidPrivate <> '' then args.Add('--pwa-vapid-private=' + ACfg.PWAVapidPrivate);
+      if ACfg.PWAVapidSubject <> '' then args.Add('--pwa-vapid-subject=' + ACfg.PWAVapidSubject);
+      if ACfg.PWAPushToken <> '' then args.Add('--pwa-push-token=' + ACfg.PWAPushToken);
+      if ACfg.PWAPushFile <> '' then args.Add('--pwa-push-file=' + ACfg.PWAPushFile);
+      if ACfg.PWAMessageFile <> '' then args.Add('--pwa-message-file=' + ACfg.PWAMessageFile);
+    end;
     { 注意：不能直接 args.DelimitedText := ExtraArgs —— 给 DelimitedText 赋值
       会先 Clear 整个列表，把上面刚加的 --port/--nogui 全部抹掉（坑 106：
       worker 因此拿默认端口 8090 起来，撞上 lwhyper 自己的监听口，无限重启。
@@ -1796,6 +1823,9 @@ begin
     Exit;
   end;
 
+  { PWA 静态资源与端点由宿主直出，不转发给业务 worker/插件 }
+  if LWPWAHandle(ARequest, AResponse) then Exit;
+
   { 插件模式 + 登录：工作台、登录、注销、状态、宿主静态资源、/p/ 闸门。
     健康探针 /lw/healthz 保持公开（LB/k8s 探针不登录）；其余在
     HandleAuthRoute 里判。未启用鉴权时整块跳过，行为与旧版一致。 }
@@ -2410,6 +2440,8 @@ begin
   LWLogRaw('  Health    : ' + scheme + '://127.0.0.1:' + IntToStr(ACfg.Port) + '/lw/healthz');
   if ACfg.UseSSL then
     LWLogRaw('  TLS       : 开（自签证书浏览器会告警，点“继续访问”；相机取景需 https）');
+  if ACfg.PWAEnabled then
+    LWLogRaw('  PWA       : 开（manifest / Service Worker / 图标 / 订阅端点由宿主直出）');
   LWLogRaw('  --------------------------------------------------');
   if ACfg.PluginMode then
     LWLogRaw('  Ctrl+C 退出宿主（插件是独立进程：收尾用 stop-all.bat 或任务管理器）')
@@ -2483,6 +2515,17 @@ begin
       ACfg.SSLKeyFile := val;
       ACfg.UseSSL := True;
     end
+    else if key = '--pwa' then ACfg.PWAEnabled := True
+    else if key = '--pwa-name' then ACfg.PWAName := val
+    else if key = '--pwa-short-name' then ACfg.PWAShortName := val
+    else if key = '--pwa-theme' then ACfg.PWAThemeColor := val
+    else if key = '--pwa-bg' then ACfg.PWABackgroundColor := val
+    else if key = '--pwa-vapid-public' then ACfg.PWAVapidPublic := val
+    else if key = '--pwa-vapid-private' then ACfg.PWAVapidPrivate := val
+    else if key = '--pwa-vapid-subject' then ACfg.PWAVapidSubject := val
+    else if key = '--pwa-push-token' then ACfg.PWAPushToken := val
+    else if key = '--pwa-push-file' then ACfg.PWAPushFile := val
+    else if key = '--pwa-message-file' then ACfg.PWAMessageFile := val
     else
     begin
       LWLog('未知参数: ' + arg);
@@ -2518,6 +2561,25 @@ begin
     ACfg.UsersFile := LWResolveExeRelativePath('hyper.users.ini');
   if Result and (ACfg.UpdateDir <> '') then
     ACfg.UpdateDir := LWResolveExeRelativePath(ACfg.UpdateDir);
+
+  { PWA 默认主题与相对路径，配置一次供宿主与 worker 共用 }
+  if Result and ACfg.PWAEnabled then
+  begin
+    if ACfg.PWAName = '' then ACfg.PWAName := 'lazarusWeb';
+    if ACfg.PWAShortName = '' then ACfg.PWAShortName := Copy(ACfg.PWAName, 1, 12);
+    if ACfg.PWAThemeColor = '' then ACfg.PWAThemeColor := '#1e88e5';
+    if ACfg.PWABackgroundColor = '' then ACfg.PWABackgroundColor := '#ffffff';
+    if ACfg.PWAVapidPrivate <> '' then
+      ACfg.PWAVapidPrivate := LWResolveExeRelativePath(ACfg.PWAVapidPrivate);
+    if ACfg.PWAPushFile <> '' then
+      ACfg.PWAPushFile := LWResolveExeRelativePath(ACfg.PWAPushFile);
+    if ACfg.PWAMessageFile <> '' then
+      ACfg.PWAMessageFile := LWResolveExeRelativePath(ACfg.PWAMessageFile);
+    LWPWAConfigure(ACfg.PWAName, ACfg.PWAShortName, ACfg.PWAThemeColor,
+      ACfg.PWABackgroundColor, ACfg.PWAVapidPublic, ACfg.PWAVapidPrivate,
+      ACfg.PWAVapidSubject, ACfg.PWAPushToken, ACfg.PWAPushFile,
+      ACfg.PWAMessageFile, ACfg.Root, LW_VERSION, True);
+  end;
 end;
 
 end.

@@ -24,7 +24,7 @@ unit lwapp;
 interface
 
 uses
-  Classes, SysUtils, Forms, Controls, lwbase, lwhttp, lwajax, lwlang;
+  Classes, SysUtils, Forms, Controls, lwbase, lwhttp, lwajax, lwlang, lwpwa;
 
 type
   { 窗体工厂：把"按名字建窗体"以对象方法的形式交给 HTTP 层 }
@@ -74,6 +74,12 @@ type
     class function Server: TLWServer;
   end;
 
+var
+  { 全局运行配置。上移到接口段是为了让 lwlogin 能读到登录锁定参数 ——
+    lwlogin 只依赖 lwbase/lwapp，不能反向引用 lwhttp 取 GCfg；而 lwhttp
+    本身不 uses lwapp，把 GCfg 暴露在这里不会形成循环单元引用。 }
+  GCfg: TLWServerConfig;
+
 implementation
 
 uses
@@ -119,7 +125,6 @@ var
   GRegistry: TStringList = nil;   { 名字 -> TFormClass，已排序，用于查表 }
   GOrder: TStringList = nil;      { 注册顺序，决定默认窗体与 /lw/api/forms 顺序 }
   GServer: TLWServer = nil;
-  GCfg: TLWServerConfig;
   GProvider: TLWFormProvider = nil;
   GLoginName: string = '';        { 登录窗体名（'' = 未启用登录）}
   GExternalPages: TStringList = nil;  { 注册名 -> 外部页面 URL（跨进程插件跳转）}
@@ -504,6 +509,27 @@ var
     if ini.Has(['patch']) then
       LWServerPatchMode := ini.Int(['patch'], 0) <> 0;
 
+    { 登录失败锁定：连续失败 N 次锁 M 分钟。0 = 关闭；非法值回默认并告警。
+      范围放宽到 1000 次 / 10080 分钟（一周），足够覆盖合理部署。 }
+    if ini.Has(['loginfailmax', 'loginfailcount']) then
+    begin
+      k := ini.Int(['loginfailmax', 'loginfailcount'], GCfg.LoginFailMax);
+      if (k < 0) or (k > 1000) then
+        LWLogFmt('警告: 配置文件 loginfailmax=%d 非法（0..1000），用默认 %d',
+          [k, GCfg.LoginFailMax])
+      else
+        GCfg.LoginFailMax := k;
+    end;
+    if ini.Has(['loginlockmin', 'loginlockminutes']) then
+    begin
+      k := ini.Int(['loginlockmin', 'loginlockminutes'], GCfg.LoginLockMin);
+      if (k < 0) or (k > 10080) then
+        LWLogFmt('警告: 配置文件 loginlockmin=%d 非法（0..10080），用默认 %d',
+          [k, GCfg.LoginLockMin])
+      else
+        GCfg.LoginLockMin := k;
+    end;
+
     { TLS（纯 FPC）：ssl=1 开 HTTPS；没给证书就自动生成自签证书 }
     if ini.Has(['ssl']) then
     begin
@@ -516,6 +542,33 @@ var
       GCfg.SSLCertFile := Trim(ini.Str(['sslcert'], ''));
     if ini.Has(['sslkey']) then
       GCfg.SSLKeyFile := Trim(ini.Str(['sslkey'], ''));
+
+    { PWA：pwa=1 开总开关；名称/主题色可缺省，推送密钥与令牌按需配置。
+      命令行随后覆盖这里的值，命令行永远优先。 }
+    if ini.Has(['pwa']) then
+    begin
+      val := LowerCase(Trim(ini.Str(['pwa'], '0')));
+      GCfg.PWAEnabled := (val = '1') or (val = 'true') or (val = 'yes');
+    end;
+    if ini.Has(['pwaname']) then GCfg.PWAName := Trim(ini.Str(['pwaname'], ''));
+    if ini.Has(['pwashortname']) then GCfg.PWAShortName := Trim(ini.Str(['pwashortname'], ''));
+    if ini.Has(['pwatheme', 'pwathemecolor']) then
+      GCfg.PWAThemeColor := Trim(ini.Str(['pwatheme', 'pwathemecolor'], GCfg.PWAThemeColor));
+    if ini.Has(['pwabg', 'pwabackground', 'pwabackgroundcolor']) then
+      GCfg.PWABackgroundColor := Trim(ini.Str(['pwabg', 'pwabackground', 'pwabackgroundcolor'],
+        GCfg.PWABackgroundColor));
+    if ini.Has(['pwavapidpublic']) then
+      GCfg.PWAVapidPublic := Trim(ini.Str(['pwavapidpublic'], ''));
+    if ini.Has(['pwavapidprivate']) then
+      GCfg.PWAVapidPrivate := Trim(ini.Str(['pwavapidprivate'], ''));
+    if ini.Has(['pwavapidsubject']) then
+      GCfg.PWAVapidSubject := Trim(ini.Str(['pwavapidsubject'], ''));
+    if ini.Has(['pwapushtoken']) then
+      GCfg.PWAPushToken := Trim(ini.Str(['pwapushtoken'], ''));
+    if ini.Has(['pwapushfile']) then
+      GCfg.PWAPushFile := Trim(ini.Str(['pwapushfile'], ''));
+    if ini.Has(['pwamessagefile']) then
+      GCfg.PWAMessageFile := Trim(ini.Str(['pwamessagefile'], ''));
 
     { 浏览器渲染层：ext（Ext JS，需要 ext-<版本> 目录）| alpine（Alpine.js，
       内置 src\client\alpine.min.js，不需要 ext 目录）。协议两者完全一致 }
@@ -626,6 +679,9 @@ begin
   if LWLangNormalize(arg) <> '' then
     GCfg.Language := LWLangNormalize(arg);
   GCfg.LoginForm := GLoginName;
+  { 登录失败锁定默认 5 次 / 15 分钟；任一项设为 0 即关闭 }
+  GCfg.LoginFailMax := 5;
+  GCfg.LoginLockMin := 15;
   GCfg.AjaxCORS := False;
   GCfg.TrustProxy := False;
   { 服务模式强制无面板：accept 留在调用线程（worker 线程），
@@ -642,6 +698,18 @@ begin
   { 空 = 不开放 /lw/shutdown。lwhyper 作为负载均衡器拉起 worker 时会生成
     随机令牌并用 --shutdown-token= 注入，换版时才走优雅退出 }
   GCfg.ShutdownToken := '';
+  { PWA 默认关闭；开启命令/配置文件见 --help }
+  GCfg.PWAEnabled := False;
+  GCfg.PWAName := '';
+  GCfg.PWAShortName := '';
+  GCfg.PWAThemeColor := '#1e88e5';
+  GCfg.PWABackgroundColor := '#ffffff';
+  GCfg.PWAVapidPublic := '';
+  GCfg.PWAVapidPrivate := '';
+  GCfg.PWAVapidSubject := '';
+  GCfg.PWAPushToken := '';
+  GCfg.PWAPushFile := '';
+  GCfg.PWAMessageFile := '';
   if GOrder.Count > 0 then
     GCfg.DefaultForm := GOrder[0];
 
@@ -746,10 +814,38 @@ begin
       GCfg.NoUI := True
     else if ValueOf('--shutdown-token=', val) then
       GCfg.ShutdownToken := Trim(val)
+    { PWA：--pwa 开总开关；--pwa-* 设置细节，命令行优先于配置文件 }
+    else if arg = '--pwa' then
+      GCfg.PWAEnabled := True
+    else if ValueOf('--pwa-name=', val) then
+      GCfg.PWAName := Trim(val)
+    else if ValueOf('--pwa-short-name=', val) then
+      GCfg.PWAShortName := Trim(val)
+    else if ValueOf('--pwa-theme=', val) then
+      GCfg.PWAThemeColor := Trim(val)
+    else if ValueOf('--pwa-bg=', val) then
+      GCfg.PWABackgroundColor := Trim(val)
+    else if ValueOf('--pwa-vapid-public=', val) then
+      GCfg.PWAVapidPublic := Trim(val)
+    else if ValueOf('--pwa-vapid-private=', val) then
+      GCfg.PWAVapidPrivate := Trim(val)
+    else if ValueOf('--pwa-vapid-subject=', val) then
+      GCfg.PWAVapidSubject := Trim(val)
+    else if ValueOf('--pwa-push-token=', val) then
+      GCfg.PWAPushToken := Trim(val)
+    else if ValueOf('--pwa-push-file=', val) then
+      GCfg.PWAPushFile := Trim(val)
+    else if ValueOf('--pwa-message-file=', val) then
+      GCfg.PWAMessageFile := Trim(val)
     else if ValueOf('--patch=', val) then
       LWServerPatchMode := (Trim(val) = '1') or SameText(Trim(val), 'true')
     else if arg = '--patch' then
       LWServerPatchMode := True
+    { --login-fail-max / --login-lock-min：命令行永远优先于 ini }
+    else if ValueOf('--login-fail-max=', val) then
+      GCfg.LoginFailMax := StrToIntDef(Trim(val), GCfg.LoginFailMax)
+    else if ValueOf('--login-lock-min=', val) then
+      GCfg.LoginLockMin := StrToIntDef(Trim(val), GCfg.LoginLockMin)
     else if ValueOf('--log=', val) then
       GCfg.LogFile := val
     else if (arg = '--help') or (arg = '-h') then
@@ -781,9 +877,22 @@ begin
       LWLogRaw('  提示: 需随包带 libssl-3-x64.dll + libcrypto-3-x64.dll');
       LWLogRaw('  --nogui               GUI 构建下也不弹服务端面板（服务化部署）');
       LWLogRaw('  --patch=1             增量补丁（事件只回变化的 ops，默认关；老前端自动退回全量）');
+      LWLogRaw('  --login-fail-max=5    同 IP 连续登录失败几次后锁定（0 = 关闭，默认 5）');
+      LWLogRaw('  --login-lock-min=15   锁定时长分钟（0 = 关闭，默认 15）；成功登录即清零');
       LWLogRaw('  --log=path            把服务端日志追加写入文件');
       LWLogRaw('  --shutdown-token=X    开放 POST /lw/shutdown 优雅退出（只认回环地址 +');
       LWLogRaw('                        该令牌，缺省不开）。lwhyper 拉起 worker 时自动注入');
+      LWLogRaw('  --pwa                 开启 PWA（manifest + Service Worker + 可安装 + 离线缓存）');
+      LWLogRaw('  --pwa-name=名         安装后的应用名（缺省取 --title=）');
+      LWLogRaw('  --pwa-short-name=名   主屏幕短名（缺省取应用名前 12 字）');
+      LWLogRaw('  --pwa-theme=#RRGGBB   浏览器工具栏颜色（默认 #1e88e5）');
+      LWLogRaw('  --pwa-bg=#RRGGBB      manifest 背景色（默认 #ffffff）');
+      LWLogRaw('  --pwa-vapid-public=   Web Push VAPID 公钥（base64url，未配置则不启用推送）');
+      LWLogRaw('  --pwa-vapid-private=  VAPID EC 私钥 PEM 路径（相对路径按 exe 目录解析）');
+      LWLogRaw('  --pwa-vapid-subject=  VAPID sub，如 mailto:admin@example.com');
+      LWLogRaw('  --pwa-push-token=     投递接口令牌；POST /lw/pwa/push 需带 X-LW-PWA-Token');
+      LWLogRaw('  --pwa-push-file=      订阅存储文件（默认 <root>\pwa-subscriptions.json）');
+      LWLogRaw('  --pwa-message-file=   广播消息文件（默认 <root>\pwa-message.json）');
       LWLogRaw('已注册窗体: ' + FormNames);
       Halt(0);
     end
@@ -836,6 +945,20 @@ begin
     end;
     Halt(1);
   end;
+  { PWA 配置收尾：名称缺省跟标签页标题；路径统一相对 exe 目录解析，
+    避免服务模式下 cwd=System32 时把订阅写到系统目录。 }
+  if GCfg.PWAName = '' then GCfg.PWAName := GCfg.Title;
+  if GCfg.PWAShortName = '' then GCfg.PWAShortName := Copy(GCfg.PWAName, 1, 12);
+  if GCfg.PWAVapidPrivate <> '' then
+    GCfg.PWAVapidPrivate := LWResolveExeRelativePath(GCfg.PWAVapidPrivate);
+  if GCfg.PWAPushFile <> '' then
+    GCfg.PWAPushFile := LWResolveExeRelativePath(GCfg.PWAPushFile);
+  if GCfg.PWAMessageFile <> '' then
+    GCfg.PWAMessageFile := LWResolveExeRelativePath(GCfg.PWAMessageFile);
+  LWPWAConfigure(GCfg.PWAName, GCfg.PWAShortName, GCfg.PWAThemeColor,
+    GCfg.PWABackgroundColor, GCfg.PWAVapidPublic, GCfg.PWAVapidPrivate,
+    GCfg.PWAVapidSubject, GCfg.PWAPushToken, GCfg.PWAPushFile,
+    GCfg.PWAMessageFile, GCfg.Root, LW_VERSION, GCfg.PWAEnabled);
   { 多语言：选语言并预热 PO（languages\<lang>\*.po，见 lwlang）。
     中文是源码原文、不需要翻译文件；英文缺文件时只告警并回落中文，
     服务照常起来 —— 多语言是可选能力，不该因为少一个 po 就起不来。 }
