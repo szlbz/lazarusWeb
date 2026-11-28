@@ -1,0 +1,62 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<CONFIG>
+  <Package Version="5">
+    <Name Value="lwehlib"/>
+    <Type Value="DesignTime"/>
+    <Author Value="lazarusWeb"/>
+    <License Value="LGPL"/>
+    <Description Value="可选设计期包：把 EhLib 的 TDBGridEh 转换为 TLWDBGrid（列/DataSource/Options/多表头）。依赖 EhLib 包；不编译本包不影响 lwdesign。开关见 lwehlib.inc。"/>
+    <Version Major="1"/>
+    <Files Count="3">
+      <Item1>
+        <Filename Value="lwdsgnehlib.pas"/>
+        <HasRegisterProc Value="True"/>
+        <UnitName Value="lwdsgnehlib"/>
+      </Item1>
+      <Item2>
+        <Filename Value="lwehlibconvert.pas"/>
+        <UnitName Value="lwehlibconvert"/>
+      </Item2>
+      <Item3>
+        <Filename Value="lwehlib.inc"/>
+        <Type Value="Text"/>
+      </Item3>
+    </Files>
+    <CompatibilityMode Value="True"/>
+    <RequiredPkgs Count="4">
+      <Item1>
+        <PackageName Value="LCL"/>
+      </Item1>
+      <Item2>
+        <PackageName Value="IDEIntf"/>
+      </Item2>
+      <Item3>
+        <PackageName Value="lwdesign"/>
+      </Item3>
+      <Item4>
+        <PackageName Value="EhLib"/>
+      </Item4>
+    </RequiredPkgs>
+    <UsageOptions>
+      <UnitPath Value=".;$(PkgOutDir)"/>
+    </UsageOptions>
+    <PublishOptions>
+      <Version Value="2"/>
+    </PublishOptions>
+    <CompilerOptions>
+      <Version Value="11"/>
+      <SearchPaths>
+        <IncludeFiles Value="."/>
+        <UnitOutputDirectory Value="../../lib/$(TargetCPU)-$(TargetOS)-$(LCLWidgetType)"/>
+      </SearchPaths>
+      <Other>
+        <CustomOptions Value=""/>
+      </Other>
+      <Linking>
+        <Debugging>
+          <GenerateDebugInfo Value="False"/>
+        </Debugging>
+      </Linking>
+    </CompilerOptions>
+  </Package>
+</CONFIG>
