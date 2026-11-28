@@ -19,7 +19,7 @@
     <Description Value="lazarusWeb 服务端：序列化 / 会话 / HTTP / 上传（nogui 下自动装 widgetset 补丁；其它 widgetset 下补丁为空实现）。本包不依赖 VirtualTreeView，任意 widgetset 均可编译，包括 --ws=nogui；VST 序列化桥接（lwvirtualtree + lwwriter/lwdispatch 的 LW_VIRTUALTREEVIEW 分支）默认关闭，需要时在引用本包源码的工程里自行定义该宏并提供 VST 单元路径"/>
     <License Value="LGPL"/>
     <Version Major="1"/>
-    <Files Count="24">
+    <Files Count="31">
       <Item1>
         <Filename Value="core/lwapp.pas"/>
         <UnitName Value="lwapp"/>
@@ -116,6 +116,34 @@
         <Filename Value="core/lwroute.pas"/>
         <UnitName Value="lwroute"/>
       </Item24>
+      <Item25>
+        <Filename Value="core/lwpluginguard.pas"/>
+        <UnitName Value="lwpluginguard"/>
+      </Item25>
+      <Item26>
+        <Filename Value="core/lwpluginidentity.pas"/>
+        <UnitName Value="lwpluginidentity"/>
+      </Item26>
+      <Item27>
+        <Filename Value="core/lwpluginauth.pas"/>
+        <UnitName Value="lwpluginauth"/>
+      </Item27>
+      <Item28>
+        <Filename Value="core/lwhyperplugin.pas"/>
+        <UnitName Value="lwhyperplugin"/>
+      </Item28>
+      <Item29>
+        <Filename Value="core/lwhyperauth.pas"/>
+        <UnitName Value="lwhyperauth"/>
+      </Item29>
+      <Item30>
+        <Filename Value="core/lwhyperui.pas"/>
+        <UnitName Value="lwhyperui"/>
+      </Item30>
+      <Item31>
+        <Filename Value="core/lwpwa.pas"/>
+        <UnitName Value="lwpwa"/>
+      </Item31>
     </Files>
     <CompatibilityMode Value="True"/>
     <RequiredPkgs Count="3">

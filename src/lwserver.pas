@@ -11,7 +11,8 @@ uses
   lwapp, lwwriter, lwsession, lwdispatch, lwhttp, lwws, lwupload, lwajax, 
   lwchart, lwconfig, lwdbgrid, lwdbnav, lwhyper, lwlogin, lwpanel, lwreport, 
   lwrlog, lwui, lwweb, lwwebsocket, lwabout, lwsidemenu, lwpluginutil, 
-  lwroute, LazarusPackageIntf;
+  lwroute, lwpluginguard, lwpluginidentity, lwpluginauth, lwhyperplugin, 
+  lwhyperauth, lwhyperui, lwpwa, LazarusPackageIntf;
 
 implementation
 
